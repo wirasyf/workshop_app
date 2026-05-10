@@ -1,0 +1,97 @@
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/connectivity_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+
+/// Layar pengaturan
+class SettingsScreen extends ConsumerWidget {
+  const SettingsScreen({super.key});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final user = ref.watch(authStateProvider).valueOrNull;
+    final isOnline = ref.watch(connectivityProvider);
+    final theme = Theme.of(context);
+
+    return Scaffold(
+      appBar: AppBar(title: const Text('Pengaturan')),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          // Profil
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [AppColors.primary.withValues(alpha: 0.08), AppColors.primaryLight.withValues(alpha: 0.05)]),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(children: [
+              CircleAvatar(radius: 28, backgroundColor: AppColors.primary,
+                child: Text(user?.name.substring(0, 1).toUpperCase() ?? 'U',
+                    style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w700))),
+              const SizedBox(width: 16),
+              Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text(user?.name ?? '-', style: theme.textTheme.titleMedium),
+                Text(user?.email ?? '-', style: theme.textTheme.bodySmall),
+                const SizedBox(height: 4),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
+                  decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
+                  child: Text(user?.role.toUpperCase() ?? '-', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
+                ),
+              ]),
+            ]),
+          ),
+          const SizedBox(height: 20),
+
+          // Status koneksi
+          _settingsTile(Icons.wifi, 'Status Koneksi',
+            subtitle: isOnline.when(data: (v) => v ? 'Online' : 'Offline', loading: () => '...', error: (_, __) => 'Error'),
+            trailing: isOnline.when(
+              data: (v) => Icon(Icons.circle, size: 12, color: v ? AppColors.success : AppColors.error),
+              loading: () => const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1)),
+              error: (_, __) => const Icon(Icons.error, size: 12, color: AppColors.error),
+            ),
+          ),
+          _settingsTile(Icons.sync, 'Sinkronisasi Data', subtitle: 'Sinkronisasi otomatis saat online'),
+          const Divider(height: 32),
+          _settingsTile(Icons.store, 'Profil Toko', subtitle: 'SpareArt Motor', onTap: () => context.go('/settings/store-profile')),
+          _settingsTile(Icons.receipt_long, 'Template Struk', subtitle: 'Konfigurasi struk thermal', onTap: () => context.go('/settings/receipt-template')),
+          _settingsTile(Icons.lock_outline, 'Ganti Password', onTap: () => context.go('/settings/change-password')),
+          const Divider(height: 32),
+          _settingsTile(Icons.info_outline, 'Tentang Aplikasi', subtitle: 'SpareArt Motor v1.0.0'),
+          const SizedBox(height: 16),
+
+          // Logout
+          SizedBox(
+            width: double.infinity, height: 48,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                await ref.read(authStateProvider.notifier).logout();
+                if (context.mounted) context.go('/login');
+              },
+              icon: const Icon(Icons.logout, color: AppColors.error),
+              label: const Text('Keluar', style: TextStyle(color: AppColors.error)),
+              style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsTile(IconData icon, String title, {String? subtitle, Widget? trailing, VoidCallback? onTap}) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title),
+      subtitle: subtitle != null ? Text(subtitle) : null,
+      trailing: trailing ?? const Icon(Icons.chevron_right, color: AppColors.textHint),
+      contentPadding: EdgeInsets.zero,
+      dense: true,
+      onTap: onTap,
+    );
+  }
+}
