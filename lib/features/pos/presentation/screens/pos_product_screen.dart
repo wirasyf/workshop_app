@@ -117,13 +117,8 @@ class _PosProductCard extends ConsumerWidget {
           unit: product.unit,
         );
 
-        if (inCartQty > 0) {
-          notifier.removeItem(product.id);
-          AppToast.show(context, '${product.name} dihapus dari keranjang', type: ToastType.info, duration: const Duration(milliseconds: 1500));
-        } else {
-          notifier.addItem(item);
-          AppToast.show(context, '${product.name} ditambah ke keranjang', type: ToastType.success, duration: const Duration(milliseconds: 1500));
-        }
+        notifier.toggleItem(item);
+        AppToast.show(context, inCartQty > 0 ? '${product.name} dihapus dari keranjang' : '${product.name} ditambah ke keranjang', type: ToastType.success, duration: const Duration(milliseconds: 1000));
         HapticFeedback.lightImpact();
       },
       child: AnimatedContainer(

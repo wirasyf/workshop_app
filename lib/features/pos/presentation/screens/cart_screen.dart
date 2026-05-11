@@ -12,6 +12,7 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../reports/presentation/screens/report_screen.dart';
+import '../../../dashboard/presentation/screens/notification_screen.dart';
 import '../providers/cart_provider.dart';
 
 /// Layar keranjang & pembayaran
@@ -47,15 +48,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final user = ref.read(authStateProvider).valueOrNull;
     final subtotal = ref.read(cartSubtotalProvider);
     final discount = ref.read(cartDiscountProvider);
+    final customer = ref.read(selectedCustomerProvider);
     final change = method == 'cash' ? paid - total : 0.0;
     final invoiceNo = 'INV-${DateTime.now().millisecondsSinceEpoch}';
 
     try {
       await db.transaction(() async {
         // 1. Insert transaksi header
-        final txnId = await db.insertTransaction(TransactionsCompanion.insert(
+        final txnCompanion = TransactionsCompanion.insert(
           invoiceNo: invoiceNo,
           cashierId: user?.id ?? 1,
+          customerId: Value(customer?.id),
           paymentMethod: Value(method),
           subtotal: Value(subtotal),
           discount: Value(discount),
@@ -63,19 +66,65 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           paidAmount: Value(method == 'cash' ? paid : total),
           changeAmount: Value(change),
           createdAt: Value(DateTime.now()),
-        ));
+        );
+        final txnId = await db.insertTransaction(txnCompanion);
+
+        // Enqueue sync untuk header
+        final syncService = ref.read(syncServiceProvider);
+        await syncService.enqueue(
+          tableName: 'transactions',
+          recordId: txnId,
+          operation: 'create',
+          data: {
+            'id': txnId,
+            'invoice_no': invoiceNo,
+            'cashier_id': user?.id ?? 1,
+            'payment_method': method,
+            'subtotal': subtotal,
+            'discount': discount,
+            'total': total,
+            'paid_amount': method == 'cash' ? paid : total,
+            'change_amount': change,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+        );
 
         // 2. Insert items & kurangi stok
         for (final item in cart) {
-          await db.insertTransactionItem(TransactionItemsCompanion.insert(
+          final itemCompanion = TransactionItemsCompanion.insert(
             transactionId: txnId,
             productId: item.productId,
             qty: item.qty,
             unitPrice: item.unitPrice,
             discount: Value(item.discount),
             subtotal: item.subtotal,
-          ));
+          );
+          final itemId = await db.insertTransactionItem(itemCompanion);
+
+          // Enqueue sync untuk item
+          await syncService.enqueue(
+            tableName: 'transaction_items',
+            recordId: itemId,
+            operation: 'create',
+            data: {
+              'id': itemId,
+              'transaction_id': txnId,
+              'product_id': item.productId,
+              'qty': item.qty,
+              'unit_price': item.unitPrice,
+              'discount': item.discount,
+              'subtotal': item.subtotal,
+            },
+          );
+
           await db.updateStock(item.productId, -item.qty);
+          // Sync stock update
+          await syncService.enqueue(
+            tableName: 'products',
+            recordId: item.productId,
+            operation: 'update',
+            data: {'stock_qty': -item.qty}, // Logika update di SyncService perlu dicek
+          );
         }
       });
 
@@ -86,13 +135,30 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ref.read(cartProvider.notifier).clear();
       ref.read(cartDiscountProvider.notifier).state = 0;
       ref.read(paidAmountProvider.notifier).state = 0;
+      ref.read(selectedCustomerProvider.notifier).state = null;
+
+      // Cek stok menipis
+      bool hasLowStock = false;
+      List<String> lowStockNames = [];
+      for (final item in cart) {
+         final p = await db.getProductById(item.productId);
+         if (p != null && p.stockQty <= p.stockMin) {
+            hasLowStock = true;
+            lowStockNames.add(p.name);
+         }
+      }
 
       // Invalidate providers to refresh data
       ref.invalidate(productsProvider);
       ref.invalidate(ownerDashboardProvider);
       ref.invalidate(reportDataProvider);
+      ref.invalidate(notificationNotifierProvider);
 
       if (mounted) {
+        if (hasLowStock) {
+          AppToast.show(context, 'Peringatan: Stok menipis untuk ${lowStockNames.join(', ')}', type: ToastType.warning, duration: const Duration(seconds: 4));
+        }
+        
         context.go('/pos/success', extra: {
           'invoiceNo': invoiceNo,
           'items': cart.toList(),
@@ -116,6 +182,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final cart = ref.watch(cartProvider);
     final subtotal = ref.watch(cartSubtotalProvider);
     final discount = ref.watch(cartDiscountProvider);
+    final tax = ref.watch(cartTaxProvider);
     final total = ref.watch(cartTotalProvider);
     final method = ref.watch(paymentMethodProvider);
     final theme = Theme.of(context);
@@ -167,6 +234,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     },
                   ),
                 ),
+                
+
 
                 // Payment section
                 Container(
@@ -178,35 +247,21 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                   ),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     _summaryRow('Subtotal', CurrencyFormatter.format(subtotal)),
-                    if (discount > 0) _summaryRow('Diskon', '-${CurrencyFormatter.format(discount)}'),
+                    // Diskon Global
+                    InkWell(
+                      onTap: () => _showDiscountDialog(context, ref),
+                      child: _summaryRow(
+                        'Diskon', 
+                        discount > 0 ? '-${CurrencyFormatter.format(discount)}' : 'Tambah Diskon',
+                        color: discount > 0 ? AppColors.error : AppColors.primary,
+                      ),
+                    ),
+                    _summaryRow('Pajak (11%)', CurrencyFormatter.format(tax)),
                     const Divider(),
                     _summaryRow('Total', CurrencyFormatter.format(total), bold: true),
                     const SizedBox(height: 12),
 
-                    // Metode bayar
-                    Row(children: [
-                      for (final m in ['cash', 'transfer', 'qris'])
-                        Expanded(child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 4),
-                          child: ChoiceChip(
-                            label: Text(m == 'cash' ? 'Tunai' : m == 'transfer' ? 'Transfer' : 'QRIS'),
-                            selected: method == m,
-                            onSelected: (_) => ref.read(paymentMethodProvider.notifier).state = m,
-                            selectedColor: AppColors.primary,
-                            backgroundColor: AppColors.infoLight,
-                            labelStyle: TextStyle(
-                              color: method == m ? Colors.white : AppColors.primary,
-                              fontWeight: method == m ? FontWeight.bold : FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                            side: const BorderSide(color: Colors.transparent),
-                            showCheckmark: false,
-                            padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        )),
-                    ]),
-                    const SizedBox(height: 12),
+
 
                     // Jumlah bayar (tunai)
                     if (method == 'cash') ...[
@@ -223,21 +278,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-                      // Quick Pay Buttons
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            _quickPayButton('Uang Pas', total),
-                            _quickPayButton('Rp 50rb', 50000),
-                            _quickPayButton('Rp 100rb', 100000),
-                            if (total > 100000) _quickPayButton('Rp 200rb', 200000),
-                          ],
-                        ),
-                      ),
+
                     ],
                     const SizedBox(height: 16),
-
                     SizedBox(
                       width: double.infinity, height: 52,
                       child: ElevatedButton(
@@ -263,30 +306,40 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     ),
   );
 
-  Widget _quickPayButton(String label, double amount) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 12),
-          visualDensity: VisualDensity.compact,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-        ),
-        onPressed: () {
-          setState(() {
-            _paidCtrl.text = amount.toStringAsFixed(0);
-          });
-        },
-        child: Text(label, style: const TextStyle(fontSize: 12)),
-      ),
-    );
-  }
 
-  Widget _summaryRow(String label, String value, {bool bold = false}) => Padding(
+  Widget _summaryRow(String label, String value, {bool bold = false, Color? color}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
       Text(label, style: TextStyle(fontSize: 14, fontWeight: bold ? FontWeight.w700 : FontWeight.w400)),
-      Text(value, style: TextStyle(fontSize: bold ? 18 : 14, fontWeight: bold ? FontWeight.w700 : FontWeight.w500, color: bold ? AppColors.primary : null)),
+      Text(value, style: TextStyle(fontSize: bold ? 18 : 14, fontWeight: bold ? FontWeight.w700 : FontWeight.w500, color: color ?? (bold ? AppColors.primary : null))),
     ]),
   );
+
+
+  void _showDiscountDialog(BuildContext context, WidgetRef ref) {
+    final ctrl = TextEditingController(text: ref.read(cartDiscountProvider).toStringAsFixed(0));
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Diskon Global'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Jumlah Diskon', prefixText: 'Rp '),
+          autofocus: true,
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          ElevatedButton(
+            onPressed: () {
+              final d = double.tryParse(ctrl.text) ?? 0;
+              ref.read(cartDiscountProvider.notifier).state = d;
+              Navigator.pop(context);
+            },
+            child: const Text('Terapkan'),
+          ),
+        ],
+      ),
+    );
+  }
 }

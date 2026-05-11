@@ -12,7 +12,7 @@ part 'app_database.g.dart';
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
-  AppDatabase.forTesting(super.e);
+  AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
   int get schemaVersion => 1;
@@ -25,6 +25,8 @@ class AppDatabase extends _$AppDatabase {
   Future<List<User>> getAllUsers() => select(users).get();
   Future<User?> getUserByEmail(String email) =>
       (select(users)..where((u) => u.email.equals(email))).getSingleOrNull();
+  Future<User?> getUserByUsername(String username) =>
+      (select(users)..where((u) => u.username.equals(username))).getSingleOrNull();
   Future<User?> getUserById(int id) =>
       (select(users)..where((u) => u.id.equals(id))).getSingleOrNull();
   Future<int> insertUser(UsersCompanion user) => into(users).insert(user);
@@ -32,6 +34,10 @@ class AppDatabase extends _$AppDatabase {
   // ── Categories ──
   Future<List<Category>> getAllCategories() => select(categories).get();
   Future<int> insertCategory(CategoriesCompanion c) => into(categories).insert(c);
+  Future<bool> updateCategory(CategoriesCompanion c) =>
+      update(categories).replace(c);
+  Future<int> deleteCategory(int id) =>
+      (delete(categories)..where((c) => c.id.equals(id))).go();
 
   // ── Products ──
   Future<List<Product>> getAllProducts({bool activeOnly = true}) {
@@ -45,8 +51,11 @@ class AppDatabase extends _$AppDatabase {
       (select(products)..where((p) => p.barcode.equals(barcode))).getSingleOrNull();
   Future<List<Product>> searchProducts(String query) =>
       (select(products)..where((p) =>
-          p.name.like('%$query%') | p.sku.like('%$query%') |
-          p.barcode.like('%$query%') | p.brand.like('%$query%'))).get();
+          p.name.like('%$query%') | 
+          p.sku.like('%$query%') |
+          p.barcode.like('%$query%') | 
+          p.brand.like('%$query%') |
+          p.motorType.like('%$query%'))).get();
   Future<List<Product>> getProductsByCategory(int catId) =>
       (select(products)..where((p) => p.categoryId.equals(catId))).get();
 
@@ -61,10 +70,13 @@ class AppDatabase extends _$AppDatabase {
   Future<int> insertProduct(ProductsCompanion p) => into(products).insert(p);
   Future<bool> updateProduct(ProductsCompanion p) =>
       (update(products)..where((t) => t.id.equals(p.id.value))).write(p).then((r) => r > 0);
-  Future<void> updateStock(int productId, int qtyChange) => customStatement(
-    'UPDATE products SET stock_qty = stock_qty + ?, updated_at = ? WHERE id = ?',
-    [Variable.withInt(qtyChange), Variable.withDateTime(DateTime.now()), Variable.withInt(productId)],
-  );
+  Future<void> updateStock(int productId, int qtyChange) async {
+    final p = await (select(products)..where((t) => t.id.equals(productId))).getSingle();
+    await update(products).replace(p.copyWith(
+      stockQty: p.stockQty + qtyChange,
+      updatedAt: Value(DateTime.now()),
+    ));
+  }
   Future<int> deleteProduct(int id) =>
       (delete(products)..where((p) => p.id.equals(id))).go();
 
@@ -156,4 +168,24 @@ class AppDatabase extends _$AppDatabase {
   Future<void> markSynced(int id) =>
       (update(syncQueue)..where((s) => s.id.equals(id)))
           .write(const SyncQueueCompanion(synced: Value(true)));
+
+  /// Hapus semua data (untuk reset aplikasi)
+  Future<void> clearAllData() async {
+    await transaction(() async {
+      await delete(syncQueue).go();
+      await delete(transactionItems).go();
+      await delete(transactions).go();
+      await delete(stockAdjustments).go();
+      await delete(productSuppliers).go();
+      await delete(poItems).go();
+      await delete(purchaseOrders).go();
+      await delete(returnItems).go();
+      await delete(returns).go();
+      await delete(products).go();
+      await delete(categories).go();
+      await delete(suppliers).go();
+      await delete(customers).go();
+      await delete(users).go();
+    });
+  }
 }

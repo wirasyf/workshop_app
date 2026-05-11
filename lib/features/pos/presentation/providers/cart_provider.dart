@@ -35,15 +35,25 @@ final cartSubtotalProvider = Provider<double>((ref) {
 /// Provider diskon keseluruhan
 final cartDiscountProvider = StateProvider<double>((ref) => 0);
 
-/// Provider total (subtotal - diskon)
+/// Provider pajak (11% dari subtotal setelah diskon)
+final cartTaxProvider = Provider<double>((ref) {
+  final subtotal = ref.watch(cartSubtotalProvider);
+  final discount = ref.watch(cartDiscountProvider);
+  final taxableAmount = subtotal - discount;
+  return taxableAmount > 0 ? taxableAmount * 0.11 : 0; // Menggunakan 0.11 langsung atau AppConstants
+});
+
+/// Provider total (subtotal - diskon + pajak)
 final cartTotalProvider = Provider<double>((ref) {
   final subtotal = ref.watch(cartSubtotalProvider);
   final discount = ref.watch(cartDiscountProvider);
-  return subtotal - discount;
+  final tax = ref.watch(cartTaxProvider);
+  return subtotal - discount + tax;
 });
 
 /// Provider metode bayar
 final paymentMethodProvider = StateProvider<String>((ref) => 'cash');
+final selectedCustomerProvider = StateProvider<Customer?>((ref) => null);
 
 /// Provider jumlah bayar
 final paidAmountProvider = StateProvider<double>((ref) => 0);
@@ -54,6 +64,11 @@ final changeAmountProvider = Provider<double>((ref) {
   final paid = ref.watch(paidAmountProvider);
   return paid - total;
 });
+
+class CartConstants {
+  static const int receiptWidth = 32; // karakter per baris struk thermal 58mm
+  static const double taxRate = 0.11; // 11% PPN
+}
 
 /// Provider riwayat transaksi
 final transactionHistoryProvider = FutureProvider.family<List<Transaction>, ({DateTime start, DateTime end})>((ref, range) {

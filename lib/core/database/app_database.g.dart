@@ -31,6 +31,18 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _usernameMeta = const VerificationMeta(
+    'username',
+  );
+  @override
+  late final GeneratedColumn<String> username = GeneratedColumn<String>(
+    'username',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+    defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
+  );
   static const VerificationMeta _emailMeta = const VerificationMeta('email');
   @override
   late final GeneratedColumn<String> email = GeneratedColumn<String>(
@@ -104,6 +116,7 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
   List<GeneratedColumn> get $columns => [
     id,
     name,
+    username,
     email,
     passwordHash,
     role,
@@ -133,6 +146,14 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
       );
     } else if (isInserting) {
       context.missing(_nameMeta);
+    }
+    if (data.containsKey('username')) {
+      context.handle(
+        _usernameMeta,
+        username.isAcceptableOrUnknown(data['username']!, _usernameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_usernameMeta);
     }
     if (data.containsKey('email')) {
       context.handle(
@@ -197,6 +218,10 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         DriftSqlType.string,
         data['${effectivePrefix}name'],
       )!,
+      username: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}username'],
+      )!,
       email: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}email'],
@@ -233,6 +258,7 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
 class User extends DataClass implements Insertable<User> {
   final int id;
   final String name;
+  final String username;
   final String email;
   final String passwordHash;
   final String role;
@@ -242,6 +268,7 @@ class User extends DataClass implements Insertable<User> {
   const User({
     required this.id,
     required this.name,
+    required this.username,
     required this.email,
     required this.passwordHash,
     required this.role,
@@ -254,6 +281,7 @@ class User extends DataClass implements Insertable<User> {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['name'] = Variable<String>(name);
+    map['username'] = Variable<String>(username);
     map['email'] = Variable<String>(email);
     map['password_hash'] = Variable<String>(passwordHash);
     map['role'] = Variable<String>(role);
@@ -269,6 +297,7 @@ class User extends DataClass implements Insertable<User> {
     return UsersCompanion(
       id: Value(id),
       name: Value(name),
+      username: Value(username),
       email: Value(email),
       passwordHash: Value(passwordHash),
       role: Value(role),
@@ -288,6 +317,7 @@ class User extends DataClass implements Insertable<User> {
     return User(
       id: serializer.fromJson<int>(json['id']),
       name: serializer.fromJson<String>(json['name']),
+      username: serializer.fromJson<String>(json['username']),
       email: serializer.fromJson<String>(json['email']),
       passwordHash: serializer.fromJson<String>(json['passwordHash']),
       role: serializer.fromJson<String>(json['role']),
@@ -302,6 +332,7 @@ class User extends DataClass implements Insertable<User> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'name': serializer.toJson<String>(name),
+      'username': serializer.toJson<String>(username),
       'email': serializer.toJson<String>(email),
       'passwordHash': serializer.toJson<String>(passwordHash),
       'role': serializer.toJson<String>(role),
@@ -314,6 +345,7 @@ class User extends DataClass implements Insertable<User> {
   User copyWith({
     int? id,
     String? name,
+    String? username,
     String? email,
     String? passwordHash,
     String? role,
@@ -323,6 +355,7 @@ class User extends DataClass implements Insertable<User> {
   }) => User(
     id: id ?? this.id,
     name: name ?? this.name,
+    username: username ?? this.username,
     email: email ?? this.email,
     passwordHash: passwordHash ?? this.passwordHash,
     role: role ?? this.role,
@@ -334,6 +367,7 @@ class User extends DataClass implements Insertable<User> {
     return User(
       id: data.id.present ? data.id.value : this.id,
       name: data.name.present ? data.name.value : this.name,
+      username: data.username.present ? data.username.value : this.username,
       email: data.email.present ? data.email.value : this.email,
       passwordHash: data.passwordHash.present
           ? data.passwordHash.value
@@ -352,6 +386,7 @@ class User extends DataClass implements Insertable<User> {
     return (StringBuffer('User(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('username: $username, ')
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
           ..write('role: $role, ')
@@ -366,6 +401,7 @@ class User extends DataClass implements Insertable<User> {
   int get hashCode => Object.hash(
     id,
     name,
+    username,
     email,
     passwordHash,
     role,
@@ -379,6 +415,7 @@ class User extends DataClass implements Insertable<User> {
       (other is User &&
           other.id == this.id &&
           other.name == this.name &&
+          other.username == this.username &&
           other.email == this.email &&
           other.passwordHash == this.passwordHash &&
           other.role == this.role &&
@@ -390,6 +427,7 @@ class User extends DataClass implements Insertable<User> {
 class UsersCompanion extends UpdateCompanion<User> {
   final Value<int> id;
   final Value<String> name;
+  final Value<String> username;
   final Value<String> email;
   final Value<String> passwordHash;
   final Value<String> role;
@@ -399,6 +437,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   const UsersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
+    this.username = const Value.absent(),
     this.email = const Value.absent(),
     this.passwordHash = const Value.absent(),
     this.role = const Value.absent(),
@@ -409,6 +448,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   UsersCompanion.insert({
     this.id = const Value.absent(),
     required String name,
+    required String username,
     required String email,
     required String passwordHash,
     this.role = const Value.absent(),
@@ -416,11 +456,13 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
   }) : name = Value(name),
+       username = Value(username),
        email = Value(email),
        passwordHash = Value(passwordHash);
   static Insertable<User> custom({
     Expression<int>? id,
     Expression<String>? name,
+    Expression<String>? username,
     Expression<String>? email,
     Expression<String>? passwordHash,
     Expression<String>? role,
@@ -431,6 +473,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
+      if (username != null) 'username': username,
       if (email != null) 'email': email,
       if (passwordHash != null) 'password_hash': passwordHash,
       if (role != null) 'role': role,
@@ -443,6 +486,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   UsersCompanion copyWith({
     Value<int>? id,
     Value<String>? name,
+    Value<String>? username,
     Value<String>? email,
     Value<String>? passwordHash,
     Value<String>? role,
@@ -453,6 +497,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     return UsersCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
+      username: username ?? this.username,
       email: email ?? this.email,
       passwordHash: passwordHash ?? this.passwordHash,
       role: role ?? this.role,
@@ -470,6 +515,9 @@ class UsersCompanion extends UpdateCompanion<User> {
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
+    }
+    if (username.present) {
+      map['username'] = Variable<String>(username.value);
     }
     if (email.present) {
       map['email'] = Variable<String>(email.value);
@@ -497,6 +545,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     return (StringBuffer('UsersCompanion(')
           ..write('id: $id, ')
           ..write('name: $name, ')
+          ..write('username: $username, ')
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
           ..write('role: $role, ')
@@ -6714,6 +6763,7 @@ typedef $$UsersTableCreateCompanionBuilder =
     UsersCompanion Function({
       Value<int> id,
       required String name,
+      required String username,
       required String email,
       required String passwordHash,
       Value<String> role,
@@ -6725,6 +6775,7 @@ typedef $$UsersTableUpdateCompanionBuilder =
     UsersCompanion Function({
       Value<int> id,
       Value<String> name,
+      Value<String> username,
       Value<String> email,
       Value<String> passwordHash,
       Value<String> role,
@@ -6828,6 +6879,11 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
 
   ColumnFilters<String> get name => $composableBuilder(
     column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get username => $composableBuilder(
+    column: $table.username,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6981,6 +7037,11 @@ class $$UsersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get username => $composableBuilder(
+    column: $table.username,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<String> get email => $composableBuilder(
     column: $table.email,
     builder: (column) => ColumnOrderings(column),
@@ -7026,6 +7087,9 @@ class $$UsersTableAnnotationComposer
 
   GeneratedColumn<String> get name =>
       $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get username =>
+      $composableBuilder(column: $table.username, builder: (column) => column);
 
   GeneratedColumn<String> get email =>
       $composableBuilder(column: $table.email, builder: (column) => column);
@@ -7185,6 +7249,7 @@ class $$UsersTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
+                Value<String> username = const Value.absent(),
                 Value<String> email = const Value.absent(),
                 Value<String> passwordHash = const Value.absent(),
                 Value<String> role = const Value.absent(),
@@ -7194,6 +7259,7 @@ class $$UsersTableTableManager
               }) => UsersCompanion(
                 id: id,
                 name: name,
+                username: username,
                 email: email,
                 passwordHash: passwordHash,
                 role: role,
@@ -7205,6 +7271,7 @@ class $$UsersTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 required String name,
+                required String username,
                 required String email,
                 required String passwordHash,
                 Value<String> role = const Value.absent(),
@@ -7214,6 +7281,7 @@ class $$UsersTableTableManager
               }) => UsersCompanion.insert(
                 id: id,
                 name: name,
+                username: username,
                 email: email,
                 passwordHash: passwordHash,
                 role: role,

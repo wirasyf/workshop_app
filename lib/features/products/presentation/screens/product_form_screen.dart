@@ -168,12 +168,44 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     );
 
     try {
+      int id;
       if (_isEditing) {
+        id = widget.productId!;
         await db.updateProduct(companion);
       } else {
-        await db.insertProduct(companion);
+        id = await db.insertProduct(companion);
       }
+
+      // Enqueue sync
+      final syncService = ref.read(syncServiceProvider);
+      await syncService.enqueue(
+        tableName: 'products',
+        recordId: id,
+        operation: _isEditing ? 'update' : 'create',
+        data: {
+          'id': id,
+          'name': _nameCtrl.text.trim(),
+          'sku': _skuCtrl.text.trim().isEmpty ? null : _skuCtrl.text.trim(),
+          'barcode': _barcodeCtrl.text.trim().isEmpty ? null : _barcodeCtrl.text.trim(),
+          'category_id': _selectedCategoryId,
+          'brand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+          'motor_type': _motorTypeCtrl.text.trim().isEmpty ? null : _motorTypeCtrl.text.trim(),
+          'cost_price': double.tryParse(_costPriceCtrl.text) ?? 0,
+          'sell_price': double.tryParse(_sellPriceCtrl.text) ?? 0,
+          'sell_price_wholesale': _wholesalePriceCtrl.text.isEmpty ? null : double.tryParse(_wholesalePriceCtrl.text),
+          'stock_qty': int.tryParse(_stockQtyCtrl.text) ?? 0,
+          'stock_min': int.tryParse(_stockMinCtrl.text) ?? 5,
+          'unit': _unitCtrl.text.trim(),
+          'image_url': finalImagePath,
+          'updated_at': DateTime.now().toIso8601String(),
+        },
+      );
+
       ref.invalidate(productsProvider);
+      if (_isEditing) {
+        ref.invalidate(productDetailProvider(widget.productId!));
+      }
+      
       if (mounted) {
         AppToast.show(
           context, 
@@ -279,8 +311,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                             builder: (_) => const BarcodeScannerDialog(),
                           ),
                         );
-                        if (code != null)
+                        if (code != null) {
                           setState(() => _barcodeCtrl.text = code);
+                        }
                       },
                     ),
                   ),
@@ -292,7 +325,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               data: (cats) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DropdownButtonFormField<int>(
-                  value: _selectedCategoryId,
+                  initialValue: _selectedCategoryId,
                   decoration: const InputDecoration(labelText: 'Kategori'),
                   items: cats
                       .map(

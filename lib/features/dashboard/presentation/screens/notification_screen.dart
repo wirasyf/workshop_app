@@ -4,6 +4,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
+import '../../../../main.dart';
 
 /// Model notifikasi
 class AppNotification {
@@ -94,13 +95,20 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
         ));
       }
 
+      final readIds = _ref.read(settingsServiceProvider).readNotifications;
+
       // Sort: critical first
       notifications.sort((a, b) {
         const priority = {'stock_critical': 0, 'stock_low': 1, 'transaction': 2, 'info': 3};
         return (priority[a.type] ?? 9).compareTo(priority[b.type] ?? 9);
       });
 
-      state = AsyncValue.data(notifications);
+      // Restore read state
+      final restored = notifications.map((n) {
+        return readIds.contains(n.id) ? n.copyWith(isRead: true) : n;
+      }).toList();
+
+      state = AsyncValue.data(restored);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -109,6 +117,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
   void markAsRead(String id) {
     final items = state.valueOrNull;
     if (items == null) return;
+    _ref.read(settingsServiceProvider).addReadNotification(id);
     state = AsyncValue.data(
       items.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList(),
     );
@@ -117,6 +126,12 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
   void markAllAsRead() {
     final items = state.valueOrNull;
     if (items == null) return;
+    
+    final settings = _ref.read(settingsServiceProvider);
+    final currentIds = settings.readNotifications.toSet();
+    currentIds.addAll(items.map((n) => n.id));
+    settings.setReadNotifications(currentIds.toList());
+
     state = AsyncValue.data(items.map((n) => n.copyWith(isRead: true)).toList());
   }
 
@@ -320,9 +335,9 @@ class _NotificationTile extends StatelessWidget {
         duration: const Duration(milliseconds: 300),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: isRead ? AppColors.surface : colors.bg.withValues(alpha: 0.5),
+          color: isRead ? theme.cardTheme.color : (theme.brightness == Brightness.dark ? colors.bg.withValues(alpha: 0.15) : colors.bg.withValues(alpha: 0.5)),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: isRead ? AppColors.border : colors.border),
+          border: Border.all(color: isRead ? (theme.brightness == Brightness.dark ? AppColors.borderDark : AppColors.border) : colors.border),
         ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,

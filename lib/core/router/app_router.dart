@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
+import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/notification_screen.dart';
@@ -13,10 +14,12 @@ import '../../features/pos/presentation/screens/transaction_history_screen.dart'
 import '../../features/products/presentation/screens/product_list_screen.dart';
 import '../../features/products/presentation/screens/product_detail_screen.dart';
 import '../../features/products/presentation/screens/product_form_screen.dart';
+import '../../features/products/presentation/screens/category_list_screen.dart';
 import '../../features/products/presentation/screens/stock_adjustment_screen.dart';
 import '../../features/reports/presentation/screens/report_screen.dart';
 import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/store_profile_screen.dart';
+import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
 import '../../features/settings/presentation/screens/receipt_template_screen.dart';
 import '../../shared/screens/shell_screen.dart';
@@ -33,13 +36,14 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.valueOrNull != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLogin = state.matchedLocation == '/login';
+      final isSignup = state.matchedLocation == '/signup';
 
       if (!isLoggedIn) {
-        // Jika tidak login dan bukan di halaman login, lempar ke login
-        return isLogin ? null : '/login';
+        // Jika tidak login dan bukan di halaman login/signup, lempar ke login
+        return (isLogin || isSignup) ? null : '/login';
       }
 
-      if (isLoggedIn && (isLogin || isSplash)) {
+      if (isLoggedIn && (isLogin || isSignup || isSplash)) {
         // Jika sudah login tapi masih di login/splash, lempar ke dashboard sesuai role
         final role = authState.valueOrNull?.role ?? AppConstants.roleKasir;
         return role == AppConstants.roleOwner ? '/dashboard' : '/cashier';
@@ -50,6 +54,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
+      GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
 
       // Shell route dengan bottom navigation
       ShellRoute(
@@ -69,6 +74,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/products',
             builder: (_, __) => const ProductListScreen(),
             routes: [
+              GoRoute(path: 'categories', builder: (_, __) => const CategoryListScreen()),
               GoRoute(path: 'add', builder: (_, __) => const ProductFormScreen()),
               GoRoute(path: ':id', builder: (_, state) =>
                   ProductDetailScreen(productId: int.parse(state.pathParameters['id']!))),
@@ -86,6 +92,7 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const SettingsScreen(),
             routes: [
               GoRoute(path: 'store-profile', builder: (_, __) => const StoreProfileScreen()),
+              GoRoute(path: 'edit-profile', builder: (_, __) => const EditProfileScreen()),
               GoRoute(path: 'change-password', builder: (_, __) => const ChangePasswordScreen()),
               GoRoute(path: 'receipt-template', builder: (_, __) => const ReceiptTemplateScreen()),
             ],

@@ -7,8 +7,9 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/utils/app_toast.dart';
+import '../../../dashboard/presentation/screens/notification_screen.dart';
+import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../providers/product_provider.dart';
-
 /// Form penyesuaian stok manual
 class StockAdjustmentScreen extends ConsumerStatefulWidget {
   final int productId;
@@ -53,6 +54,8 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
       await db.updateStock(widget.productId, change);
       ref.invalidate(productsProvider);
       ref.invalidate(productDetailProvider(widget.productId));
+      ref.invalidate(notificationNotifierProvider);
+      ref.invalidate(ownerDashboardProvider);
 
       if (mounted) {
         AppToast.show(context, 'Stok ${_isAdd ? "ditambah" : "dikurangi"} $qty', type: ToastType.success);
@@ -160,24 +163,25 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
 
   Widget _toggleButton(String label, bool isAddOption, IconData icon) {
     final selected = _isAdd == isAddOption;
-    return GestureDetector(
-      onTap: () => setState(() => _isAdd = isAddOption),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 14),
-        decoration: BoxDecoration(
-          color: selected ? AppColors.primary : AppColors.infoLight,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: Colors.transparent,
-            width: 1,
-          ),
-        ),
-        child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(icon, size: 18, color: selected ? Colors.white : AppColors.primary),
-          const SizedBox(width: 6),
-          Text(label, style: TextStyle(fontWeight: selected ? FontWeight.bold : FontWeight.w600, color: selected ? Colors.white : AppColors.primary)),
-        ]),
+    return ChoiceChip(
+      label: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(icon, size: 16, color: selected ? Colors.white : AppColors.primary),
+        const SizedBox(width: 8),
+        Text(label),
+      ]),
+      selected: selected,
+      onSelected: (_) => setState(() => _isAdd = isAddOption),
+      selectedColor: AppColors.primary,
+      backgroundColor: AppColors.infoLight,
+      labelStyle: TextStyle(
+        color: selected ? Colors.white : AppColors.primary,
+        fontWeight: selected ? FontWeight.bold : FontWeight.w600,
+        fontSize: 13,
       ),
+      side: const BorderSide(color: Colors.transparent),
+      showCheckmark: false,
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
     );
   }
 }

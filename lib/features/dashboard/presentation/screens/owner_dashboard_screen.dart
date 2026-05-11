@@ -10,6 +10,8 @@ import '../../../../shared/widgets/metric_card.dart';
 import 'notification_screen.dart';
 
 import 'package:fl_chart/fl_chart.dart';
+import '../../../../core/utils/report_utils.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 /// Dashboard provider — omzet hari ini, jumlah transaksi, stok menipis
 final ownerDashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async {
@@ -74,7 +76,10 @@ class OwnerDashboardScreen extends ConsumerWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Halo, Owner 👋', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
+                        Consumer(builder: (context, ref, _) {
+                          final user = ref.watch(authStateProvider).valueOrNull;
+                          return Text('Halo, ${user?.name ?? "Owner"} 👋', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold));
+                        }),
                         const SizedBox(height: 2),
                         Text(DateFormatter.formatLong(DateTime.now()), style: theme.textTheme.bodySmall),
                       ],
@@ -140,25 +145,8 @@ class OwnerDashboardScreen extends ConsumerWidget {
                   ),
                   child: Builder(
                           builder: (context) {
-                            final now = DateTime.now();
-                            final displaySales = List.generate(7, (index) {
-                              final d = now.subtract(Duration(days: 6 - index));
-                              final dateStr = '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
-                              final hasData = dailySales.any((e) => (e['date'] as String).startsWith(dateStr));
-                              final total = hasData 
-                                  ? dailySales.firstWhere((e) => (e['date'] as String).startsWith(dateStr))['total'] 
-                                  : 0.0;
-                              return {
-                                'date': dateStr,
-                                'total': total,
-                              };
-                            });
-
-                            final maxSales = displaySales.fold<double>(0, (prev, e) {
-                              final total = ((e['total'] as num?)?.toDouble() ?? 0) / 1000;
-                              return total > prev ? total : prev;
-                            });
-                            final maxY = maxSales > 0 ? maxSales * 1.2 : 1000.0;
+                            final displaySales = ReportUtils.getChartDisplayData(dailySales, 7);
+                            final maxY = ReportUtils.getChartMaxY(displaySales);
                             
                             return BarChart(BarChartData(
                               maxY: maxY,
@@ -176,18 +164,12 @@ class OwnerDashboardScreen extends ConsumerWidget {
                               ),
                               barGroups: displaySales.asMap().entries.map((e) {
                                 return BarChartGroupData(x: e.key, barRods: [
-                                  BarChartRodData(
-                                    toY: ((e.value['total'] as num?)?.toDouble() ?? 0) / 1000,
-                                    gradient: const LinearGradient(
-                                      colors: [Color(0xFF60A5FA), Color(0xFF3B82F6)],
-                                      begin: Alignment.bottomCenter,
-                                      end: Alignment.topCenter,
-                                    ),
+                                  ReportUtils.buildBarRod(
+                                    value: (e.value['total'] as num?)?.toDouble() ?? 0,
+                                    maxY: maxY,
                                     width: 16,
-                                    borderRadius: const BorderRadius.vertical(top: Radius.circular(6)),
-                                    backDrawRodData: BackgroundBarChartRodData(
-                                      show: true, toY: maxY, color: AppColors.border.withValues(alpha: 0.3),
-                                    ),
+                                    radius: 6,
+                                    backgroundBarColor: AppColors.border.withValues(alpha: 0.3),
                                   ),
                                 ]);
                               }).toList(),
@@ -213,7 +195,11 @@ class OwnerDashboardScreen extends ConsumerWidget {
                                       space: 4,
                                       child: Text(
                                         CurrencyFormatter.formatCompact(value * 1000),
-                                        style: const TextStyle(fontSize: 9, color: AppColors.textSecondary, fontWeight: FontWeight.w500),
+                                        style: TextStyle(
+                                          fontSize: 9,
+                                          color: theme.textTheme.bodySmall?.color ?? AppColors.textSecondary,
+                                          fontWeight: FontWeight.w500,
+                                        ),
                                       ),
                                     );
                                   },
@@ -237,7 +223,11 @@ class OwnerDashboardScreen extends ConsumerWidget {
                                         meta: meta,
                                         space: 6,
                                         angle: -0.5,
-                                        child: Text(label, style: const TextStyle(fontSize: 9, color: AppColors.textPrimary, fontWeight: FontWeight.w600)),
+                                        child: Text(label, style: TextStyle(
+                                          fontSize: 9,
+                                          color: theme.textTheme.bodySmall?.color ?? AppColors.textPrimary,
+                                          fontWeight: FontWeight.w600,
+                                        )),
                                       );
                                     }
                                     return SideTitleWidget(meta: meta, child: const SizedBox());

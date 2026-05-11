@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:spareart_app/main.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/connectivity_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/services/sync_service.dart';
+import '../../../../core/services/settings_service.dart';
+import '../../../../shared/utils/app_toast.dart';
 
 /// Layar pengaturan
 class SettingsScreen extends ConsumerWidget {
@@ -43,6 +47,11 @@ class SettingsScreen extends ConsumerWidget {
                   child: Text(user?.role.toUpperCase() ?? '-', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
                 ),
               ]),
+              const Spacer(),
+              IconButton(
+                icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                onPressed: () => context.go('/settings/edit-profile'),
+              ),
             ]),
           ),
           const SizedBox(height: 20),
@@ -56,7 +65,30 @@ class SettingsScreen extends ConsumerWidget {
               error: (_, __) => const Icon(Icons.error, size: 12, color: AppColors.error),
             ),
           ),
-          _settingsTile(Icons.sync, 'Sinkronisasi Data', subtitle: 'Sinkronisasi otomatis saat online'),
+          _settingsTile(Icons.sync, 'Sinkronisasi Data', subtitle: 'Sinkronisasi otomatis saat online', onTap: () {
+            ref.read(syncServiceProvider).syncPendingChanges();
+            AppToast.show(context, 'Sinkronisasi dimulai', type: ToastType.info);
+          }),
+          
+          Consumer(builder: (context, ref, _) {
+            final themeMode = ref.watch(themeModeProvider);
+            final isDark = themeMode == ThemeMode.dark;
+            return _settingsTile(
+              Icons.dark_mode_outlined,
+              'Mode Gelap',
+              subtitle: 'Gunakan tema visual gelap',
+              trailing: Switch(
+                value: isDark,
+                onChanged: (value) {
+                  final newMode = value ? 'dark' : 'light';
+                  ref.read(settingsServiceProvider).setThemeMode(newMode);
+                  ref.read(themeModeProvider.notifier).state = value ? ThemeMode.dark : ThemeMode.light;
+                },
+                activeColor: AppColors.primary,
+              ),
+            );
+          }),
+          
           const Divider(height: 32),
           _settingsTile(Icons.store, 'Profil Toko', subtitle: 'SpareArt Motor', onTap: () => context.go('/settings/store-profile')),
           _settingsTile(Icons.receipt_long, 'Template Struk', subtitle: 'Konfigurasi struk thermal', onTap: () => context.go('/settings/receipt-template')),

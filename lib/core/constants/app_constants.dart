@@ -30,5 +30,5 @@ class AppConstants {
   static const int defaultPageSize = 20;
 
   // Receipt
-  static const int receiptWidth = 32; // karakter per baris struk thermal 58mm
+  static const int receiptWidth = 32;
 }

@@ -53,12 +53,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     }
 
     if (success && mounted) {
+      AppToast.show(context, 'Login berhasil', type: ToastType.success);
       final role = ref.read(currentRoleProvider);
-      if (role == AppConstants.roleOwner) {
-        context.go('/dashboard');
-      } else {
-        context.go('/cashier');
-      }
+      Future.delayed(const Duration(milliseconds: 500), () {
+        if (!mounted) return;
+        if (role == AppConstants.roleOwner) {
+          context.go('/dashboard');
+        } else {
+          context.go('/cashier');
+        }
+      });
     } else if (mounted) {
       final error = ref.read(authStateProvider).error?.toString() ?? 'Login gagal';
       AppToast.show(context, error, type: ToastType.error);
@@ -108,9 +112,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       keyboardType: TextInputType.emailAddress,
                       textInputAction: TextInputAction.next,
                       decoration: const InputDecoration(
-                        labelText: 'Email',
-                        hintText: 'Masukkan email',
-                        prefixIcon: Icon(Icons.email_outlined),
+                        labelText: 'Username atau Email',
+                        hintText: 'Masukkan username atau email',
+                        prefixIcon: Icon(Icons.person_outline),
                       ),
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
@@ -154,21 +158,16 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 20),
 
-                    // Demo hint
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.infoLight,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        children: [
-                          Text('Akun Demo:', style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700)),
-                          const SizedBox(height: 4),
-                          Text('Owner: owner@spareart.com / owner123', style: theme.textTheme.labelSmall),
-                          Text('Kasir: kasir@spareart.com / kasir123', style: theme.textTheme.labelSmall),
-                        ],
-                      ),
+                    // Signup link
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Text('Belum punya akun?'),
+                        TextButton(
+                          onPressed: () => context.push('/signup'),
+                          child: const Text('Daftar Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+                        ),
+                      ],
                     ),
                   ],
                 ),

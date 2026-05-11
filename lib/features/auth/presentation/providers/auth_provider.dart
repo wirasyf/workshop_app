@@ -1,3 +1,4 @@
+import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/settings_service.dart';
@@ -8,7 +9,8 @@ import '../../../../main.dart';
 final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
   final db = ref.watch(databaseProvider);
   final settings = ref.watch(settingsServiceProvider);
-  return AuthNotifier(db, settings);
+  final sync = ref.watch(syncServiceProvider);
+  return AuthNotifier(db, settings, sync);
 });
 
 /// Provider untuk cek apakah sedang login
@@ -25,8 +27,9 @@ final currentRoleProvider = Provider<String>((ref) {
 class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   final AppDatabase _db;
   final SettingsService _settings;
+  final SyncService _sync;
 
-  AuthNotifier(this._db, this._settings) : super(const AsyncValue.loading()) {
+  AuthNotifier(this._db, this._settings, this._sync) : super(const AsyncValue.loading()) {
     _loadSession();
   }
 
@@ -44,13 +47,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     state = const AsyncValue.data(null);
   }
 
-  /// Login dengan email dan password (offline-first via lokal DB)
-  Future<bool> login(String email, String password) async {
+  /// Login dengan username/email dan password (offline-first via lokal DB)
+  Future<bool> login(String identifier, String password) async {
     state = const AsyncValue.loading();
     try {
-      final user = await _db.getUserByEmail(email);
+      // Cek berdasarkan username dulu, baru email
+      final trimmedIdentifier = identifier.trim();
+      User? user = await _db.getUserByUsername(trimmedIdentifier);
+      user ??= await _db.getUserByEmail(trimmedIdentifier);
+      
       if (user == null) {
-        state = AsyncValue.error('Email tidak ditemukan', StackTrace.current);
+        state = AsyncValue.error('User tidak ditemukan', StackTrace.current);
         return false;
       }
       if (user.passwordHash != password) {
@@ -67,6 +74,75 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       
       state = AsyncValue.data(user);
       return true;
+    } catch (e, st) {
+      state = AsyncValue.error(e, st);
+      return false;
+    }
+  }
+
+  /// Signup user baru
+  Future<bool> signup({
+    required String name,
+    required String username,
+    required String email,
+    required String password,
+    String role = 'owner',
+  }) async {
+    state = const AsyncValue.loading();
+    try {
+      final trimmedUsername = username.trim();
+      final trimmedEmail = email.trim();
+
+      // Cek apakah username sudah terdaftar
+      final existingUser = await _db.getUserByUsername(trimmedUsername);
+      if (existingUser != null) {
+        state = AsyncValue.error('Username sudah digunakan', StackTrace.current);
+        return false;
+      }
+
+      // Cek apakah email sudah terdaftar
+      final existingEmail = await _db.getUserByEmail(trimmedEmail);
+      if (existingEmail != null) {
+        state = AsyncValue.error('Email sudah terdaftar', StackTrace.current);
+        return false;
+      }
+
+      final companion = UsersCompanion.insert(
+        name: name.trim(),
+        username: trimmedUsername,
+        email: trimmedEmail,
+        passwordHash: password,
+        role: Value(role),
+        isActive: const Value(true),
+        createdAt: Value(DateTime.now()),
+      );
+
+      final id = await _db.insertUser(companion);
+      final user = await _db.getUserById(id);
+
+      if (user != null) {
+        // Enqueue sync ke Supabase
+        await _sync.enqueue(
+          tableName: 'users',
+          recordId: id,
+          operation: 'create',
+          data: {
+            'id': id,
+            'name': name.trim(),
+            'username': trimmedUsername,
+            'email': trimmedEmail,
+            'password_hash': password,
+            'role': role,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+        );
+        
+        // Save session otomatis setelah signup
+        await _settings.setUserId(id);
+        state = AsyncValue.data(user);
+        return true;
+      }
+      return false;
     } catch (e, st) {
       state = AsyncValue.error(e, st);
       return false;

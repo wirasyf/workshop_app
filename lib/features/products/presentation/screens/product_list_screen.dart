@@ -22,7 +22,11 @@ class ProductListScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Manajemen Stok'),
         actions: [
-          IconButton(icon: const Icon(Icons.qr_code_scanner), onPressed: () {/* TODO: barcode scan */}),
+          IconButton(
+            icon: const Icon(Icons.category_outlined),
+            onPressed: () => context.go('/products/categories'),
+            tooltip: 'Kelola Kategori',
+          ),
         ],
       ),
       body: Column(
@@ -85,12 +89,10 @@ class ProductListScreen extends ConsumerWidget {
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (items) {
                 if (items.isEmpty) {
-                  return EmptyStateWidget(
+                  return const EmptyStateWidget(
                     icon: Icons.inventory_2_outlined,
                     title: 'Belum ada produk',
-                    subtitle: 'Tambah produk pertama Anda',
-                    actionLabel: 'Tambah Produk',
-                    onAction: () => context.go('/products/add'),
+                    subtitle: 'Tambah produk pertama Anda menggunakan tombol di bawah',
                   );
                 }
                 return RefreshIndicator(
