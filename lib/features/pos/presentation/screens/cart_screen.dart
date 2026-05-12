@@ -48,7 +48,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final user = ref.read(authStateProvider).value;
     final subtotal = ref.read(cartSubtotalProvider);
     final discount = ref.read(cartDiscountProvider);
-    final customer = ref.read(selectedCustomerProvider);
     final change = method == 'cash' ? paid - total : 0.0;
     final invoiceNo = 'INV-${DateTime.now().millisecondsSinceEpoch}';
 
@@ -58,7 +57,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         final txnCompanion = TransactionsCompanion.insert(
           invoiceNo: invoiceNo,
           cashierId: user?.id ?? 1,
-          customerId: Value(customer?.id),
           paymentMethod: Value(method),
           subtotal: Value(subtotal),
           discount: Value(discount),
@@ -118,13 +116,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           );
 
           await db.updateStock(item.productId, -item.qty);
-          // Sync stock update
-          await syncService.enqueue(
-            tableName: 'products',
-            recordId: item.productId,
-            operation: 'update',
-            data: {'stock_qty': -item.qty}, // Logika update di SyncService perlu dicek
-          );
+          
+          // Ambil stok terbaru untuk dikirim ke sync
+          final updatedProduct = await db.getProductById(item.productId);
+          if (updatedProduct != null) {
+            await syncService.enqueue(
+              tableName: 'products',
+              recordId: item.productId,
+              operation: 'update',
+              data: {'stock_qty': updatedProduct.stockQty},
+            );
+          }
         }
       });
 
@@ -135,7 +137,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ref.read(cartProvider.notifier).clear();
       ref.read(cartDiscountProvider.notifier).state = 0;
       ref.read(paidAmountProvider.notifier).state = 0;
-      ref.read(selectedCustomerProvider.notifier).state = null;
 
       // Cek stok menipis
       bool hasLowStock = false;

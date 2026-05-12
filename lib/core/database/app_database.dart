@@ -6,16 +6,16 @@ import 'tables.dart';
 part 'app_database.g.dart';
 
 @DriftDatabase(tables: [
-  Users, Categories, Products, Suppliers, ProductSuppliers, Customers,
-  Transactions, TransactionItems, PurchaseOrders, PoItems,
-  StockAdjustments, Returns, ReturnItems, SyncQueue,
+  Users, Categories, Products,
+  Transactions, TransactionItems,
+  StockAdjustments, SyncQueue, Notifications,
 ])
 class AppDatabase extends _$AppDatabase {
   AppDatabase() : super(_openConnection());
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 2;
+  int get schemaVersion => 3;
 
   @override
   MigrationStrategy get migration {
@@ -29,6 +29,9 @@ class AppDatabase extends _$AppDatabase {
           await m.addColumn(users, users.avatarUrl);
           await m.addColumn(products, products.sellPriceWholesale);
           await m.addColumn(products, products.updatedAt);
+        }
+        if (from < 3) {
+          await m.createTable(notifications);
         }
       },
       beforeOpen: (details) async {
@@ -174,11 +177,6 @@ class AppDatabase extends _$AppDatabase {
       (select(stockAdjustments)..where((a) => a.productId.equals(productId))
         ..orderBy([(a) => OrderingTerm.desc(a.createdAt)])).get();
 
-  // ── Suppliers & Customers ──
-  Future<List<Supplier>> getAllSuppliers() => select(suppliers).get();
-  Future<int> insertSupplier(SuppliersCompanion s) => into(suppliers).insert(s);
-  Future<List<Customer>> getAllCustomers() => select(customers).get();
-  Future<int> insertCustomer(CustomersCompanion c) => into(customers).insert(c);
 
   // ── Sync Queue ──
   Future<int> addToSyncQueue(SyncQueueCompanion e) => into(syncQueue).insert(e);
@@ -189,22 +187,27 @@ class AppDatabase extends _$AppDatabase {
       (update(syncQueue)..where((s) => s.id.equals(id)))
           .write(const SyncQueueCompanion(synced: Value(true)));
 
+  // ── Notifications ──
+  Future<List<Notification>> getAllNotifications() => 
+      (select(notifications)..orderBy([(n) => OrderingTerm.desc(n.createdAt)])).get();
+  Future<int> insertNotification(NotificationsCompanion n) => into(notifications).insert(n);
+  Future<void> markNotificationRead(int id) =>
+      (update(notifications)..where((n) => n.id.equals(id)))
+          .write(const NotificationsCompanion(isRead: Value(true)));
+  Future<void> deleteAllNotifications() => delete(notifications).go();
+  Future<void> deleteNotification(int id) =>
+      (delete(notifications)..where((n) => n.id.equals(id))).go();
+
   /// Hapus semua data (untuk reset aplikasi)
   Future<void> clearAllData() async {
     await transaction(() async {
+      await delete(notifications).go();
       await delete(syncQueue).go();
       await delete(transactionItems).go();
       await delete(transactions).go();
       await delete(stockAdjustments).go();
-      await delete(productSuppliers).go();
-      await delete(poItems).go();
-      await delete(purchaseOrders).go();
-      await delete(returnItems).go();
-      await delete(returns).go();
       await delete(products).go();
       await delete(categories).go();
-      await delete(suppliers).go();
-      await delete(customers).go();
       await delete(users).go();
     });
   }

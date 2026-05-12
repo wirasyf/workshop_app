@@ -1,35 +1,46 @@
-import 'package:flutter/material.dart';
+import 'package:drift/drift.dart' hide Column;
+import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:spareart_app/core/database/app_database.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
-import '../../../../main.dart';
+
 
 /// Model notifikasi
 class AppNotification {
-  final String id;
+  final int? id;
   final String title;
   final String message;
   final String type; // 'stock_critical', 'stock_low', 'transaction', 'info'
   final DateTime createdAt;
-  final IconData icon;
   final bool isRead;
 
   const AppNotification({
-    required this.id,
+    this.id,
     required this.title,
     required this.message,
     required this.type,
     required this.createdAt,
-    required this.icon,
     this.isRead = false,
   });
 
-  AppNotification copyWith({bool? isRead}) => AppNotification(
-    id: id, title: title, message: message, type: type,
-    createdAt: createdAt, icon: icon, isRead: isRead ?? this.isRead,
+  IconData get icon => switch (type) {
+    'stock_critical' => Icons.error_rounded,
+    'stock_low' => Icons.warning_amber_rounded,
+    'transaction' => Icons.receipt_long_rounded,
+    _ => Icons.info_rounded,
+  };
+
+  AppNotification copyWith({int? id, bool? isRead}) => AppNotification(
+    id: id ?? this.id, 
+    title: title, 
+    message: message, 
+    type: type,
+    createdAt: createdAt, 
+    isRead: isRead ?? this.isRead,
   );
 }
 
@@ -41,105 +52,95 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
   }
 
   Future<void> load() async {
-    state = const AsyncValue.loading();
     try {
       final db = _ref.read(databaseProvider);
-      final now = DateTime.now();
-      final start = DateFormatter.startOfDay(now);
-      final end = DateFormatter.endOfDay(now);
-      final notifications = <AppNotification>[];
-
-      // 1. Stok kritis / menipis
-      final lowStock = await db.getLowStockProducts();
-      for (final p in lowStock) {
-        if (p.stockQty == 0) {
-          notifications.add(AppNotification(
-            id: 'stock_empty_${p.id}',
-            title: 'Stok Habis!',
-            message: '${p.name} sudah habis. Segera lakukan restok agar penjualan tidak terganggu.',
-            type: 'stock_critical',
-            createdAt: now,
-            icon: Icons.error_rounded,
-          ));
-        } else {
-          notifications.add(AppNotification(
-            id: 'stock_low_${p.id}',
-            title: 'Stok Menipis',
-            message: '${p.name} sisa ${p.stockQty} ${p.unit}. Batas minimal stok: ${p.stockMin} ${p.unit}.',
-            type: 'stock_low',
-            createdAt: now,
-            icon: Icons.warning_amber_rounded,
-          ));
-        }
-      }
-
-      // 2. Ringkasan transaksi hari ini
-      final txnCount = await db.getTransactionCount(start, end);
-      final totalSales = await db.getTotalSales(start, end);
-      if (txnCount > 0) {
-        notifications.add(AppNotification(
-          id: 'txn_today',
-          title: 'Transaksi Hari Ini',
-          message: '$txnCount transaksi berhasil dengan total omzet ${CurrencyFormatter.format(totalSales)}.',
-          type: 'transaction',
-          createdAt: now,
-          icon: Icons.receipt_long_rounded,
-        ));
+      
+      // 1. Ambil dari DB
+      final dbNotifs = await db.getAllNotifications();
+      
+      // 2. Jika kosong atau perlu refresh (simulasi auto-generation)
+      if (dbNotifs.isEmpty) {
+        await _generateInitialNotifications(db);
+        final refreshed = await db.getAllNotifications();
+        state = AsyncValue.data(refreshed.map(_fromDb).toList());
       } else {
-        notifications.add(AppNotification(
-          id: 'txn_today_empty',
-          title: 'Belum Ada Transaksi',
-          message: 'Belum ada transaksi hari ini. Semangat berjualan!',
-          type: 'info',
-          createdAt: now,
-          icon: Icons.info_rounded,
-        ));
+        state = AsyncValue.data(dbNotifs.map(_fromDb).toList());
       }
-
-      final readIds = _ref.read(settingsServiceProvider).readNotifications;
-
-      // Sort: critical first
-      notifications.sort((a, b) {
-        const priority = {'stock_critical': 0, 'stock_low': 1, 'transaction': 2, 'info': 3};
-        return (priority[a.type] ?? 9).compareTo(priority[b.type] ?? 9);
-      });
-
-      // Restore read state
-      final restored = notifications.map((n) {
-        return readIds.contains(n.id) ? n.copyWith(isRead: true) : n;
-      }).toList();
-
-      state = AsyncValue.data(restored);
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
   }
 
-  void markAsRead(String id) {
-    final items = state.value;
-    if (items == null) return;
-    _ref.read(settingsServiceProvider).addReadNotification(id);
-    state = AsyncValue.data(
-      items.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList(),
-    );
+  AppNotification _fromDb(Notification n) => AppNotification(
+    id: n.id,
+    title: n.title,
+    message: n.message,
+    type: n.type,
+    createdAt: n.createdAt,
+    isRead: n.isRead,
+  );
+
+  Future<void> _generateInitialNotifications(AppDatabase db) async {
+    final now = DateTime.now();
+    final start = DateFormatter.startOfDay(now);
+    final end = DateFormatter.endOfDay(now);
+
+    // Stok rendah
+    final lowStock = await db.getLowStockProducts();
+    for (final p in lowStock) {
+      await db.insertNotification(NotificationsCompanion.insert(
+        title: p.stockQty == 0 ? 'Stok Habis!' : 'Stok Menipis',
+        message: p.stockQty == 0 
+          ? '${p.name} sudah habis. Segera restok.' 
+          : '${p.name} sisa ${p.stockQty} ${p.unit}.',
+        type: p.stockQty == 0 ? 'stock_critical' : 'stock_low',
+        createdAt: Value(now),
+      ));
+    }
+
+    // Transaksi hari ini
+    final txnCount = await db.getTransactionCount(start, end);
+    if (txnCount > 0) {
+      final total = await db.getTotalSales(start, end);
+      await db.insertNotification(NotificationsCompanion.insert(
+        title: 'Transaksi Hari Ini',
+        message: '$txnCount transaksi berhasil. Total: ${CurrencyFormatter.format(total)}',
+        type: 'transaction',
+        createdAt: Value(now),
+      ));
+    }
   }
 
-  void markAllAsRead() {
+  Future<void> markAsRead(int id) async {
+    await _ref.read(databaseProvider).markNotificationRead(id);
+    final items = state.value;
+    if (items != null) {
+      state = AsyncValue.data(
+        items.map((n) => n.id == id ? n.copyWith(isRead: true) : n).toList(),
+      );
+    }
+  }
+
+  Future<void> markAllAsRead() async {
     final items = state.value;
     if (items == null) return;
     
-    final settings = _ref.read(settingsServiceProvider);
-    final currentIds = settings.readNotifications.toSet();
-    currentIds.addAll(items.map((n) => n.id));
-    settings.setReadNotifications(currentIds.toList());
-
+    final db = _ref.read(databaseProvider);
+    for (final n in items) {
+      if (!n.isRead && n.id != null) {
+        await db.markNotificationRead(n.id!);
+      }
+    }
+    
     state = AsyncValue.data(items.map((n) => n.copyWith(isRead: true)).toList());
   }
 
-  void deleteNotification(String id) {
+  Future<void> deleteNotification(int id) async {
+    await _ref.read(databaseProvider).deleteNotification(id);
     final items = state.value;
-    if (items == null) return;
-    state = AsyncValue.data(items.where((n) => n.id != id).toList());
+    if (items != null) {
+      state = AsyncValue.data(items.where((n) => n.id != id).toList());
+    }
   }
 }
 
@@ -201,7 +202,7 @@ class NotificationScreen extends ConsumerWidget {
               itemBuilder: (context, index) {
                 final n = items[index];
                 return Dismissible(
-                  key: Key(n.id),
+                  key: Key(n.id.toString()),
                   direction: DismissDirection.endToStart,
                   background: Container(
                     alignment: Alignment.centerRight,
@@ -213,7 +214,7 @@ class NotificationScreen extends ConsumerWidget {
                     child: const Icon(Icons.delete_rounded, color: Colors.white),
                   ),
                   onDismissed: (_) {
-                    ref.read(notificationNotifierProvider.notifier).deleteNotification(n.id);
+                    if (n.id != null) ref.read(notificationNotifierProvider.notifier).deleteNotification(n.id!);
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('Notifikasi "${n.title}" dihapus'), duration: const Duration(seconds: 2)),
                     );
@@ -221,7 +222,7 @@ class NotificationScreen extends ConsumerWidget {
                   child: _NotificationTile(
                     notification: n,
                     onTap: () {
-                      ref.read(notificationNotifierProvider.notifier).markAsRead(n.id);
+                      if (n.id != null) ref.read(notificationNotifierProvider.notifier).markAsRead(n.id!);
                       _showNotificationDetail(context, n);
                     },
                   ),

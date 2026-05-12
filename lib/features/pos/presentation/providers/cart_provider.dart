@@ -54,7 +54,6 @@ final cartTotalProvider = Provider<double>((ref) {
 
 /// Provider metode bayar
 final paymentMethodProvider = StateProvider<String>((ref) => 'cash');
-final selectedCustomerProvider = StateProvider<Customer?>((ref) => null);
 
 /// Provider jumlah bayar
 final paidAmountProvider = StateProvider<double>((ref) => 0);

@@ -47,40 +47,12 @@ class Products extends Table {
   DateTimeColumn get updatedAt => dateTime().nullable()();
 }
 
-/// Supplier
-class Suppliers extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get name => text().withLength(max: 200)();
-  TextColumn get contactName => text().nullable()();
-  TextColumn get phone => text().nullable()();
-  TextColumn get address => text().nullable()();
-  TextColumn get notes => text().nullable()();
-}
-
-/// Relasi produk-supplier
-class ProductSuppliers extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get productId => integer().references(Products, #id)();
-  IntColumn get supplierId => integer().references(Suppliers, #id)();
-  RealColumn get lastCost => real().nullable()();
-  BoolColumn get isPrimary => boolean().withDefault(const Constant(false))();
-}
-
-/// Pelanggan
-class Customers extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get name => text().withLength(max: 200)();
-  TextColumn get phone => text().nullable()();
-  TextColumn get address => text().nullable()();
-  IntColumn get loyaltyPoints => integer().withDefault(const Constant(0))();
-}
-
 /// Transaksi penjualan (header)
 class Transactions extends Table {
   IntColumn get id => integer().autoIncrement()();
   TextColumn get invoiceNo => text().unique()();
   IntColumn get cashierId => integer().references(Users, #id)();
-  IntColumn get customerId => integer().nullable().references(Customers, #id)();
+  IntColumn get customerId => integer().nullable()();
   TextColumn get paymentMethod => text().withDefault(const Constant('cash'))();
   RealColumn get subtotal => real().withDefault(const Constant(0.0))();
   RealColumn get discount => real().withDefault(const Constant(0.0))();
@@ -102,28 +74,6 @@ class TransactionItems extends Table {
   RealColumn get subtotal => real()();
 }
 
-/// Purchase Order (header)
-class PurchaseOrders extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  TextColumn get poNumber => text().unique()();
-  IntColumn get supplierId => integer().references(Suppliers, #id)();
-  IntColumn get createdBy => integer().references(Users, #id)();
-  TextColumn get status => text().withDefault(const Constant('draft'))();
-  RealColumn get totalAmount => real().withDefault(const Constant(0.0))();
-  DateTimeColumn get expectedDate => dateTime().nullable()();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-}
-
-/// Item PO (detail)
-class PoItems extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get poId => integer().references(PurchaseOrders, #id)();
-  IntColumn get productId => integer().references(Products, #id)();
-  IntColumn get qtyOrdered => integer()();
-  IntColumn get qtyReceived => integer().withDefault(const Constant(0))();
-  RealColumn get costPrice => real()();
-}
-
 /// Penyesuaian stok manual
 class StockAdjustments extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -135,26 +85,6 @@ class StockAdjustments extends Table {
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }
 
-/// Retur (header)
-class Returns extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get transactionId => integer().nullable().references(Transactions, #id)();
-  IntColumn get userId => integer().references(Users, #id)();
-  TextColumn get returnType => text()();
-  TextColumn get reason => text().nullable()();
-  RealColumn get refundAmount => real().withDefault(const Constant(0.0))();
-  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
-}
-
-/// Item retur (detail)
-class ReturnItems extends Table {
-  IntColumn get id => integer().autoIncrement()();
-  IntColumn get returnId => integer().references(Returns, #id)();
-  IntColumn get productId => integer().references(Products, #id)();
-  IntColumn get qty => integer()();
-  RealColumn get unitPrice => real()();
-}
-
 /// Antrian sinkronisasi offline-first
 class SyncQueue extends Table {
   IntColumn get id => integer().autoIncrement()();
@@ -164,4 +94,14 @@ class SyncQueue extends Table {
   TextColumn get data => text()();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   BoolColumn get synced => boolean().withDefault(const Constant(false))();
+}
+
+/// Notifikasi sistem & riwayat alert
+class Notifications extends Table {
+  IntColumn get id => integer().autoIncrement()();
+  TextColumn get title => text().withLength(max: 200)();
+  TextColumn get message => text()();
+  TextColumn get type => text()(); // 'stock_critical', 'stock_low', 'transaction', 'info'
+  BoolColumn get isRead => boolean().withDefault(const Constant(false))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
 }

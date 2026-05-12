@@ -139,6 +139,40 @@ class SyncService {
           isActive: Value(row['is_active'] ?? true),
         ));
       }
+
+
+      // 5. Download Transactions
+      final txnData = await client.from('transactions').select();
+      for (final row in txnData) {
+        await _db.into(_db.transactions).insertOnConflictUpdate(TransactionsCompanion.insert(
+          id: Value(row['id']),
+          invoiceNo: row['invoice_no'],
+          cashierId: row['cashier_id'],
+          customerId: Value(row['customer_id']),
+          paymentMethod: Value(row['payment_method'] ?? 'cash'),
+          subtotal: Value((row['subtotal'] as num?)?.toDouble() ?? 0.0),
+          discount: Value((row['discount'] as num?)?.toDouble() ?? 0.0),
+          total: Value((row['total'] as num?)?.toDouble() ?? 0.0),
+          paidAmount: Value((row['paid_amount'] as num?)?.toDouble() ?? 0.0),
+          changeAmount: Value((row['change_amount'] as num?)?.toDouble() ?? 0.0),
+          status: Value(row['status'] ?? 'completed'),
+          createdAt: Value(DateTime.parse(row['created_at'])),
+        ));
+      }
+
+      // 6. Download Transaction Items
+      final itemData = await client.from('transaction_items').select();
+      for (final row in itemData) {
+        await _db.into(_db.transactionItems).insertOnConflictUpdate(TransactionItemsCompanion.insert(
+          id: Value(row['id']),
+          transactionId: row['transaction_id'],
+          productId: row['product_id'],
+          qty: row['qty'],
+          unitPrice: (row['unit_price'] as num).toDouble(),
+          discount: Value((row['discount'] as num?)?.toDouble() ?? 0.0),
+          subtotal: (row['subtotal'] as num).toDouble(),
+        ));
+      }
     } catch (e) {
       debugPrint('Error downloading user data: $e');
     }

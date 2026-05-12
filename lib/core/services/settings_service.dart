@@ -16,7 +16,6 @@ class SettingsService {
   static const String keyReceiptFooter = 'receipt_footer';
   static const String keyUserId = 'user_id';
   static const String keyThemeMode = 'theme_mode';
-  static const String keyReadNotifications = 'read_notifications';
 
   late SharedPreferences _prefs;
 
@@ -53,17 +52,4 @@ class SettingsService {
     await _prefs.setString(keyThemeMode, mode);
   }
 
-  List<String> get readNotifications => _prefs.getStringList(keyReadNotifications) ?? [];
-
-  Future<void> addReadNotification(String id) async {
-    final current = readNotifications;
-    if (!current.contains(id)) {
-      current.add(id);
-      await _prefs.setStringList(keyReadNotifications, current);
-    }
-  }
-
-  Future<void> setReadNotifications(List<String> ids) async {
-    await _prefs.setStringList(keyReadNotifications, ids);
-  }
 }
