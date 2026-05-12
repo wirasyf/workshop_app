@@ -56,7 +56,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
               icon: Badge(
                 isLabelVisible: count > 0,
                 label: Text('$count', style: const TextStyle(fontSize: 10)),
-                child: const Icon(Icons.notifications_outlined),
+                child: const Icon(Icons.notifications_rounded),
               ),
               onPressed: () => context.go('/notifications'),
             );
@@ -94,7 +94,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
                                 : FileImage(File(user.avatarUrl!)))
                             : null,
                         child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
-                            ? const Icon(Icons.person_outline, color: AppColors.primary)
+                            ? const Icon(Icons.person_rounded, color: AppColors.primary)
                             : null,
                       ),
                     ),
@@ -110,23 +110,23 @@ class OwnerDashboardScreen extends ConsumerWidget {
                   children: [
                     MetricCard(
                       label: 'Omzet Hari Ini', value: CurrencyFormatter.formatCompact(data['totalSales'] ?? 0),
-                      icon: Icons.monetization_on_outlined, iconColor: AppColors.success,
+                      icon: Icons.monetization_on_rounded, iconColor: AppColors.success,
                       subtitle: '+12%',
                       onTap: () => context.go('/reports'),
                     ),
                     MetricCard(
                       label: 'Transaksi', value: '${data['txnCount'] ?? 0}',
-                      icon: Icons.receipt_long_outlined, iconColor: AppColors.info,
+                      icon: Icons.receipt_long_rounded, iconColor: AppColors.info,
                       onTap: () => context.go('/history'),
                     ),
                     MetricCard(
                       label: 'Stok Menipis', value: '${data['lowStockCount'] ?? 0}',
-                      icon: Icons.warning_amber_outlined, iconColor: AppColors.warning,
+                      icon: Icons.warning_rounded, iconColor: AppColors.warning,
                       onTap: () => context.go('/products'),
                     ),
                     MetricCard(
                       label: 'PO Aktif', value: '0',
-                      icon: Icons.local_shipping_outlined, iconColor: AppColors.secondary,
+                      icon: Icons.local_shipping_rounded, iconColor: AppColors.secondary,
                     ),
                   ],
                 ),
@@ -277,14 +277,14 @@ class OwnerDashboardScreen extends ConsumerWidget {
                                   borderRadius: BorderRadius.circular(10),
                                 ),
                                 child: Icon(
-                                  p.stockQty == 0 ? Icons.error_outline : Icons.warning_amber_rounded,
+                                  p.stockQty == 0 ? Icons.error_rounded : Icons.warning_rounded,
                                   size: 18,
                                   color: p.stockQty == 0 ? AppColors.error : AppColors.warning,
                                 ),
                               ),
                               title: Text(p.name, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
                               subtitle: Text('Sisa ${p.stockQty} ${p.unit}'),
-                              trailing: const Icon(Icons.chevron_right, size: 18, color: AppColors.textHint),
+                              trailing: const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
                               onTap: () => context.go('/products/${p.id}'),
                               dense: true,
                             ),

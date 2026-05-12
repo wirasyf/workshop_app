@@ -80,12 +80,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.photo_library),
+              leading: const Icon(Icons.photo_library_rounded),
               title: const Text('Galeri'),
               onTap: () => Navigator.pop(context, ImageSource.gallery),
             ),
             ListTile(
-              leading: const Icon(Icons.camera_alt),
+              leading: const Icon(Icons.camera_alt_rounded),
               title: const Text('Kamera'),
               onTap: () => Navigator.pop(context, ImageSource.camera),
             ),
@@ -256,7 +256,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Produk' : 'Tambah Produk'),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.chevron_left_rounded),
           onPressed: () => context.go('/products'),
         ),
       ),
@@ -290,7 +290,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                                 imageUrl: _imagePath!,
                                 fit: BoxFit.cover,
                                 placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
-                                errorWidget: (context, url, error) => const Icon(Icons.error),
+                                errorWidget: (context, url, error) => const Icon(Icons.error_rounded),
                               )
                             : Image.file(
                                 File(_imagePath!),
@@ -301,7 +301,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             Icon(
-                              Icons.add_a_photo,
+                              Icons.add_a_photo_rounded,
                               color: AppColors.primary,
                               size: 32,
                             ),
@@ -334,7 +334,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     _barcodeCtrl,
                     'Barcode',
                     suffix: IconButton(
-                      icon: const Icon(Icons.qr_code_scanner, size: 20),
+                      icon: const Icon(Icons.qr_code_scanner_rounded, size: 20),
                       onPressed: () async {
                         final code = await Navigator.push<String>(
                           context,

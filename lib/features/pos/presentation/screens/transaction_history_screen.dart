@@ -26,7 +26,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (items) {
           if (items.isEmpty) {
-            return const EmptyStateWidget(icon: Icons.receipt_long_outlined, title: 'Belum ada transaksi hari ini');
+            return const EmptyStateWidget(icon: Icons.receipt_long_rounded, title: 'Belum ada transaksi hari ini');
           }
           return ListView.separated(
             padding: const EdgeInsets.all(16),
@@ -48,7 +48,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
                       color: AppColors.success.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: const Icon(Icons.receipt, color: AppColors.success, size: 22),
+                    child: const Icon(Icons.receipt_rounded, color: AppColors.success, size: 22),
                   ),
                   const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [

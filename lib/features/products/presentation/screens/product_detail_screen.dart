@@ -21,9 +21,9 @@ class ProductDetailScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Detail Produk'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/products')),
+        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/products')),
         actions: [
-          IconButton(icon: const Icon(Icons.edit_outlined), onPressed: () => context.go('/products/$productId/edit')),
+          IconButton(icon: const Icon(Icons.edit_rounded), onPressed: () => context.go('/products/$productId/edit')),
         ],
       ),
       body: productAsync.when(
@@ -62,15 +62,15 @@ class ProductDetailScreen extends ConsumerWidget {
                                         imageUrl: product.imageUrl!,
                                         fit: BoxFit.cover,
                                         placeholder: (_, __) => const Center(child: CircularProgressIndicator()),
-                                        errorWidget: (_, __, ___) => const Icon(Icons.error, size: 40),
+                                        errorWidget: (_, __, ___) => const Icon(Icons.error_rounded, size: 40),
                                       )
                                     : Image.file(
                                         File(product.imageUrl!),
                                         fit: BoxFit.cover,
-                                        errorBuilder: (_, __, ___) => const Icon(Icons.settings_outlined, size: 40, color: AppColors.primary),
+                                        errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, size: 40, color: AppColors.primary),
                                       ),
                               )
-                            : const Icon(Icons.settings_outlined, size: 40, color: AppColors.primary),
+                            : const Icon(Icons.settings_rounded, size: 40, color: AppColors.primary),
                       ),
                       const SizedBox(height: 12),
                       Text(product.name, style: theme.textTheme.headlineSmall, textAlign: TextAlign.center),
@@ -112,7 +112,7 @@ class ProductDetailScreen extends ConsumerWidget {
                     Expanded(
                       child: OutlinedButton.icon(
                         onPressed: () => context.go('/products/$productId/adjust'),
-                        icon: const Icon(Icons.tune, size: 18),
+                        icon: const Icon(Icons.tune_rounded, size: 18),
                         label: const Text('Sesuaikan Stok'),
                       ),
                     ),
@@ -120,7 +120,7 @@ class ProductDetailScreen extends ConsumerWidget {
                     Expanded(
                       child: ElevatedButton.icon(
                         onPressed: () => context.go('/products/$productId/edit'),
-                        icon: const Icon(Icons.edit, size: 18),
+                        icon: const Icon(Icons.edit_rounded, size: 18),
                         label: const Text('Edit Produk'),
                       ),
                     ),

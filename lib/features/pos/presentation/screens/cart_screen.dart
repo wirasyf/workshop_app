@@ -190,10 +190,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Keranjang'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/pos')),
+        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/pos')),
         actions: [
           if (cart.isNotEmpty)
-            IconButton(icon: const Icon(Icons.delete_outline), onPressed: () => ref.read(cartProvider.notifier).clear()),
+            IconButton(icon: const Icon(Icons.delete_rounded), onPressed: () => ref.read(cartProvider.notifier).clear()),
         ],
       ),
       body: cart.isEmpty
@@ -217,12 +217,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                           // Qty controls
                           Row(children: [
-                            _qtyButton(Icons.remove, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty - 1)),
+                            _qtyButton(Icons.remove_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty - 1)),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: Text('${item.qty}', style: theme.textTheme.titleSmall),
                             ),
-                            _qtyButton(Icons.add, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1)),
+                            _qtyButton(Icons.add_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1)),
                           ]),
                           const SizedBox(width: 12),
                           SizedBox(
@@ -272,7 +272,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           labelText: 'Jumlah Bayar',
                           prefixText: 'Rp ',
                           suffixIcon: IconButton(
-                            icon: const Icon(Icons.close, size: 18),
+                            icon: const Icon(Icons.close_rounded, size: 18),
                             onPressed: () => _paidCtrl.clear(),
                           ),
                         ),

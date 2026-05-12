@@ -27,7 +27,7 @@ class CategoryListScreen extends ConsumerWidget {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.category_outlined, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
+                  Icon(Icons.category_rounded, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
                   const Text('Belum ada kategori', style: TextStyle(color: AppColors.textSecondary)),
                 ],
@@ -47,7 +47,7 @@ class CategoryListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => _showCategoryDialog(context, ref),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
         label: const Text('Kategori Baru'),
       ),
     );
@@ -142,11 +142,11 @@ class _CategoryTile extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             IconButton(
-              icon: const Icon(Icons.edit_outlined, size: 20, color: AppColors.primary),
+              icon: const Icon(Icons.edit_rounded, size: 20, color: AppColors.primary),
               onPressed: () => const CategoryListScreen()._showCategoryDialog(context, ref, category: category),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, size: 20, color: AppColors.error),
+              icon: const Icon(Icons.delete_rounded, size: 20, color: AppColors.error),
               onPressed: () => _confirmDelete(context, ref),
             ),
           ],

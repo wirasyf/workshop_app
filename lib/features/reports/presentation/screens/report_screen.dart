@@ -72,7 +72,7 @@ class ReportScreen extends ConsumerWidget {
         title: const Text('Laporan Penjualan'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.download_outlined),
+            icon: const Icon(Icons.download_rounded),
             tooltip: 'Unduh Laporan CSV',
             onPressed: () => _exportReport(context, ref),
           ),
@@ -143,7 +143,7 @@ class ReportScreen extends ConsumerWidget {
                               value: CurrencyFormatter.formatCompact(
                                 data['totalSales'] ?? 0,
                               ),
-                              icon: Icons.monetization_on_outlined,
+                              icon: Icons.monetization_on_rounded,
                               iconColor: AppColors.success,
                             ),
                           ),
@@ -152,7 +152,7 @@ class ReportScreen extends ConsumerWidget {
                             child: MetricCard(
                               label: 'Transaksi',
                               value: '${data['txnCount'] ?? 0}',
-                              icon: Icons.receipt_long_outlined,
+                              icon: Icons.receipt_long_rounded,
                               iconColor: AppColors.info,
                             ),
                           ),
@@ -220,7 +220,7 @@ class ReportScreen extends ConsumerWidget {
                                         borderRadius: BorderRadius.circular(10),
                                       ),
                                       child: const Icon(
-                                        Icons.receipt,
+                                        Icons.receipt_rounded,
                                         color: AppColors.success,
                                         size: 18,
                                       ),

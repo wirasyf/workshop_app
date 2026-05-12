@@ -58,7 +58,7 @@ class SettingsScreen extends ConsumerWidget {
               ]),
               const Spacer(),
               IconButton(
-                icon: const Icon(Icons.edit_outlined, color: AppColors.primary),
+                icon: const Icon(Icons.edit_rounded, color: AppColors.primary),
                 onPressed: () => context.go('/settings/edit-profile'),
               ),
             ]),
@@ -66,15 +66,15 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 20),
 
           // Status koneksi
-          _settingsTile(Icons.wifi, 'Status Koneksi',
+          _settingsTile(Icons.wifi_rounded, 'Status Koneksi',
             subtitle: isOnline.when(data: (v) => v ? 'Online' : 'Offline', loading: () => '...', error: (_, __) => 'Error'),
             trailing: isOnline.when(
               data: (v) => Icon(Icons.circle, size: 12, color: v ? AppColors.success : AppColors.error),
               loading: () => const SizedBox(width: 12, height: 12, child: CircularProgressIndicator(strokeWidth: 1)),
-              error: (_, __) => const Icon(Icons.error, size: 12, color: AppColors.error),
+              error: (_, __) => const Icon(Icons.error_rounded, size: 12, color: AppColors.error),
             ),
           ),
-          _settingsTile(Icons.sync, 'Sinkronisasi Data', subtitle: 'Sinkronisasi otomatis saat online', onTap: () {
+          _settingsTile(Icons.sync_rounded, 'Sinkronisasi Data', subtitle: 'Sinkronisasi otomatis saat online', onTap: () {
             ref.read(syncServiceProvider).syncPendingChanges();
             AppToast.show(context, 'Sinkronisasi dimulai', type: ToastType.info);
           }),
@@ -83,7 +83,7 @@ class SettingsScreen extends ConsumerWidget {
             final themeMode = ref.watch(themeModeProvider);
             final isDark = themeMode == ThemeMode.dark;
             return _settingsTile(
-              Icons.dark_mode_outlined,
+              Icons.dark_mode_rounded,
               'Mode Gelap',
               subtitle: 'Gunakan tema visual gelap',
               trailing: Switch(
@@ -99,11 +99,11 @@ class SettingsScreen extends ConsumerWidget {
           }),
           
           const Divider(height: 32),
-          _settingsTile(Icons.store, 'Profil Toko', subtitle: 'SpareArt Motor', onTap: () => context.go('/settings/store-profile')),
-          _settingsTile(Icons.receipt_long, 'Template Struk', subtitle: 'Konfigurasi struk thermal', onTap: () => context.go('/settings/receipt-template')),
-          _settingsTile(Icons.lock_outline, 'Ganti Password', onTap: () => context.go('/settings/change-password')),
+          _settingsTile(Icons.store_rounded, 'Profil Toko', subtitle: 'SpareArt Motor', onTap: () => context.go('/settings/store-profile')),
+          _settingsTile(Icons.receipt_long_rounded, 'Template Struk', subtitle: 'Konfigurasi struk thermal', onTap: () => context.go('/settings/receipt-template')),
+          _settingsTile(Icons.lock_rounded, 'Ganti Password', onTap: () => context.go('/settings/change-password')),
           const Divider(height: 32),
-          _settingsTile(Icons.info_outline, 'Tentang Aplikasi', subtitle: 'SpareArt Motor v1.0.0'),
+          _settingsTile(Icons.info_rounded, 'Tentang Aplikasi', subtitle: 'SpareArt Motor v1.0.0'),
           const SizedBox(height: 16),
 
           // Logout
@@ -114,7 +114,7 @@ class SettingsScreen extends ConsumerWidget {
                 await ref.read(authStateProvider.notifier).logout();
                 if (context.mounted) context.go('/login');
               },
-              icon: const Icon(Icons.logout, color: AppColors.error),
+              icon: const Icon(Icons.logout_rounded, color: AppColors.error),
               label: const Text('Keluar', style: TextStyle(color: AppColors.error)),
               style: OutlinedButton.styleFrom(side: const BorderSide(color: AppColors.error)),
             ),
@@ -129,7 +129,7 @@ class SettingsScreen extends ConsumerWidget {
       leading: Icon(icon, color: AppColors.primary),
       title: Text(title),
       subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: trailing ?? const Icon(Icons.chevron_right, color: AppColors.textHint),
+      trailing: trailing ?? const Icon(Icons.chevron_right_rounded, color: AppColors.textHint),
       contentPadding: EdgeInsets.zero,
       dense: true,
       onTap: onTap,

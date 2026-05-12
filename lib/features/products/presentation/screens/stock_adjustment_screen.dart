@@ -82,7 +82,7 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Sesuaikan Stok'),
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: () => context.go('/products/${widget.productId}')),
+        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/products/${widget.productId}')),
       ),
       body: productAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
@@ -99,7 +99,7 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
                   padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(color: AppColors.infoLight, borderRadius: BorderRadius.circular(12)),
                   child: Row(children: [
-                    const Icon(Icons.inventory_2, color: AppColors.info),
+                    const Icon(Icons.inventory_2_rounded, color: AppColors.info),
                     const SizedBox(width: 12),
                     Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                       Text(product.name, style: theme.textTheme.titleSmall),
@@ -120,9 +120,9 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
 
                 // Tambah / Kurang
                 Row(children: [
-                  Expanded(child: _toggleButton('Tambah', true, Icons.add)),
+                  Expanded(child: _toggleButton('Tambah', true, Icons.add_rounded)),
                   const SizedBox(width: 12),
-                  Expanded(child: _toggleButton('Kurangi', false, Icons.remove)),
+                  Expanded(child: _toggleButton('Kurangi', false, Icons.remove_rounded)),
                 ]),
                 const SizedBox(height: 16),
 

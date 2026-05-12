@@ -27,7 +27,7 @@ class PosProductScreen extends ConsumerWidget {
         title: const Text('Kasir / POS'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.qr_code_scanner), 
+            icon: const Icon(Icons.qr_code_scanner_rounded), 
             onPressed: () async {
               final code = await Navigator.push<String>(
                 context,
@@ -49,7 +49,7 @@ class PosProductScreen extends ConsumerWidget {
               onChanged: (v) => ref.read(productSearchProvider.notifier).state = v,
               decoration: const InputDecoration(
                 hintText: 'Cari produk...',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
           ),
@@ -65,7 +65,7 @@ class PosProductScreen extends ConsumerWidget {
               error: (e, _) => Center(child: Text('Error: $e')),
               data: (items) {
                 if (items.isEmpty) {
-                  return const EmptyStateWidget(icon: Icons.inventory_2_outlined, title: 'Tidak ada produk');
+                  return const EmptyStateWidget(icon: Icons.inventory_2_rounded, title: 'Tidak ada produk');
                 }
                 return GridView.builder(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -85,7 +85,7 @@ class PosProductScreen extends ConsumerWidget {
       floatingActionButton: cartItemCount > 0
           ? FloatingActionButton.extended(
               onPressed: () => context.go('/pos/cart'),
-              icon: const Icon(Icons.shopping_cart),
+              icon: const Icon(Icons.shopping_cart_rounded),
               label: Text('Keranjang ($cartItemCount)'),
               backgroundColor: AppColors.secondary,
             )
@@ -150,9 +150,9 @@ class _PosProductCard extends ConsumerWidget {
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(10),
                             child: Image.file(File(product.imageUrl!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => 
-                              Icon(Icons.settings_outlined, size: 36, color: isOutOfStock ? AppColors.textHint : AppColors.primary)),
+                              Icon(Icons.settings_rounded, size: 36, color: isOutOfStock ? AppColors.textHint : AppColors.primary)),
                           )
-                        : Icon(Icons.settings_outlined, size: 36,
+                        : Icon(Icons.settings_rounded, size: 36,
                             color: isOutOfStock ? AppColors.textHint : AppColors.primary),
                   ),
                 ),

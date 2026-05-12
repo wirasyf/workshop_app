@@ -45,7 +45,7 @@ class EmptyStateWidget extends StatelessWidget {
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: onAction,
-                icon: const Icon(Icons.add, size: 18),
+                icon: const Icon(Icons.add_rounded, size: 18),
                 label: Text(actionLabel!),
               ),
             ],

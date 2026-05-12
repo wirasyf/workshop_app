@@ -25,7 +25,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
                   color: AppColors.successLight,
                   shape: BoxShape.circle,
                 ),
-                child: const Icon(Icons.check_circle, size: 72, color: AppColors.success),
+                child: const Icon(Icons.check_circle_rounded, size: 72, color: AppColors.success),
               ),
               const SizedBox(height: 24),
               Text('Pembayaran Berhasil!', style: theme.textTheme.headlineMedium),
@@ -36,7 +36,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
                 width: double.infinity, height: 52,
                 child: ElevatedButton.icon(
                   onPressed: () => context.go('/pos'),
-                  icon: const Icon(Icons.add_shopping_cart),
+                  icon: const Icon(Icons.add_shopping_cart_rounded),
                   label: const Text('Transaksi Baru'),
                 ),
               ),
@@ -63,7 +63,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
                       ),
                     );
                   },
-                  icon: const Icon(Icons.receipt_outlined),
+                  icon: const Icon(Icons.receipt_long_rounded),
                   label: const Text('Lihat Struk'),
                 ),
               ),

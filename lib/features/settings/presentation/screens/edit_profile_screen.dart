@@ -174,7 +174,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                                 : (File(_currentAvatarUrl!).existsSync() ? FileImage(File(_currentAvatarUrl!)) : null)) 
                             : null) as ImageProvider?,
                     child: (_imageFile == null && (_currentAvatarUrl == null || _currentAvatarUrl!.isEmpty))
-                        ? const Icon(Icons.person, size: 50, color: AppColors.primary)
+                        ? const Icon(Icons.person_rounded, size: 50, color: AppColors.primary)
                         : null,
                   ),
                   Positioned(
@@ -188,7 +188,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                           color: AppColors.primary,
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(Icons.camera_alt, size: 18, color: Colors.white),
+                        child: const Icon(Icons.camera_alt_rounded, size: 18, color: Colors.white),
                       ),
                     ),
                   ),

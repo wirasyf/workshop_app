@@ -59,7 +59,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
             message: '${p.name} sudah habis. Segera lakukan restok agar penjualan tidak terganggu.',
             type: 'stock_critical',
             createdAt: now,
-            icon: Icons.error_outline,
+            icon: Icons.error_rounded,
           ));
         } else {
           notifications.add(AppNotification(
@@ -83,7 +83,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
           message: '$txnCount transaksi berhasil dengan total omzet ${CurrencyFormatter.format(totalSales)}.',
           type: 'transaction',
           createdAt: now,
-          icon: Icons.receipt_long_outlined,
+          icon: Icons.receipt_long_rounded,
         ));
       } else {
         notifications.add(AppNotification(
@@ -92,7 +92,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
           message: 'Belum ada transaksi hari ini. Semangat berjualan!',
           type: 'info',
           createdAt: now,
-          icon: Icons.info_outline,
+          icon: Icons.info_rounded,
         ));
       }
 
@@ -170,7 +170,7 @@ class NotificationScreen extends ConsumerWidget {
           if (notifs.value?.any((n) => !n.isRead) == true)
             TextButton.icon(
               onPressed: () => ref.read(notificationNotifierProvider.notifier).markAllAsRead(),
-              icon: const Icon(Icons.done_all, size: 18),
+              icon: const Icon(Icons.done_all_rounded, size: 18),
               label: const Text('Baca Semua', style: TextStyle(fontSize: 12)),
             ),
         ],
@@ -184,7 +184,7 @@ class NotificationScreen extends ConsumerWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.notifications_off_outlined, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
+                  Icon(Icons.notifications_off_rounded, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
                   Text('Tidak ada notifikasi', style: theme.textTheme.bodyLarge?.copyWith(color: AppColors.textSecondary)),
                 ],
@@ -210,7 +210,7 @@ class NotificationScreen extends ConsumerWidget {
                       color: AppColors.error,
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.delete_outline, color: Colors.white),
+                    child: const Icon(Icons.delete_rounded, color: Colors.white),
                   ),
                   onDismissed: (_) {
                     ref.read(notificationNotifierProvider.notifier).deleteNotification(n.id);
@@ -286,7 +286,7 @@ class NotificationScreen extends ConsumerWidget {
             Text(n.message, style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary, height: 1.5)),
             const SizedBox(height: 12),
             Row(children: [
-              Icon(Icons.access_time, size: 14, color: AppColors.textHint),
+              Icon(Icons.access_time_rounded, size: 14, color: AppColors.textHint),
               const SizedBox(width: 4),
               Text(DateFormatter.formatWithTime(n.createdAt),
                 style: TextStyle(fontSize: 12, color: AppColors.textHint)),
@@ -383,7 +383,7 @@ class _NotificationTile extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, size: 18, color: AppColors.textHint),
+            const Icon(Icons.chevron_right_rounded, size: 18, color: AppColors.textHint),
           ],
         ),
       ),

@@ -86,7 +86,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               decoration: InputDecoration(
                 labelText: 'Password Lama',
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureOld ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(_obscureOld ? Icons.visibility_off_rounded : Icons.visibility_rounded),
                   onPressed: () => setState(() => _obscureOld = !_obscureOld),
                 ),
               ),
@@ -99,7 +99,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               decoration: InputDecoration(
                 labelText: 'Password Baru',
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureNew ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(_obscureNew ? Icons.visibility_off_rounded : Icons.visibility_rounded),
                   onPressed: () => setState(() => _obscureNew = !_obscureNew),
                 ),
               ),
@@ -116,7 +116,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
               decoration: InputDecoration(
                 labelText: 'Konfirmasi Password Baru',
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureConfirm ? Icons.visibility_off : Icons.visibility),
+                  icon: Icon(_obscureConfirm ? Icons.visibility_off_rounded : Icons.visibility_rounded),
                   onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
               ),

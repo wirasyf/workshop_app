@@ -24,7 +24,7 @@ class ProductListScreen extends ConsumerWidget {
         title: const Text('Manajemen Stok'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.category_outlined),
+            icon: const Icon(Icons.category_rounded),
             onPressed: () => context.go('/products/categories'),
             tooltip: 'Kelola Kategori',
           ),
@@ -39,7 +39,7 @@ class ProductListScreen extends ConsumerWidget {
               onChanged: (v) => ref.read(productSearchProvider.notifier).state = v,
               decoration: const InputDecoration(
                 hintText: 'Cari produk, SKU, barcode...',
-                prefixIcon: Icon(Icons.search),
+                prefixIcon: Icon(Icons.search_rounded),
               ),
             ),
           ),
@@ -91,7 +91,7 @@ class ProductListScreen extends ConsumerWidget {
               data: (items) {
                 if (items.isEmpty) {
                   return const EmptyStateWidget(
-                    icon: Icons.inventory_2_outlined,
+                    icon: Icons.inventory_2_rounded,
                     title: 'Belum ada produk',
                     subtitle: 'Tambah produk pertama Anda menggunakan tombol di bawah',
                   );
@@ -112,7 +112,7 @@ class ProductListScreen extends ConsumerWidget {
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/products/add'),
-        icon: const Icon(Icons.add),
+        icon: const Icon(Icons.add_rounded),
         label: const Text('Produk Baru'),
       ),
     );
@@ -152,15 +152,15 @@ class _ProductTile extends StatelessWidget {
                             imageUrl: product.imageUrl!,
                             fit: BoxFit.cover,
                             placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (_, __, ___) => const Icon(Icons.error, size: 20),
+                            errorWidget: (_, __, ___) => const Icon(Icons.error_rounded, size: 20),
                           )
                         : Image.file(
                             File(product.imageUrl!),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.settings_outlined, color: AppColors.primary, size: 28),
+                            errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
                           ),
                     )
-                  : const Icon(Icons.settings_outlined, color: AppColors.primary, size: 28),
+                  : const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
             ),
             const SizedBox(width: 12),
             Expanded(
