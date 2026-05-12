@@ -39,7 +39,7 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
     setState(() => _isLoading = true);
 
     final db = ref.read(databaseProvider);
-    final user = ref.read(authStateProvider).valueOrNull;
+    final user = ref.read(authStateProvider).value;
     final qty = int.parse(_qtyCtrl.text);
     final change = _isAdd ? qty : -qty;
 

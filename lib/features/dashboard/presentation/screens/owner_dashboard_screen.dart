@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -41,6 +43,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final dashboard = ref.watch(ownerDashboardProvider);
+    final user = ref.watch(authStateProvider).value;
     final theme = Theme.of(context);
 
     return Scaffold(
@@ -76,10 +79,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Consumer(builder: (context, ref, _) {
-                          final user = ref.watch(authStateProvider).valueOrNull;
-                          return Text('Halo, ${user?.name ?? "Owner"} 👋', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold));
-                        }),
+                        Text('Halo, ${user?.name ?? "User"} 👋', style: theme.textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold)),
                         const SizedBox(height: 2),
                         Text(DateFormatter.formatLong(DateTime.now()), style: theme.textTheme.bodySmall),
                       ],
@@ -88,7 +88,14 @@ class OwnerDashboardScreen extends ConsumerWidget {
                       onTap: () => context.go('/settings'),
                       child: CircleAvatar(
                         backgroundColor: AppColors.primary.withValues(alpha: 0.1),
-                        child: const Icon(Icons.person_outline, color: AppColors.primary),
+                        backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                            ? (user.avatarUrl!.startsWith('http')
+                                ? CachedNetworkImageProvider(user.avatarUrl!)
+                                : FileImage(File(user.avatarUrl!)))
+                            : null,
+                        child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                            ? const Icon(Icons.person_outline, color: AppColors.primary)
+                            : null,
                       ),
                     ),
                   ],
@@ -153,7 +160,7 @@ class OwnerDashboardScreen extends ConsumerWidget {
                               barTouchData: BarTouchData(
                                 touchTooltipData: BarTouchTooltipData(
                                   getTooltipColor: (_) => const Color(0xFF334155),
-                                  tooltipRoundedRadius: 8,
+                                  tooltipBorder: BorderSide.none,
                                   getTooltipItem: (group, groupIndex, rod, rodIndex) {
                                     return BarTooltipItem(
                                       CurrencyFormatter.formatCompact(rod.toY * 1000),

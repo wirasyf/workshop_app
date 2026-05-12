@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
@@ -146,8 +147,18 @@ class _ProductTile extends StatelessWidget {
               child: product.imageUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: Image.file(File(product.imageUrl!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => 
-                        const Icon(Icons.settings_outlined, color: AppColors.primary, size: 28)),
+                      child: product.imageUrl!.startsWith('http')
+                        ? CachedNetworkImage(
+                            imageUrl: product.imageUrl!,
+                            fit: BoxFit.cover,
+                            placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorWidget: (_, __, ___) => const Icon(Icons.error, size: 20),
+                          )
+                        : Image.file(
+                            File(product.imageUrl!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => const Icon(Icons.settings_outlined, color: AppColors.primary, size: 28),
+                          ),
                     )
                   : const Icon(Icons.settings_outlined, color: AppColors.primary, size: 28),
             ),

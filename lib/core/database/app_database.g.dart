@@ -72,7 +72,18 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: false,
-    defaultValue: const Constant('kasir'),
+    defaultValue: const Constant('owner'),
+  );
+  static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
+    'avatarUrl',
+  );
+  @override
+  late final GeneratedColumn<String> avatarUrl = GeneratedColumn<String>(
+    'avatar_url',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
   );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
@@ -120,6 +131,7 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     email,
     passwordHash,
     role,
+    avatarUrl,
     isActive,
     createdAt,
     supabaseUid,
@@ -180,6 +192,12 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         role.isAcceptableOrUnknown(data['role']!, _roleMeta),
       );
     }
+    if (data.containsKey('avatar_url')) {
+      context.handle(
+        _avatarUrlMeta,
+        avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -234,6 +252,10 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         DriftSqlType.string,
         data['${effectivePrefix}role'],
       )!,
+      avatarUrl: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}avatar_url'],
+      ),
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -262,6 +284,7 @@ class User extends DataClass implements Insertable<User> {
   final String email;
   final String passwordHash;
   final String role;
+  final String? avatarUrl;
   final bool isActive;
   final DateTime createdAt;
   final String? supabaseUid;
@@ -272,6 +295,7 @@ class User extends DataClass implements Insertable<User> {
     required this.email,
     required this.passwordHash,
     required this.role,
+    this.avatarUrl,
     required this.isActive,
     required this.createdAt,
     this.supabaseUid,
@@ -285,6 +309,9 @@ class User extends DataClass implements Insertable<User> {
     map['email'] = Variable<String>(email);
     map['password_hash'] = Variable<String>(passwordHash);
     map['role'] = Variable<String>(role);
+    if (!nullToAbsent || avatarUrl != null) {
+      map['avatar_url'] = Variable<String>(avatarUrl);
+    }
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || supabaseUid != null) {
@@ -301,6 +328,9 @@ class User extends DataClass implements Insertable<User> {
       email: Value(email),
       passwordHash: Value(passwordHash),
       role: Value(role),
+      avatarUrl: avatarUrl == null && nullToAbsent
+          ? const Value.absent()
+          : Value(avatarUrl),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       supabaseUid: supabaseUid == null && nullToAbsent
@@ -321,6 +351,7 @@ class User extends DataClass implements Insertable<User> {
       email: serializer.fromJson<String>(json['email']),
       passwordHash: serializer.fromJson<String>(json['passwordHash']),
       role: serializer.fromJson<String>(json['role']),
+      avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       supabaseUid: serializer.fromJson<String?>(json['supabaseUid']),
@@ -336,6 +367,7 @@ class User extends DataClass implements Insertable<User> {
       'email': serializer.toJson<String>(email),
       'passwordHash': serializer.toJson<String>(passwordHash),
       'role': serializer.toJson<String>(role),
+      'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'supabaseUid': serializer.toJson<String?>(supabaseUid),
@@ -349,6 +381,7 @@ class User extends DataClass implements Insertable<User> {
     String? email,
     String? passwordHash,
     String? role,
+    Value<String?> avatarUrl = const Value.absent(),
     bool? isActive,
     DateTime? createdAt,
     Value<String?> supabaseUid = const Value.absent(),
@@ -359,6 +392,7 @@ class User extends DataClass implements Insertable<User> {
     email: email ?? this.email,
     passwordHash: passwordHash ?? this.passwordHash,
     role: role ?? this.role,
+    avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     supabaseUid: supabaseUid.present ? supabaseUid.value : this.supabaseUid,
@@ -373,6 +407,7 @@ class User extends DataClass implements Insertable<User> {
           ? data.passwordHash.value
           : this.passwordHash,
       role: data.role.present ? data.role.value : this.role,
+      avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       supabaseUid: data.supabaseUid.present
@@ -390,6 +425,7 @@ class User extends DataClass implements Insertable<User> {
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
           ..write('role: $role, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('supabaseUid: $supabaseUid')
@@ -405,6 +441,7 @@ class User extends DataClass implements Insertable<User> {
     email,
     passwordHash,
     role,
+    avatarUrl,
     isActive,
     createdAt,
     supabaseUid,
@@ -419,6 +456,7 @@ class User extends DataClass implements Insertable<User> {
           other.email == this.email &&
           other.passwordHash == this.passwordHash &&
           other.role == this.role &&
+          other.avatarUrl == this.avatarUrl &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.supabaseUid == this.supabaseUid);
@@ -431,6 +469,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   final Value<String> email;
   final Value<String> passwordHash;
   final Value<String> role;
+  final Value<String?> avatarUrl;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<String?> supabaseUid;
@@ -441,6 +480,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.email = const Value.absent(),
     this.passwordHash = const Value.absent(),
     this.role = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
@@ -452,6 +492,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     required String email,
     required String passwordHash,
     this.role = const Value.absent(),
+    this.avatarUrl = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
@@ -466,6 +507,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Expression<String>? email,
     Expression<String>? passwordHash,
     Expression<String>? role,
+    Expression<String>? avatarUrl,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<String>? supabaseUid,
@@ -477,6 +519,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       if (email != null) 'email': email,
       if (passwordHash != null) 'password_hash': passwordHash,
       if (role != null) 'role': role,
+      if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (supabaseUid != null) 'supabase_uid': supabaseUid,
@@ -490,6 +533,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Value<String>? email,
     Value<String>? passwordHash,
     Value<String>? role,
+    Value<String?>? avatarUrl,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<String?>? supabaseUid,
@@ -501,6 +545,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       email: email ?? this.email,
       passwordHash: passwordHash ?? this.passwordHash,
       role: role ?? this.role,
+      avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       supabaseUid: supabaseUid ?? this.supabaseUid,
@@ -528,6 +573,9 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (role.present) {
       map['role'] = Variable<String>(role.value);
     }
+    if (avatarUrl.present) {
+      map['avatar_url'] = Variable<String>(avatarUrl.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -549,6 +597,7 @@ class UsersCompanion extends UpdateCompanion<User> {
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
           ..write('role: $role, ')
+          ..write('avatarUrl: $avatarUrl, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('supabaseUid: $supabaseUid')
@@ -6767,6 +6816,7 @@ typedef $$UsersTableCreateCompanionBuilder =
       required String email,
       required String passwordHash,
       Value<String> role,
+      Value<String?> avatarUrl,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<String?> supabaseUid,
@@ -6779,6 +6829,7 @@ typedef $$UsersTableUpdateCompanionBuilder =
       Value<String> email,
       Value<String> passwordHash,
       Value<String> role,
+      Value<String?> avatarUrl,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<String?> supabaseUid,
@@ -6899,6 +6950,11 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
 
   ColumnFilters<String> get role => $composableBuilder(
     column: $table.role,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -7057,6 +7113,11 @@ class $$UsersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get avatarUrl => $composableBuilder(
+    column: $table.avatarUrl,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -7101,6 +7162,9 @@ class $$UsersTableAnnotationComposer
 
   GeneratedColumn<String> get role =>
       $composableBuilder(column: $table.role, builder: (column) => column);
+
+  GeneratedColumn<String> get avatarUrl =>
+      $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -7253,6 +7317,7 @@ class $$UsersTableTableManager
                 Value<String> email = const Value.absent(),
                 Value<String> passwordHash = const Value.absent(),
                 Value<String> role = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> supabaseUid = const Value.absent(),
@@ -7263,6 +7328,7 @@ class $$UsersTableTableManager
                 email: email,
                 passwordHash: passwordHash,
                 role: role,
+                avatarUrl: avatarUrl,
                 isActive: isActive,
                 createdAt: createdAt,
                 supabaseUid: supabaseUid,
@@ -7275,6 +7341,7 @@ class $$UsersTableTableManager
                 required String email,
                 required String passwordHash,
                 Value<String> role = const Value.absent(),
+                Value<String?> avatarUrl = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> supabaseUid = const Value.absent(),
@@ -7285,6 +7352,7 @@ class $$UsersTableTableManager
                 email: email,
                 passwordHash: passwordHash,
                 role: role,
+                avatarUrl: avatarUrl,
                 isActive: isActive,
                 createdAt: createdAt,
                 supabaseUid: supabaseUid,

@@ -15,7 +15,27 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
+
+  @override
+  MigrationStrategy get migration {
+    return MigrationStrategy(
+      onCreate: (m) async {
+        await m.createAll();
+      },
+      onUpgrade: (m, from, to) async {
+        if (from < 2) {
+          // Tambahkan kolom baru ke tabel yang sudah ada
+          await m.addColumn(users, users.avatarUrl);
+          await m.addColumn(products, products.sellPriceWholesale);
+          await m.addColumn(products, products.updatedAt);
+        }
+      },
+      beforeOpen: (details) async {
+        // Optional: Logika tambahan sebelum database dibuka
+      },
+    );
+  }
 
   static QueryExecutor _openConnection() {
     return driftDatabase(name: AppConstants.dbName);

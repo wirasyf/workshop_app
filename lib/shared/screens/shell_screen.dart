@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../features/auth/presentation/providers/auth_provider.dart';
-import '../../core/constants/app_constants.dart';
 import '../../core/constants/app_colors.dart';
 import '../../core/services/connectivity_service.dart';
 
@@ -13,10 +11,7 @@ class ShellScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final authState = ref.watch(authStateProvider);
     final isOnline = ref.watch(connectivityProvider);
-    final role = authState.valueOrNull?.role ?? AppConstants.roleKasir;
-    final isOwner = role == AppConstants.roleOwner;
     final location = GoRouterState.of(context).matchedLocation;
 
     return Scaffold(
@@ -42,9 +37,7 @@ class ShellScreen extends ConsumerWidget {
           Expanded(child: child),
         ],
       ),
-      bottomNavigationBar: isOwner
-          ? _ownerBottomNav(context, location)
-          : _cashierBottomNav(context, location),
+      bottomNavigationBar: _ownerBottomNav(context, location),
     );
   }
 
@@ -77,26 +70,5 @@ class ShellScreen extends ConsumerWidget {
     );
   }
 
-  /// Bottom nav untuk Kasir: Beranda · POS · Riwayat
-  Widget _cashierBottomNav(BuildContext context, String location) {
-    int index = 0;
-    if (location.startsWith('/pos')) index = 1;
-    if (location.startsWith('/history')) index = 2;
 
-    return NavigationBar(
-      selectedIndex: index,
-      onDestinationSelected: (i) {
-        switch (i) {
-          case 0: context.go('/cashier');
-          case 1: context.go('/pos');
-          case 2: context.go('/history');
-        }
-      },
-      destinations: const [
-        NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'Beranda'),
-        NavigationDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale), label: 'POS'),
-        NavigationDestination(icon: Icon(Icons.receipt_long_outlined), selectedIcon: Icon(Icons.receipt_long), label: 'Riwayat'),
-      ],
-    );
-  }
 }

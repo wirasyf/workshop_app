@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:csv/csv.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -341,7 +342,7 @@ class ReportScreen extends ConsumerWidget {
           barTouchData: BarTouchData(
             touchTooltipData: BarTouchTooltipData(
               getTooltipColor: (_) => const Color(0xFF334155),
-              tooltipRoundedRadius: 8,
+              tooltipBorder: BorderSide.none,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 return BarTooltipItem(
                   CurrencyFormatter.formatCompact(rod.toY * 1000),
@@ -456,7 +457,7 @@ class ReportScreen extends ConsumerWidget {
   }
 
   Future<void> _exportReport(BuildContext context, WidgetRef ref) async {
-    final data = ref.read(reportDataProvider).valueOrNull;
+    final data = ref.read(reportDataProvider).value;
     if (data == null) {
       ScaffoldMessenger.of(
         context,

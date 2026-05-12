@@ -54,14 +54,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
     if (success && mounted) {
       AppToast.show(context, 'Login berhasil', type: ToastType.success);
-      final role = ref.read(currentRoleProvider);
       Future.delayed(const Duration(milliseconds: 500), () {
         if (!mounted) return;
-        if (role == AppConstants.roleOwner) {
-          context.go('/dashboard');
-        } else {
-          context.go('/cashier');
-        }
+        context.go('/dashboard');
       });
     } else if (mounted) {
       final error = ref.read(authStateProvider).error?.toString() ?? 'Login gagal';

@@ -11,7 +11,8 @@ class Users extends Table {
   TextColumn get username => text().unique()();
   TextColumn get email => text().unique()();
   TextColumn get passwordHash => text()();
-  TextColumn get role => text().withDefault(const Constant('kasir'))();
+  TextColumn get role => text().withDefault(const Constant('owner'))();
+  TextColumn get avatarUrl => text().nullable()();
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get supabaseUid => text().nullable()();

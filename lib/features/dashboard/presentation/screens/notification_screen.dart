@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -115,7 +116,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
   }
 
   void markAsRead(String id) {
-    final items = state.valueOrNull;
+    final items = state.value;
     if (items == null) return;
     _ref.read(settingsServiceProvider).addReadNotification(id);
     state = AsyncValue.data(
@@ -124,7 +125,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
   }
 
   void markAllAsRead() {
-    final items = state.valueOrNull;
+    final items = state.value;
     if (items == null) return;
     
     final settings = _ref.read(settingsServiceProvider);
@@ -136,7 +137,7 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
   }
 
   void deleteNotification(String id) {
-    final items = state.valueOrNull;
+    final items = state.value;
     if (items == null) return;
     state = AsyncValue.data(items.where((n) => n.id != id).toList());
   }
@@ -150,7 +151,7 @@ final notificationNotifierProvider =
 /// Provider badge count (unread)
 final notificationBadgeProvider = Provider<int>((ref) {
   final notifs = ref.watch(notificationNotifierProvider);
-  return notifs.valueOrNull?.where((n) => !n.isRead).length ?? 0;
+  return notifs.value?.where((n) => !n.isRead).length ?? 0;
 });
 
 /// Layar Notifikasi
@@ -166,7 +167,7 @@ class NotificationScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Notifikasi'),
         actions: [
-          if (notifs.valueOrNull?.any((n) => !n.isRead) == true)
+          if (notifs.value?.any((n) => !n.isRead) == true)
             TextButton.icon(
               onPressed: () => ref.read(notificationNotifierProvider.notifier).markAllAsRead(),
               icon: const Icon(Icons.done_all, size: 18),

@@ -1,3 +1,5 @@
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 /// Konstanta global aplikasi SpareArt
 class AppConstants {
   AppConstants._();
@@ -8,16 +10,15 @@ class AppConstants {
   static const String storeName = 'SpareArt Motor';
 
   // Supabase
-  static const String supabaseUrl = 'https://fnygvetwksousfdjbwwh.supabase.co';
-  static const String supabaseAnonKey =
-      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZueWd2ZXR3a3NvdXNmZGpid3doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzgzMjEwNzQsImV4cCI6MjA5Mzg5NzA3NH0.tRA396K3XBGbtR8OrjCBoL_QUP7q-H4riitehvGptXw';
+  static String get supabaseUrl => dotenv.get('SUPABASE_URL', fallback: '');
+  static String get supabaseAnonKey =>
+      dotenv.get('SUPABASE_ANON_KEY', fallback: '');
 
   // Database
   static const String dbName = 'spareart_db';
 
   // Roles
   static const String roleOwner = 'owner';
-  static const String roleKasir = 'kasir';
 
   // Stock thresholds
   static const int stockCriticalThreshold = 0;

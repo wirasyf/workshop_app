@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spareart_app/main.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/connectivity_service.dart';
@@ -15,7 +17,7 @@ class SettingsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final user = ref.watch(authStateProvider).valueOrNull;
+    final user = ref.watch(authStateProvider).value;
     final isOnline = ref.watch(connectivityProvider);
     final theme = Theme.of(context);
 
@@ -33,19 +35,26 @@ class SettingsScreen extends ConsumerWidget {
               border: Border.all(color: AppColors.border),
             ),
             child: Row(children: [
-              CircleAvatar(radius: 28, backgroundColor: AppColors.primary,
-                child: Text(user?.name.substring(0, 1).toUpperCase() ?? 'U',
-                    style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w700))),
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.primary,
+                backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                    ? (user.avatarUrl!.startsWith('http')
+                        ? CachedNetworkImageProvider(user.avatarUrl!)
+                        : FileImage(File(user.avatarUrl!)))
+                    : null,
+                child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                    ? Text(user?.name.substring(0, 1).toUpperCase() ?? 'U',
+                        style: const TextStyle(fontSize: 24, color: Colors.white, fontWeight: FontWeight.w700))
+                    : null,
+              ),
               const SizedBox(width: 16),
               Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text(user?.name ?? '-', style: theme.textTheme.titleMedium),
                 Text(user?.email ?? '-', style: theme.textTheme.bodySmall),
                 const SizedBox(height: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 2),
-                  decoration: BoxDecoration(color: AppColors.primaryLight.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(20)),
-                  child: Text(user?.role.toUpperCase() ?? '-', style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.primary)),
-                ),
+                const SizedBox(height: 4),
+                Text('Akun Terverifikasi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.success)),
               ]),
               const Spacer(),
               IconButton(

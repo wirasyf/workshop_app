@@ -4,11 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:spareart_app/features/pos/presentation/widgets/barcode_scanner_dialog.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/file_storage_service.dart';
 import '../../../../core/services/sync_service.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../providers/product_provider.dart';
 
@@ -106,6 +109,28 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     }
   }
 
+  Future<String?> _uploadProductImage(String productName) async {
+    if (_imageFile == null) return _imagePath;
+
+    try {
+      final client = SupabaseService.client;
+      final fileExt = _imageFile!.path.split('.').last;
+      final fileName = 'prod_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+
+      await client.storage.from('products').upload(
+        fileName,
+        _imageFile!,
+        fileOptions: const FileOptions(upsert: true),
+      );
+
+      return client.storage.from('products').getPublicUrl(fileName);
+    } catch (e) {
+      debugPrint('Error uploading product image: $e');
+      // Jika gagal upload ke cloud, simpan lokal saja sebagai cadangan
+      return await FileStorageService.saveProductImage(_imageFile!);
+    }
+  }
+
   @override
   void dispose() {
     for (final c in [
@@ -130,44 +155,42 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final db = ref.read(databaseProvider);
-
-    String? finalImagePath = _imagePath;
-    if (_imageFile != null) {
-      finalImagePath = await FileStorageService.saveProductImage(_imageFile!);
-    }
-
-    final companion = ProductsCompanion(
-      id: _isEditing ? Value(widget.productId!) : const Value.absent(),
-      name: Value(_nameCtrl.text.trim()),
-      sku: Value.absentIfNull(
-        _skuCtrl.text.trim().isEmpty ? null : _skuCtrl.text.trim(),
-      ),
-      barcode: Value.absentIfNull(
-        _barcodeCtrl.text.trim().isEmpty ? null : _barcodeCtrl.text.trim(),
-      ),
-      categoryId: Value(_selectedCategoryId),
-      brand: Value.absentIfNull(
-        _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
-      ),
-      motorType: Value.absentIfNull(
-        _motorTypeCtrl.text.trim().isEmpty ? null : _motorTypeCtrl.text.trim(),
-      ),
-      costPrice: Value(double.tryParse(_costPriceCtrl.text) ?? 0),
-      sellPrice: Value(double.tryParse(_sellPriceCtrl.text) ?? 0),
-      sellPriceWholesale: Value.absentIfNull(
-        _wholesalePriceCtrl.text.isEmpty
-            ? null
-            : double.tryParse(_wholesalePriceCtrl.text),
-      ),
-      stockQty: Value(int.tryParse(_stockQtyCtrl.text) ?? 0),
-      stockMin: Value(int.tryParse(_stockMinCtrl.text) ?? 5),
-      unit: Value(_unitCtrl.text.trim()),
-      imageUrl: Value.absentIfNull(finalImagePath),
-      updatedAt: Value(DateTime.now()),
-    );
-
     try {
+      final db = ref.read(databaseProvider);
+
+      // 1. Upload ke Supabase Storage
+      final finalImagePath = await _uploadProductImage(_nameCtrl.text);
+
+      final companion = ProductsCompanion(
+        id: _isEditing ? Value(widget.productId!) : const Value.absent(),
+        name: Value(_nameCtrl.text.trim()),
+        sku: Value.absentIfNull(
+          _skuCtrl.text.trim().isEmpty ? null : _skuCtrl.text.trim(),
+        ),
+        barcode: Value.absentIfNull(
+          _barcodeCtrl.text.trim().isEmpty ? null : _barcodeCtrl.text.trim(),
+        ),
+        categoryId: Value(_selectedCategoryId),
+        brand: Value.absentIfNull(
+          _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+        ),
+        motorType: Value.absentIfNull(
+          _motorTypeCtrl.text.trim().isEmpty ? null : _motorTypeCtrl.text.trim(),
+        ),
+        costPrice: Value(double.tryParse(_costPriceCtrl.text) ?? 0),
+        sellPrice: Value(double.tryParse(_sellPriceCtrl.text) ?? 0),
+        sellPriceWholesale: Value.absentIfNull(
+          _wholesalePriceCtrl.text.isEmpty
+              ? null
+              : double.tryParse(_wholesalePriceCtrl.text),
+        ),
+        stockQty: Value(int.tryParse(_stockQtyCtrl.text) ?? 0),
+        stockMin: Value(int.tryParse(_stockMinCtrl.text) ?? 5),
+        unit: Value(_unitCtrl.text.trim()),
+        imageUrl: Value.absentIfNull(finalImagePath),
+        updatedAt: Value(DateTime.now()),
+      );
+
       int id;
       if (_isEditing) {
         id = widget.productId!;
@@ -218,9 +241,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       if (mounted) {
         AppToast.show(context, 'Error: $e', type: ToastType.error);
       }
-    }
-    if (mounted) {
-      setState(() => _isLoading = false);
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -261,10 +285,17 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                       : _imagePath != null
                       ? ClipRRect(
                           borderRadius: BorderRadius.circular(20),
-                          child: Image.file(
-                            File(_imagePath!),
-                            fit: BoxFit.cover,
-                          ),
+                          child: _imagePath!.startsWith('http') 
+                            ? CachedNetworkImage(
+                                imageUrl: _imagePath!,
+                                fit: BoxFit.cover,
+                                placeholder: (context, url) => const Center(child: CircularProgressIndicator()),
+                                errorWidget: (context, url, error) => const Icon(Icons.error),
+                              )
+                            : Image.file(
+                                File(_imagePath!),
+                                fit: BoxFit.cover,
+                              ),
                         )
                       : const Column(
                           mainAxisAlignment: MainAxisAlignment.center,
@@ -282,7 +313,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                                 color: AppColors.primary,
                               ),
                             ),
-                          ],
+                            ],
                         ),
                 ),
               ),
@@ -325,7 +356,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               data: (cats) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: DropdownButtonFormField<int>(
-                  initialValue: _selectedCategoryId,
+                  value: _selectedCategoryId,
                   decoration: const InputDecoration(labelText: 'Kategori'),
                   items: cats
                       .map(

@@ -45,7 +45,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     setState(() => _isProcessing = true);
     final db = ref.read(databaseProvider);
-    final user = ref.read(authStateProvider).valueOrNull;
+    final user = ref.read(authStateProvider).value;
     final subtotal = ref.read(cartSubtotalProvider);
     final discount = ref.read(cartDiscountProvider);
     final customer = ref.read(selectedCustomerProvider);

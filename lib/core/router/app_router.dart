@@ -6,7 +6,6 @@ import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/notification_screen.dart';
-import '../../features/dashboard/presentation/screens/cashier_dashboard_screen.dart';
 import '../../features/pos/presentation/screens/pos_product_screen.dart';
 import '../../features/pos/presentation/screens/cart_screen.dart';
 import '../../features/pos/presentation/screens/payment_success_screen.dart';
@@ -23,7 +22,6 @@ import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
 import '../../features/settings/presentation/screens/receipt_template_screen.dart';
 import '../../shared/screens/shell_screen.dart';
-import '../constants/app_constants.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   final authState = ref.watch(authStateProvider);
@@ -33,7 +31,7 @@ final routerProvider = Provider<GoRouter>((ref) {
     redirect: (context, state) {
       if (authState.isLoading) return null; // Tunggu loading selesai di Splash
 
-      final isLoggedIn = authState.valueOrNull != null;
+      final isLoggedIn = authState.value != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLogin = state.matchedLocation == '/login';
       final isSignup = state.matchedLocation == '/signup';
@@ -44,9 +42,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       }
 
       if (isLoggedIn && (isLogin || isSignup || isSplash)) {
-        // Jika sudah login tapi masih di login/splash, lempar ke dashboard sesuai role
-        final role = authState.valueOrNull?.role ?? AppConstants.roleKasir;
-        return role == AppConstants.roleOwner ? '/dashboard' : '/cashier';
+        return '/dashboard';
       }
       
       return null;
@@ -61,7 +57,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state, child) => ShellScreen(child: child),
         routes: [
           GoRoute(path: '/dashboard', builder: (_, __) => const OwnerDashboardScreen()),
-          GoRoute(path: '/cashier', builder: (_, __) => const CashierDashboardScreen()),
           GoRoute(
             path: '/pos',
             builder: (_, __) => const PosProductScreen(),

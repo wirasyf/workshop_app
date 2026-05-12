@@ -1,8 +1,11 @@
 import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/settings_service.dart';
 import '../../../../core/services/sync_service.dart';
+import '../../../../core/services/supabase_service.dart';
 import '../../../../main.dart';
 
 /// Provider untuk auth state — menyimpan user yang sedang login
@@ -15,12 +18,12 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>
 
 /// Provider untuk cek apakah sedang login
 final isLoggedInProvider = Provider<bool>((ref) {
-  return ref.watch(authStateProvider).valueOrNull != null;
+  return ref.watch(authStateProvider).value != null;
 });
 
 /// Provider untuk role user
 final currentRoleProvider = Provider<String>((ref) {
-  return ref.watch(authStateProvider).valueOrNull?.role ?? 'kasir';
+  return ref.watch(authStateProvider).value?.role ?? 'owner';
 });
 
 /// Notifier untuk mengelola state autentikasi
@@ -51,10 +54,42 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
   Future<bool> login(String identifier, String password) async {
     state = const AsyncValue.loading();
     try {
-      // Cek berdasarkan username dulu, baru email
       final trimmedIdentifier = identifier.trim();
+      
+      // 1. Cek di database lokal dulu
       User? user = await _db.getUserByUsername(trimmedIdentifier);
       user ??= await _db.getUserByEmail(trimmedIdentifier);
+      
+      // 2. Jika tidak ada lokal, coba cari di Supabase
+      if (user == null) {
+        try {
+          final client = SupabaseService.client;
+          final response = await client
+              .from('users')
+              .select()
+              .or('username.eq.$trimmedIdentifier,email.eq.$trimmedIdentifier')
+              .maybeSingle();
+
+          if (response != null) {
+            // User ditemukan di Supabase, simpan ke lokal
+            final companion = UsersCompanion.insert(
+              name: response['name'],
+              username: response['username'],
+              email: response['email'],
+              passwordHash: response['password_hash'],
+              role: Value(response['role'] ?? 'owner'),
+              isActive: Value(response['is_active'] ?? true),
+              createdAt: Value(DateTime.parse(response['created_at'])),
+            );
+            
+            final newId = await _db.insertUser(companion);
+            user = await _db.getUserById(newId);
+          }
+        } catch (e) {
+          // Gagal cek Supabase (mungkin offline), lanjut ke error user null
+          debugPrint('Supabase login check failed: $e');
+        }
+      }
       
       if (user == null) {
         state = AsyncValue.error('User tidak ditemukan', StackTrace.current);
@@ -68,6 +103,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         state = AsyncValue.error('Akun tidak aktif', StackTrace.current);
         return false;
       }
+      
+      // 3. Download data user (produk, kategori, dll) dari server
+      await _sync.downloadUserData();
       
       // Save session
       await _settings.setUserId(user.id);

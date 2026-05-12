@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'core/database/app_database.dart';
 import 'core/router/app_router.dart';
 import 'core/services/sync_service.dart';
@@ -12,6 +13,9 @@ final settingsServiceProvider = Provider<SettingsService>((ref) => throw Unimple
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Load environment variables
+  await dotenv.load(fileName: ".env");
 
   // Inisialisasi data lokalisasi (Indonesian)
   await initializeDateFormatting('id_ID', null);

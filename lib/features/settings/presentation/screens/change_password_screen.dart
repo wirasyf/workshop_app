@@ -37,7 +37,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final user = ref.read(authStateProvider).valueOrNull;
+      final user = ref.read(authStateProvider).value;
       if (user == null) throw Exception('User tidak ditemukan');
 
       if (user.passwordHash != _oldPassCtrl.text) {
