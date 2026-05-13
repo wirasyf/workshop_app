@@ -10,9 +10,10 @@ import '../../../../shared/utils/app_toast.dart';
 import '../../../dashboard/presentation/screens/notification_screen.dart';
 import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../providers/product_provider.dart';
+import 'package:uuid/uuid.dart';
 /// Form penyesuaian stok manual
 class StockAdjustmentScreen extends ConsumerStatefulWidget {
-  final int productId;
+  final String productId;
   const StockAdjustmentScreen({super.key, required this.productId});
 
   @override
@@ -44,9 +45,11 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
     final change = _isAdd ? qty : -qty;
 
     try {
+      final id = const Uuid().v4();
       await db.insertStockAdjustment(StockAdjustmentsCompanion.insert(
+        id: id,
         productId: widget.productId,
-        userId: user?.id ?? 1,
+        userId: user?.id ?? '1',
         type: _type,
         qtyChange: change,
         reason: Value(_reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim()),

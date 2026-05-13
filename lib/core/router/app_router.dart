@@ -72,11 +72,11 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(path: 'categories', builder: (_, __) => const CategoryListScreen()),
               GoRoute(path: 'add', builder: (_, __) => const ProductFormScreen()),
               GoRoute(path: ':id', builder: (_, state) =>
-                  ProductDetailScreen(productId: int.parse(state.pathParameters['id']!))),
+                  ProductDetailScreen(productId: state.pathParameters['id']!)),
               GoRoute(path: ':id/edit', builder: (_, state) =>
-                  ProductFormScreen(productId: int.parse(state.pathParameters['id']!))),
+                  ProductFormScreen(productId: state.pathParameters['id']!)),
               GoRoute(path: ':id/adjust', builder: (_, state) =>
-                  StockAdjustmentScreen(productId: int.parse(state.pathParameters['id']!))),
+                  StockAdjustmentScreen(productId: state.pathParameters['id']!)),
             ],
           ),
           GoRoute(path: '/history', builder: (_, __) => const TransactionHistoryScreen()),

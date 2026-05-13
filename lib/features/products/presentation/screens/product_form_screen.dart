@@ -13,11 +13,12 @@ import '../../../../core/services/file_storage_service.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/services/supabase_service.dart';
 import '../../../../shared/utils/app_toast.dart';
+import 'package:uuid/uuid.dart';
 import '../providers/product_provider.dart';
 
 /// Form tambah/edit produk
 class ProductFormScreen extends ConsumerStatefulWidget {
-  final int? productId;
+  final String? productId;
   const ProductFormScreen({super.key, this.productId});
 
   @override
@@ -37,7 +38,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final _stockQtyCtrl = TextEditingController();
   final _stockMinCtrl = TextEditingController();
   final _unitCtrl = TextEditingController(text: 'pcs');
-  int? _selectedCategoryId;
+  String? _selectedCategoryId;
   String? _imagePath;
   File? _imageFile;
   bool _isLoading = false;
@@ -160,9 +161,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
       // 1. Upload ke Supabase Storage
       final finalImagePath = await _uploadProductImage(_nameCtrl.text);
+      final uuid = const Uuid();
+      final id = _isEditing ? widget.productId! : uuid.v4();
 
       final companion = ProductsCompanion(
-        id: _isEditing ? Value(widget.productId!) : const Value.absent(),
+        id: Value(id),
         name: Value(_nameCtrl.text.trim()),
         sku: Value.absentIfNull(
           _skuCtrl.text.trim().isEmpty ? null : _skuCtrl.text.trim(),
@@ -191,12 +194,10 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         updatedAt: Value(DateTime.now()),
       );
 
-      int id;
       if (_isEditing) {
-        id = widget.productId!;
         await db.updateProduct(companion);
       } else {
-        id = await db.insertProduct(companion);
+        await db.insertProduct(companion);
       }
 
       // Enqueue sync
@@ -355,7 +356,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
             categories.when(
               data: (cats) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: DropdownButtonFormField<int>(
+                child: DropdownButtonFormField<String>(
                   value: _selectedCategoryId,
                   decoration: const InputDecoration(labelText: 'Kategori'),
                   items: cats

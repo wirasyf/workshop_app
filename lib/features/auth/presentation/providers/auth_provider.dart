@@ -6,6 +6,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/services/settings_service.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/services/supabase_service.dart';
+import 'package:uuid/uuid.dart';
 import '../../../../main.dart';
 
 /// Provider untuk auth state — menyimpan user yang sedang login
@@ -21,10 +22,6 @@ final isLoggedInProvider = Provider<bool>((ref) {
   return ref.watch(authStateProvider).value != null;
 });
 
-/// Provider untuk role user
-final currentRoleProvider = Provider<String>((ref) {
-  return ref.watch(authStateProvider).value?.role ?? 'owner';
-});
 
 /// Notifier untuk mengelola state autentikasi
 class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
@@ -73,17 +70,17 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
           if (response != null) {
             // User ditemukan di Supabase, simpan ke lokal
             final companion = UsersCompanion.insert(
+              id: response['id'], // Gunakan ID dari server
               name: response['name'],
               username: response['username'],
               email: response['email'],
               passwordHash: response['password_hash'],
-              role: Value(response['role'] ?? 'owner'),
               isActive: Value(response['is_active'] ?? true),
               createdAt: Value(DateTime.parse(response['created_at'])),
             );
             
-            final newId = await _db.insertUser(companion);
-            user = await _db.getUserById(newId);
+            await _db.insertUser(companion);
+            user = await _db.getUserById(response['id']);
           }
         } catch (e) {
           // Gagal cek Supabase (mungkin offline), lanjut ke error user null
@@ -124,7 +121,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     required String username,
     required String email,
     required String password,
-    String role = 'owner',
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -145,17 +141,18 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         return false;
       }
 
+      final id = const Uuid().v4();
       final companion = UsersCompanion.insert(
+        id: id,
         name: name.trim(),
         username: trimmedUsername,
         email: trimmedEmail,
         passwordHash: password,
-        role: Value(role),
         isActive: const Value(true),
         createdAt: Value(DateTime.now()),
       );
 
-      final id = await _db.insertUser(companion);
+      await _db.insertUser(companion);
       final user = await _db.getUserById(id);
 
       if (user != null) {
@@ -170,7 +167,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
             'username': trimmedUsername,
             'email': trimmedEmail,
             'password_hash': password,
-            'role': role,
             'created_at': DateTime.now().toIso8601String(),
           },
         );

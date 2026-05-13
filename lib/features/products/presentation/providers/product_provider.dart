@@ -13,7 +13,7 @@ final stockFilterProvider = StateProvider<StockFilter>((ref) => StockFilter.all)
 final productSearchProvider = StateProvider<String>((ref) => '');
 
 /// Provider filter kategori
-final selectedCategoryProvider = StateProvider<int?>((ref) => null);
+final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 
 /// Provider daftar kategori
 final categoriesProvider = FutureProvider<List<Category>>((ref) {
@@ -52,13 +52,13 @@ final productsProvider = FutureProvider<List<Product>>((ref) async {
 });
 
 /// Provider detail produk
-final productDetailProvider = FutureProvider.family<Product?, int>((ref, id) {
+final productDetailProvider = FutureProvider.family<Product?, String>((ref, id) {
   final db = ref.watch(databaseProvider);
   return db.getProductById(id);
 });
 
 /// Provider riwayat penyesuaian stok
-final stockAdjustmentsProvider = FutureProvider.family<List<StockAdjustment>, int>((ref, productId) {
+final stockAdjustmentsProvider = FutureProvider.family<List<StockAdjustment>, String>((ref, productId) {
   final db = ref.watch(databaseProvider);
   return db.getStockAdjustments(productId);
 });

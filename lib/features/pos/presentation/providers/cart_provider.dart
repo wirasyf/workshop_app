@@ -5,7 +5,7 @@ import '../../../../core/services/sync_service.dart';
 
 /// Item dalam keranjang
 class CartItem {
-  final int productId;
+  final String productId;
   final String name;
   final double unitPrice;
   final String unit;
@@ -97,11 +97,11 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
     }
   }
 
-  void removeItem(int productId) {
+  void removeItem(String productId) {
     state = state.where((i) => i.productId != productId).toList();
   }
 
-  void updateQty(int productId, int qty) {
+  void updateQty(String productId, int qty) {
     if (qty <= 0) { removeItem(productId); return; }
     state = state.map((i) => i.productId == productId ? i.copyWith(qty: qty) : i).toList();
   }

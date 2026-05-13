@@ -10,16 +10,12 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
   $UsersTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
@@ -63,16 +59,6 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     false,
     type: DriftSqlType.string,
     requiredDuringInsert: true,
-  );
-  static const VerificationMeta _roleMeta = const VerificationMeta('role');
-  @override
-  late final GeneratedColumn<String> role = GeneratedColumn<String>(
-    'role',
-    aliasedName,
-    false,
-    type: DriftSqlType.string,
-    requiredDuringInsert: false,
-    defaultValue: const Constant('owner'),
   );
   static const VerificationMeta _avatarUrlMeta = const VerificationMeta(
     'avatarUrl',
@@ -130,7 +116,6 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     username,
     email,
     passwordHash,
-    role,
     avatarUrl,
     isActive,
     createdAt,
@@ -150,6 +135,8 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -185,12 +172,6 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
       );
     } else if (isInserting) {
       context.missing(_passwordHashMeta);
-    }
-    if (data.containsKey('role')) {
-      context.handle(
-        _roleMeta,
-        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
-      );
     }
     if (data.containsKey('avatar_url')) {
       context.handle(
@@ -229,7 +210,7 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return User(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       name: attachedDatabase.typeMapping.read(
@@ -247,10 +228,6 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
       passwordHash: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}password_hash'],
-      )!,
-      role: attachedDatabase.typeMapping.read(
-        DriftSqlType.string,
-        data['${effectivePrefix}role'],
       )!,
       avatarUrl: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
@@ -278,12 +255,11 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
 }
 
 class User extends DataClass implements Insertable<User> {
-  final int id;
+  final String id;
   final String name;
   final String username;
   final String email;
   final String passwordHash;
-  final String role;
   final String? avatarUrl;
   final bool isActive;
   final DateTime createdAt;
@@ -294,7 +270,6 @@ class User extends DataClass implements Insertable<User> {
     required this.username,
     required this.email,
     required this.passwordHash,
-    required this.role,
     this.avatarUrl,
     required this.isActive,
     required this.createdAt,
@@ -303,12 +278,11 @@ class User extends DataClass implements Insertable<User> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['username'] = Variable<String>(username);
     map['email'] = Variable<String>(email);
     map['password_hash'] = Variable<String>(passwordHash);
-    map['role'] = Variable<String>(role);
     if (!nullToAbsent || avatarUrl != null) {
       map['avatar_url'] = Variable<String>(avatarUrl);
     }
@@ -327,7 +301,6 @@ class User extends DataClass implements Insertable<User> {
       username: Value(username),
       email: Value(email),
       passwordHash: Value(passwordHash),
-      role: Value(role),
       avatarUrl: avatarUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(avatarUrl),
@@ -345,12 +318,11 @@ class User extends DataClass implements Insertable<User> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return User(
-      id: serializer.fromJson<int>(json['id']),
+      id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       username: serializer.fromJson<String>(json['username']),
       email: serializer.fromJson<String>(json['email']),
       passwordHash: serializer.fromJson<String>(json['passwordHash']),
-      role: serializer.fromJson<String>(json['role']),
       avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -361,12 +333,11 @@ class User extends DataClass implements Insertable<User> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
+      'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'username': serializer.toJson<String>(username),
       'email': serializer.toJson<String>(email),
       'passwordHash': serializer.toJson<String>(passwordHash),
-      'role': serializer.toJson<String>(role),
       'avatarUrl': serializer.toJson<String?>(avatarUrl),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -375,12 +346,11 @@ class User extends DataClass implements Insertable<User> {
   }
 
   User copyWith({
-    int? id,
+    String? id,
     String? name,
     String? username,
     String? email,
     String? passwordHash,
-    String? role,
     Value<String?> avatarUrl = const Value.absent(),
     bool? isActive,
     DateTime? createdAt,
@@ -391,7 +361,6 @@ class User extends DataClass implements Insertable<User> {
     username: username ?? this.username,
     email: email ?? this.email,
     passwordHash: passwordHash ?? this.passwordHash,
-    role: role ?? this.role,
     avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
@@ -406,7 +375,6 @@ class User extends DataClass implements Insertable<User> {
       passwordHash: data.passwordHash.present
           ? data.passwordHash.value
           : this.passwordHash,
-      role: data.role.present ? data.role.value : this.role,
       avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -424,7 +392,6 @@ class User extends DataClass implements Insertable<User> {
           ..write('username: $username, ')
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
-          ..write('role: $role, ')
           ..write('avatarUrl: $avatarUrl, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
@@ -440,7 +407,6 @@ class User extends DataClass implements Insertable<User> {
     username,
     email,
     passwordHash,
-    role,
     avatarUrl,
     isActive,
     createdAt,
@@ -455,7 +421,6 @@ class User extends DataClass implements Insertable<User> {
           other.username == this.username &&
           other.email == this.email &&
           other.passwordHash == this.passwordHash &&
-          other.role == this.role &&
           other.avatarUrl == this.avatarUrl &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
@@ -463,54 +428,55 @@ class User extends DataClass implements Insertable<User> {
 }
 
 class UsersCompanion extends UpdateCompanion<User> {
-  final Value<int> id;
+  final Value<String> id;
   final Value<String> name;
   final Value<String> username;
   final Value<String> email;
   final Value<String> passwordHash;
-  final Value<String> role;
   final Value<String?> avatarUrl;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<String?> supabaseUid;
+  final Value<int> rowid;
   const UsersCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.username = const Value.absent(),
     this.email = const Value.absent(),
     this.passwordHash = const Value.absent(),
-    this.role = const Value.absent(),
     this.avatarUrl = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   UsersCompanion.insert({
-    this.id = const Value.absent(),
+    required String id,
     required String name,
     required String username,
     required String email,
     required String passwordHash,
-    this.role = const Value.absent(),
     this.avatarUrl = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
-  }) : name = Value(name),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
        username = Value(username),
        email = Value(email),
        passwordHash = Value(passwordHash);
   static Insertable<User> custom({
-    Expression<int>? id,
+    Expression<String>? id,
     Expression<String>? name,
     Expression<String>? username,
     Expression<String>? email,
     Expression<String>? passwordHash,
-    Expression<String>? role,
     Expression<String>? avatarUrl,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<String>? supabaseUid,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -518,25 +484,25 @@ class UsersCompanion extends UpdateCompanion<User> {
       if (username != null) 'username': username,
       if (email != null) 'email': email,
       if (passwordHash != null) 'password_hash': passwordHash,
-      if (role != null) 'role': role,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (supabaseUid != null) 'supabase_uid': supabaseUid,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   UsersCompanion copyWith({
-    Value<int>? id,
+    Value<String>? id,
     Value<String>? name,
     Value<String>? username,
     Value<String>? email,
     Value<String>? passwordHash,
-    Value<String>? role,
     Value<String?>? avatarUrl,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<String?>? supabaseUid,
+    Value<int>? rowid,
   }) {
     return UsersCompanion(
       id: id ?? this.id,
@@ -544,11 +510,11 @@ class UsersCompanion extends UpdateCompanion<User> {
       username: username ?? this.username,
       email: email ?? this.email,
       passwordHash: passwordHash ?? this.passwordHash,
-      role: role ?? this.role,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       supabaseUid: supabaseUid ?? this.supabaseUid,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -556,7 +522,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -570,9 +536,6 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (passwordHash.present) {
       map['password_hash'] = Variable<String>(passwordHash.value);
     }
-    if (role.present) {
-      map['role'] = Variable<String>(role.value);
-    }
     if (avatarUrl.present) {
       map['avatar_url'] = Variable<String>(avatarUrl.value);
     }
@@ -585,6 +548,9 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (supabaseUid.present) {
       map['supabase_uid'] = Variable<String>(supabaseUid.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -596,11 +562,11 @@ class UsersCompanion extends UpdateCompanion<User> {
           ..write('username: $username, ')
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
-          ..write('role: $role, ')
           ..write('avatarUrl: $avatarUrl, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
-          ..write('supabaseUid: $supabaseUid')
+          ..write('supabaseUid: $supabaseUid, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -614,16 +580,12 @@ class $CategoriesTable extends Categories
   $CategoriesTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
@@ -649,11 +611,11 @@ class $CategoriesTable extends Categories
     'parentId',
   );
   @override
-  late final GeneratedColumn<int> parentId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> parentId = GeneratedColumn<String>(
     'parent_id',
     aliasedName,
     true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   @override
@@ -672,6 +634,8 @@ class $CategoriesTable extends Categories
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -705,7 +669,7 @@ class $CategoriesTable extends Categories
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Category(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       name: attachedDatabase.typeMapping.read(
@@ -717,7 +681,7 @@ class $CategoriesTable extends Categories
         data['${effectivePrefix}slug'],
       )!,
       parentId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}parent_id'],
       ),
     );
@@ -730,10 +694,10 @@ class $CategoriesTable extends Categories
 }
 
 class Category extends DataClass implements Insertable<Category> {
-  final int id;
+  final String id;
   final String name;
   final String slug;
-  final int? parentId;
+  final String? parentId;
   const Category({
     required this.id,
     required this.name,
@@ -743,11 +707,11 @@ class Category extends DataClass implements Insertable<Category> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     map['slug'] = Variable<String>(slug);
     if (!nullToAbsent || parentId != null) {
-      map['parent_id'] = Variable<int>(parentId);
+      map['parent_id'] = Variable<String>(parentId);
     }
     return map;
   }
@@ -769,28 +733,28 @@ class Category extends DataClass implements Insertable<Category> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Category(
-      id: serializer.fromJson<int>(json['id']),
+      id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       slug: serializer.fromJson<String>(json['slug']),
-      parentId: serializer.fromJson<int?>(json['parentId']),
+      parentId: serializer.fromJson<String?>(json['parentId']),
     );
   }
   @override
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
+      'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'slug': serializer.toJson<String>(slug),
-      'parentId': serializer.toJson<int?>(parentId),
+      'parentId': serializer.toJson<String?>(parentId),
     };
   }
 
   Category copyWith({
-    int? id,
+    String? id,
     String? name,
     String? slug,
-    Value<int?> parentId = const Value.absent(),
+    Value<String?> parentId = const Value.absent(),
   }) => Category(
     id: id ?? this.id,
     name: name ?? this.name,
@@ -830,48 +794,56 @@ class Category extends DataClass implements Insertable<Category> {
 }
 
 class CategoriesCompanion extends UpdateCompanion<Category> {
-  final Value<int> id;
+  final Value<String> id;
   final Value<String> name;
   final Value<String> slug;
-  final Value<int?> parentId;
+  final Value<String?> parentId;
+  final Value<int> rowid;
   const CategoriesCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
     this.slug = const Value.absent(),
     this.parentId = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   CategoriesCompanion.insert({
-    this.id = const Value.absent(),
+    required String id,
     required String name,
     required String slug,
     this.parentId = const Value.absent(),
-  }) : name = Value(name),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
        slug = Value(slug);
   static Insertable<Category> custom({
-    Expression<int>? id,
+    Expression<String>? id,
     Expression<String>? name,
     Expression<String>? slug,
-    Expression<int>? parentId,
+    Expression<String>? parentId,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (name != null) 'name': name,
       if (slug != null) 'slug': slug,
       if (parentId != null) 'parent_id': parentId,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   CategoriesCompanion copyWith({
-    Value<int>? id,
+    Value<String>? id,
     Value<String>? name,
     Value<String>? slug,
-    Value<int?>? parentId,
+    Value<String?>? parentId,
+    Value<int>? rowid,
   }) {
     return CategoriesCompanion(
       id: id ?? this.id,
       name: name ?? this.name,
       slug: slug ?? this.slug,
       parentId: parentId ?? this.parentId,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -879,7 +851,7 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -888,7 +860,10 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
       map['slug'] = Variable<String>(slug.value);
     }
     if (parentId.present) {
-      map['parent_id'] = Variable<int>(parentId.value);
+      map['parent_id'] = Variable<String>(parentId.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
     }
     return map;
   }
@@ -899,7 +874,8 @@ class CategoriesCompanion extends UpdateCompanion<Category> {
           ..write('id: $id, ')
           ..write('name: $name, ')
           ..write('slug: $slug, ')
-          ..write('parentId: $parentId')
+          ..write('parentId: $parentId, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -912,16 +888,12 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
   $ProductsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _nameMeta = const VerificationMeta('name');
   @override
@@ -957,11 +929,11 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     'categoryId',
   );
   @override
-  late final GeneratedColumn<int> categoryId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
     'category_id',
     aliasedName,
     true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES categories (id)',
@@ -1139,6 +1111,8 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
     if (data.containsKey('name')) {
       context.handle(
@@ -1251,7 +1225,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Product(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       name: attachedDatabase.typeMapping.read(
@@ -1267,7 +1241,7 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
         data['${effectivePrefix}barcode'],
       ),
       categoryId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}category_id'],
       ),
       brand: attachedDatabase.typeMapping.read(
@@ -1328,11 +1302,11 @@ class $ProductsTable extends Products with TableInfo<$ProductsTable, Product> {
 }
 
 class Product extends DataClass implements Insertable<Product> {
-  final int id;
+  final String id;
   final String name;
   final String? sku;
   final String? barcode;
-  final int? categoryId;
+  final String? categoryId;
   final String? brand;
   final String? motorType;
   final int stockQty;
@@ -1367,7 +1341,7 @@ class Product extends DataClass implements Insertable<Product> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     map['name'] = Variable<String>(name);
     if (!nullToAbsent || sku != null) {
       map['sku'] = Variable<String>(sku);
@@ -1376,7 +1350,7 @@ class Product extends DataClass implements Insertable<Product> {
       map['barcode'] = Variable<String>(barcode);
     }
     if (!nullToAbsent || categoryId != null) {
-      map['category_id'] = Variable<int>(categoryId);
+      map['category_id'] = Variable<String>(categoryId);
     }
     if (!nullToAbsent || brand != null) {
       map['brand'] = Variable<String>(brand);
@@ -1445,11 +1419,11 @@ class Product extends DataClass implements Insertable<Product> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Product(
-      id: serializer.fromJson<int>(json['id']),
+      id: serializer.fromJson<String>(json['id']),
       name: serializer.fromJson<String>(json['name']),
       sku: serializer.fromJson<String?>(json['sku']),
       barcode: serializer.fromJson<String?>(json['barcode']),
-      categoryId: serializer.fromJson<int?>(json['categoryId']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
       brand: serializer.fromJson<String?>(json['brand']),
       motorType: serializer.fromJson<String?>(json['motorType']),
       stockQty: serializer.fromJson<int>(json['stockQty']),
@@ -1470,11 +1444,11 @@ class Product extends DataClass implements Insertable<Product> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
+      'id': serializer.toJson<String>(id),
       'name': serializer.toJson<String>(name),
       'sku': serializer.toJson<String?>(sku),
       'barcode': serializer.toJson<String?>(barcode),
-      'categoryId': serializer.toJson<int?>(categoryId),
+      'categoryId': serializer.toJson<String?>(categoryId),
       'brand': serializer.toJson<String?>(brand),
       'motorType': serializer.toJson<String?>(motorType),
       'stockQty': serializer.toJson<int>(stockQty),
@@ -1491,11 +1465,11 @@ class Product extends DataClass implements Insertable<Product> {
   }
 
   Product copyWith({
-    int? id,
+    String? id,
     String? name,
     Value<String?> sku = const Value.absent(),
     Value<String?> barcode = const Value.absent(),
-    Value<int?> categoryId = const Value.absent(),
+    Value<String?> categoryId = const Value.absent(),
     Value<String?> brand = const Value.absent(),
     Value<String?> motorType = const Value.absent(),
     int? stockQty,
@@ -1623,11 +1597,11 @@ class Product extends DataClass implements Insertable<Product> {
 }
 
 class ProductsCompanion extends UpdateCompanion<Product> {
-  final Value<int> id;
+  final Value<String> id;
   final Value<String> name;
   final Value<String?> sku;
   final Value<String?> barcode;
-  final Value<int?> categoryId;
+  final Value<String?> categoryId;
   final Value<String?> brand;
   final Value<String?> motorType;
   final Value<int> stockQty;
@@ -1640,6 +1614,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<DateTime?> updatedAt;
+  final Value<int> rowid;
   const ProductsCompanion({
     this.id = const Value.absent(),
     this.name = const Value.absent(),
@@ -1658,9 +1633,10 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   ProductsCompanion.insert({
-    this.id = const Value.absent(),
+    required String id,
     required String name,
     this.sku = const Value.absent(),
     this.barcode = const Value.absent(),
@@ -1677,13 +1653,15 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.updatedAt = const Value.absent(),
-  }) : name = Value(name);
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name);
   static Insertable<Product> custom({
-    Expression<int>? id,
+    Expression<String>? id,
     Expression<String>? name,
     Expression<String>? sku,
     Expression<String>? barcode,
-    Expression<int>? categoryId,
+    Expression<String>? categoryId,
     Expression<String>? brand,
     Expression<String>? motorType,
     Expression<int>? stockQty,
@@ -1696,6 +1674,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<DateTime>? updatedAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -1716,15 +1695,16 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (updatedAt != null) 'updated_at': updatedAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   ProductsCompanion copyWith({
-    Value<int>? id,
+    Value<String>? id,
     Value<String>? name,
     Value<String?>? sku,
     Value<String?>? barcode,
-    Value<int?>? categoryId,
+    Value<String?>? categoryId,
     Value<String?>? brand,
     Value<String?>? motorType,
     Value<int>? stockQty,
@@ -1737,6 +1717,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<DateTime?>? updatedAt,
+    Value<int>? rowid,
   }) {
     return ProductsCompanion(
       id: id ?? this.id,
@@ -1756,6 +1737,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -1763,7 +1745,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (name.present) {
       map['name'] = Variable<String>(name.value);
@@ -1775,7 +1757,7 @@ class ProductsCompanion extends UpdateCompanion<Product> {
       map['barcode'] = Variable<String>(barcode.value);
     }
     if (categoryId.present) {
-      map['category_id'] = Variable<int>(categoryId.value);
+      map['category_id'] = Variable<String>(categoryId.value);
     }
     if (brand.present) {
       map['brand'] = Variable<String>(brand.value);
@@ -1813,6 +1795,9 @@ class ProductsCompanion extends UpdateCompanion<Product> {
     if (updatedAt.present) {
       map['updated_at'] = Variable<DateTime>(updatedAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -1835,7 +1820,8 @@ class ProductsCompanion extends UpdateCompanion<Product> {
           ..write('imageUrl: $imageUrl, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
-          ..write('updatedAt: $updatedAt')
+          ..write('updatedAt: $updatedAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -1849,16 +1835,12 @@ class $TransactionsTable extends Transactions
   $TransactionsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _invoiceNoMeta = const VerificationMeta(
     'invoiceNo',
@@ -1872,15 +1854,13 @@ class $TransactionsTable extends Transactions
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways('UNIQUE'),
   );
-  static const VerificationMeta _cashierIdMeta = const VerificationMeta(
-    'cashierId',
-  );
+  static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
   @override
-  late final GeneratedColumn<int> cashierId = GeneratedColumn<int>(
-    'cashier_id',
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
+    'user_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES users (id)',
@@ -1890,11 +1870,11 @@ class $TransactionsTable extends Transactions
     'customerId',
   );
   @override
-  late final GeneratedColumn<int> customerId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> customerId = GeneratedColumn<String>(
     'customer_id',
     aliasedName,
     true,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
   static const VerificationMeta _paymentMethodMeta = const VerificationMeta(
@@ -1993,7 +1973,7 @@ class $TransactionsTable extends Transactions
   List<GeneratedColumn> get $columns => [
     id,
     invoiceNo,
-    cashierId,
+    userId,
     customerId,
     paymentMethod,
     subtotal,
@@ -2018,6 +1998,8 @@ class $TransactionsTable extends Transactions
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
     if (data.containsKey('invoice_no')) {
       context.handle(
@@ -2027,13 +2009,13 @@ class $TransactionsTable extends Transactions
     } else if (isInserting) {
       context.missing(_invoiceNoMeta);
     }
-    if (data.containsKey('cashier_id')) {
+    if (data.containsKey('user_id')) {
       context.handle(
-        _cashierIdMeta,
-        cashierId.isAcceptableOrUnknown(data['cashier_id']!, _cashierIdMeta),
+        _userIdMeta,
+        userId.isAcceptableOrUnknown(data['user_id']!, _userIdMeta),
       );
     } else if (isInserting) {
-      context.missing(_cashierIdMeta);
+      context.missing(_userIdMeta);
     }
     if (data.containsKey('customer_id')) {
       context.handle(
@@ -2105,19 +2087,19 @@ class $TransactionsTable extends Transactions
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return Transaction(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       invoiceNo: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}invoice_no'],
       )!,
-      cashierId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
-        data['${effectivePrefix}cashier_id'],
+      userId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}user_id'],
       )!,
       customerId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}customer_id'],
       ),
       paymentMethod: attachedDatabase.typeMapping.read(
@@ -2162,10 +2144,10 @@ class $TransactionsTable extends Transactions
 }
 
 class Transaction extends DataClass implements Insertable<Transaction> {
-  final int id;
+  final String id;
   final String invoiceNo;
-  final int cashierId;
-  final int? customerId;
+  final String userId;
+  final String? customerId;
   final String paymentMethod;
   final double subtotal;
   final double discount;
@@ -2177,7 +2159,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   const Transaction({
     required this.id,
     required this.invoiceNo,
-    required this.cashierId,
+    required this.userId,
     this.customerId,
     required this.paymentMethod,
     required this.subtotal,
@@ -2191,11 +2173,11 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
+    map['id'] = Variable<String>(id);
     map['invoice_no'] = Variable<String>(invoiceNo);
-    map['cashier_id'] = Variable<int>(cashierId);
+    map['user_id'] = Variable<String>(userId);
     if (!nullToAbsent || customerId != null) {
-      map['customer_id'] = Variable<int>(customerId);
+      map['customer_id'] = Variable<String>(customerId);
     }
     map['payment_method'] = Variable<String>(paymentMethod);
     map['subtotal'] = Variable<double>(subtotal);
@@ -2212,7 +2194,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     return TransactionsCompanion(
       id: Value(id),
       invoiceNo: Value(invoiceNo),
-      cashierId: Value(cashierId),
+      userId: Value(userId),
       customerId: customerId == null && nullToAbsent
           ? const Value.absent()
           : Value(customerId),
@@ -2233,10 +2215,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return Transaction(
-      id: serializer.fromJson<int>(json['id']),
+      id: serializer.fromJson<String>(json['id']),
       invoiceNo: serializer.fromJson<String>(json['invoiceNo']),
-      cashierId: serializer.fromJson<int>(json['cashierId']),
-      customerId: serializer.fromJson<int?>(json['customerId']),
+      userId: serializer.fromJson<String>(json['userId']),
+      customerId: serializer.fromJson<String?>(json['customerId']),
       paymentMethod: serializer.fromJson<String>(json['paymentMethod']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       discount: serializer.fromJson<double>(json['discount']),
@@ -2251,10 +2233,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
+      'id': serializer.toJson<String>(id),
       'invoiceNo': serializer.toJson<String>(invoiceNo),
-      'cashierId': serializer.toJson<int>(cashierId),
-      'customerId': serializer.toJson<int?>(customerId),
+      'userId': serializer.toJson<String>(userId),
+      'customerId': serializer.toJson<String?>(customerId),
       'paymentMethod': serializer.toJson<String>(paymentMethod),
       'subtotal': serializer.toJson<double>(subtotal),
       'discount': serializer.toJson<double>(discount),
@@ -2267,10 +2249,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   }
 
   Transaction copyWith({
-    int? id,
+    String? id,
     String? invoiceNo,
-    int? cashierId,
-    Value<int?> customerId = const Value.absent(),
+    String? userId,
+    Value<String?> customerId = const Value.absent(),
     String? paymentMethod,
     double? subtotal,
     double? discount,
@@ -2282,7 +2264,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   }) => Transaction(
     id: id ?? this.id,
     invoiceNo: invoiceNo ?? this.invoiceNo,
-    cashierId: cashierId ?? this.cashierId,
+    userId: userId ?? this.userId,
     customerId: customerId.present ? customerId.value : this.customerId,
     paymentMethod: paymentMethod ?? this.paymentMethod,
     subtotal: subtotal ?? this.subtotal,
@@ -2297,7 +2279,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     return Transaction(
       id: data.id.present ? data.id.value : this.id,
       invoiceNo: data.invoiceNo.present ? data.invoiceNo.value : this.invoiceNo,
-      cashierId: data.cashierId.present ? data.cashierId.value : this.cashierId,
+      userId: data.userId.present ? data.userId.value : this.userId,
       customerId: data.customerId.present
           ? data.customerId.value
           : this.customerId,
@@ -2323,7 +2305,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
     return (StringBuffer('Transaction(')
           ..write('id: $id, ')
           ..write('invoiceNo: $invoiceNo, ')
-          ..write('cashierId: $cashierId, ')
+          ..write('userId: $userId, ')
           ..write('customerId: $customerId, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('subtotal: $subtotal, ')
@@ -2341,7 +2323,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
   int get hashCode => Object.hash(
     id,
     invoiceNo,
-    cashierId,
+    userId,
     customerId,
     paymentMethod,
     subtotal,
@@ -2358,7 +2340,7 @@ class Transaction extends DataClass implements Insertable<Transaction> {
       (other is Transaction &&
           other.id == this.id &&
           other.invoiceNo == this.invoiceNo &&
-          other.cashierId == this.cashierId &&
+          other.userId == this.userId &&
           other.customerId == this.customerId &&
           other.paymentMethod == this.paymentMethod &&
           other.subtotal == this.subtotal &&
@@ -2371,10 +2353,10 @@ class Transaction extends DataClass implements Insertable<Transaction> {
 }
 
 class TransactionsCompanion extends UpdateCompanion<Transaction> {
-  final Value<int> id;
+  final Value<String> id;
   final Value<String> invoiceNo;
-  final Value<int> cashierId;
-  final Value<int?> customerId;
+  final Value<String> userId;
+  final Value<String?> customerId;
   final Value<String> paymentMethod;
   final Value<double> subtotal;
   final Value<double> discount;
@@ -2383,10 +2365,11 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   final Value<double> changeAmount;
   final Value<String> status;
   final Value<DateTime> createdAt;
+  final Value<int> rowid;
   const TransactionsCompanion({
     this.id = const Value.absent(),
     this.invoiceNo = const Value.absent(),
-    this.cashierId = const Value.absent(),
+    this.userId = const Value.absent(),
     this.customerId = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.subtotal = const Value.absent(),
@@ -2396,11 +2379,12 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.changeAmount = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   TransactionsCompanion.insert({
-    this.id = const Value.absent(),
+    required String id,
     required String invoiceNo,
-    required int cashierId,
+    required String userId,
     this.customerId = const Value.absent(),
     this.paymentMethod = const Value.absent(),
     this.subtotal = const Value.absent(),
@@ -2410,13 +2394,15 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     this.changeAmount = const Value.absent(),
     this.status = const Value.absent(),
     this.createdAt = const Value.absent(),
-  }) : invoiceNo = Value(invoiceNo),
-       cashierId = Value(cashierId);
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       invoiceNo = Value(invoiceNo),
+       userId = Value(userId);
   static Insertable<Transaction> custom({
-    Expression<int>? id,
+    Expression<String>? id,
     Expression<String>? invoiceNo,
-    Expression<int>? cashierId,
-    Expression<int>? customerId,
+    Expression<String>? userId,
+    Expression<String>? customerId,
     Expression<String>? paymentMethod,
     Expression<double>? subtotal,
     Expression<double>? discount,
@@ -2425,11 +2411,12 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Expression<double>? changeAmount,
     Expression<String>? status,
     Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
       if (invoiceNo != null) 'invoice_no': invoiceNo,
-      if (cashierId != null) 'cashier_id': cashierId,
+      if (userId != null) 'user_id': userId,
       if (customerId != null) 'customer_id': customerId,
       if (paymentMethod != null) 'payment_method': paymentMethod,
       if (subtotal != null) 'subtotal': subtotal,
@@ -2439,14 +2426,15 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       if (changeAmount != null) 'change_amount': changeAmount,
       if (status != null) 'status': status,
       if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   TransactionsCompanion copyWith({
-    Value<int>? id,
+    Value<String>? id,
     Value<String>? invoiceNo,
-    Value<int>? cashierId,
-    Value<int?>? customerId,
+    Value<String>? userId,
+    Value<String?>? customerId,
     Value<String>? paymentMethod,
     Value<double>? subtotal,
     Value<double>? discount,
@@ -2455,11 +2443,12 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     Value<double>? changeAmount,
     Value<String>? status,
     Value<DateTime>? createdAt,
+    Value<int>? rowid,
   }) {
     return TransactionsCompanion(
       id: id ?? this.id,
       invoiceNo: invoiceNo ?? this.invoiceNo,
-      cashierId: cashierId ?? this.cashierId,
+      userId: userId ?? this.userId,
       customerId: customerId ?? this.customerId,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       subtotal: subtotal ?? this.subtotal,
@@ -2469,6 +2458,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
       changeAmount: changeAmount ?? this.changeAmount,
       status: status ?? this.status,
       createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -2476,16 +2466,16 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (invoiceNo.present) {
       map['invoice_no'] = Variable<String>(invoiceNo.value);
     }
-    if (cashierId.present) {
-      map['cashier_id'] = Variable<int>(cashierId.value);
+    if (userId.present) {
+      map['user_id'] = Variable<String>(userId.value);
     }
     if (customerId.present) {
-      map['customer_id'] = Variable<int>(customerId.value);
+      map['customer_id'] = Variable<String>(customerId.value);
     }
     if (paymentMethod.present) {
       map['payment_method'] = Variable<String>(paymentMethod.value);
@@ -2511,6 +2501,9 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -2519,7 +2512,7 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
     return (StringBuffer('TransactionsCompanion(')
           ..write('id: $id, ')
           ..write('invoiceNo: $invoiceNo, ')
-          ..write('cashierId: $cashierId, ')
+          ..write('userId: $userId, ')
           ..write('customerId: $customerId, ')
           ..write('paymentMethod: $paymentMethod, ')
           ..write('subtotal: $subtotal, ')
@@ -2528,7 +2521,8 @@ class TransactionsCompanion extends UpdateCompanion<Transaction> {
           ..write('paidAmount: $paidAmount, ')
           ..write('changeAmount: $changeAmount, ')
           ..write('status: $status, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -2542,26 +2536,22 @@ class $TransactionItemsTable extends TransactionItems
   $TransactionItemsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _transactionIdMeta = const VerificationMeta(
     'transactionId',
   );
   @override
-  late final GeneratedColumn<int> transactionId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> transactionId = GeneratedColumn<String>(
     'transaction_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES transactions (id)',
@@ -2571,11 +2561,11 @@ class $TransactionItemsTable extends TransactionItems
     'productId',
   );
   @override
-  late final GeneratedColumn<int> productId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
     'product_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES products (id)',
@@ -2648,6 +2638,8 @@ class $TransactionItemsTable extends TransactionItems
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
     if (data.containsKey('transaction_id')) {
       context.handle(
@@ -2708,15 +2700,15 @@ class $TransactionItemsTable extends TransactionItems
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return TransactionItem(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       transactionId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}transaction_id'],
       )!,
       productId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}product_id'],
       )!,
       qty: attachedDatabase.typeMapping.read(
@@ -2745,9 +2737,9 @@ class $TransactionItemsTable extends TransactionItems
 }
 
 class TransactionItem extends DataClass implements Insertable<TransactionItem> {
-  final int id;
-  final int transactionId;
-  final int productId;
+  final String id;
+  final String transactionId;
+  final String productId;
   final int qty;
   final double unitPrice;
   final double discount;
@@ -2764,9 +2756,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['transaction_id'] = Variable<int>(transactionId);
-    map['product_id'] = Variable<int>(productId);
+    map['id'] = Variable<String>(id);
+    map['transaction_id'] = Variable<String>(transactionId);
+    map['product_id'] = Variable<String>(productId);
     map['qty'] = Variable<int>(qty);
     map['unit_price'] = Variable<double>(unitPrice);
     map['discount'] = Variable<double>(discount);
@@ -2792,9 +2784,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return TransactionItem(
-      id: serializer.fromJson<int>(json['id']),
-      transactionId: serializer.fromJson<int>(json['transactionId']),
-      productId: serializer.fromJson<int>(json['productId']),
+      id: serializer.fromJson<String>(json['id']),
+      transactionId: serializer.fromJson<String>(json['transactionId']),
+      productId: serializer.fromJson<String>(json['productId']),
       qty: serializer.fromJson<int>(json['qty']),
       unitPrice: serializer.fromJson<double>(json['unitPrice']),
       discount: serializer.fromJson<double>(json['discount']),
@@ -2805,9 +2797,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'transactionId': serializer.toJson<int>(transactionId),
-      'productId': serializer.toJson<int>(productId),
+      'id': serializer.toJson<String>(id),
+      'transactionId': serializer.toJson<String>(transactionId),
+      'productId': serializer.toJson<String>(productId),
       'qty': serializer.toJson<int>(qty),
       'unitPrice': serializer.toJson<double>(unitPrice),
       'discount': serializer.toJson<double>(discount),
@@ -2816,9 +2808,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
   }
 
   TransactionItem copyWith({
-    int? id,
-    int? transactionId,
-    int? productId,
+    String? id,
+    String? transactionId,
+    String? productId,
     int? qty,
     double? unitPrice,
     double? discount,
@@ -2884,13 +2876,14 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
 }
 
 class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
-  final Value<int> id;
-  final Value<int> transactionId;
-  final Value<int> productId;
+  final Value<String> id;
+  final Value<String> transactionId;
+  final Value<String> productId;
   final Value<int> qty;
   final Value<double> unitPrice;
   final Value<double> discount;
   final Value<double> subtotal;
+  final Value<int> rowid;
   const TransactionItemsCompanion({
     this.id = const Value.absent(),
     this.transactionId = const Value.absent(),
@@ -2899,28 +2892,32 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     this.unitPrice = const Value.absent(),
     this.discount = const Value.absent(),
     this.subtotal = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   TransactionItemsCompanion.insert({
-    this.id = const Value.absent(),
-    required int transactionId,
-    required int productId,
+    required String id,
+    required String transactionId,
+    required String productId,
     required int qty,
     required double unitPrice,
     this.discount = const Value.absent(),
     required double subtotal,
-  }) : transactionId = Value(transactionId),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       transactionId = Value(transactionId),
        productId = Value(productId),
        qty = Value(qty),
        unitPrice = Value(unitPrice),
        subtotal = Value(subtotal);
   static Insertable<TransactionItem> custom({
-    Expression<int>? id,
-    Expression<int>? transactionId,
-    Expression<int>? productId,
+    Expression<String>? id,
+    Expression<String>? transactionId,
+    Expression<String>? productId,
     Expression<int>? qty,
     Expression<double>? unitPrice,
     Expression<double>? discount,
     Expression<double>? subtotal,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -2930,17 +2927,19 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       if (unitPrice != null) 'unit_price': unitPrice,
       if (discount != null) 'discount': discount,
       if (subtotal != null) 'subtotal': subtotal,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   TransactionItemsCompanion copyWith({
-    Value<int>? id,
-    Value<int>? transactionId,
-    Value<int>? productId,
+    Value<String>? id,
+    Value<String>? transactionId,
+    Value<String>? productId,
     Value<int>? qty,
     Value<double>? unitPrice,
     Value<double>? discount,
     Value<double>? subtotal,
+    Value<int>? rowid,
   }) {
     return TransactionItemsCompanion(
       id: id ?? this.id,
@@ -2950,6 +2949,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       unitPrice: unitPrice ?? this.unitPrice,
       discount: discount ?? this.discount,
       subtotal: subtotal ?? this.subtotal,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -2957,13 +2957,13 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (transactionId.present) {
-      map['transaction_id'] = Variable<int>(transactionId.value);
+      map['transaction_id'] = Variable<String>(transactionId.value);
     }
     if (productId.present) {
-      map['product_id'] = Variable<int>(productId.value);
+      map['product_id'] = Variable<String>(productId.value);
     }
     if (qty.present) {
       map['qty'] = Variable<int>(qty.value);
@@ -2977,6 +2977,9 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     if (subtotal.present) {
       map['subtotal'] = Variable<double>(subtotal.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -2989,7 +2992,8 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
           ..write('qty: $qty, ')
           ..write('unitPrice: $unitPrice, ')
           ..write('discount: $discount, ')
-          ..write('subtotal: $subtotal')
+          ..write('subtotal: $subtotal, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -3003,26 +3007,22 @@ class $StockAdjustmentsTable extends StockAdjustments
   $StockAdjustmentsTable(this.attachedDatabase, [this._alias]);
   static const VerificationMeta _idMeta = const VerificationMeta('id');
   @override
-  late final GeneratedColumn<int> id = GeneratedColumn<int>(
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
     'id',
     aliasedName,
     false,
-    hasAutoIncrement: true,
-    type: DriftSqlType.int,
-    requiredDuringInsert: false,
-    defaultConstraints: GeneratedColumn.constraintIsAlways(
-      'PRIMARY KEY AUTOINCREMENT',
-    ),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
   );
   static const VerificationMeta _productIdMeta = const VerificationMeta(
     'productId',
   );
   @override
-  late final GeneratedColumn<int> productId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> productId = GeneratedColumn<String>(
     'product_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES products (id)',
@@ -3030,11 +3030,11 @@ class $StockAdjustmentsTable extends StockAdjustments
   );
   static const VerificationMeta _userIdMeta = const VerificationMeta('userId');
   @override
-  late final GeneratedColumn<int> userId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> userId = GeneratedColumn<String>(
     'user_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
     defaultConstraints: GeneratedColumn.constraintIsAlways(
       'REFERENCES users (id)',
@@ -3105,6 +3105,8 @@ class $StockAdjustmentsTable extends StockAdjustments
     final data = instance.toColumns(true);
     if (data.containsKey('id')) {
       context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
     }
     if (data.containsKey('product_id')) {
       context.handle(
@@ -3160,15 +3162,15 @@ class $StockAdjustmentsTable extends StockAdjustments
     final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
     return StockAdjustment(
       id: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}id'],
       )!,
       productId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}product_id'],
       )!,
       userId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}user_id'],
       )!,
       type: attachedDatabase.typeMapping.read(
@@ -3197,9 +3199,9 @@ class $StockAdjustmentsTable extends StockAdjustments
 }
 
 class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
-  final int id;
-  final int productId;
-  final int userId;
+  final String id;
+  final String productId;
+  final String userId;
   final String type;
   final int qtyChange;
   final String? reason;
@@ -3216,9 +3218,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
-    map['id'] = Variable<int>(id);
-    map['product_id'] = Variable<int>(productId);
-    map['user_id'] = Variable<int>(userId);
+    map['id'] = Variable<String>(id);
+    map['product_id'] = Variable<String>(productId);
+    map['user_id'] = Variable<String>(userId);
     map['type'] = Variable<String>(type);
     map['qty_change'] = Variable<int>(qtyChange);
     if (!nullToAbsent || reason != null) {
@@ -3248,9 +3250,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
   }) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return StockAdjustment(
-      id: serializer.fromJson<int>(json['id']),
-      productId: serializer.fromJson<int>(json['productId']),
-      userId: serializer.fromJson<int>(json['userId']),
+      id: serializer.fromJson<String>(json['id']),
+      productId: serializer.fromJson<String>(json['productId']),
+      userId: serializer.fromJson<String>(json['userId']),
       type: serializer.fromJson<String>(json['type']),
       qtyChange: serializer.fromJson<int>(json['qtyChange']),
       reason: serializer.fromJson<String?>(json['reason']),
@@ -3261,9 +3263,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
   Map<String, dynamic> toJson({ValueSerializer? serializer}) {
     serializer ??= driftRuntimeOptions.defaultSerializer;
     return <String, dynamic>{
-      'id': serializer.toJson<int>(id),
-      'productId': serializer.toJson<int>(productId),
-      'userId': serializer.toJson<int>(userId),
+      'id': serializer.toJson<String>(id),
+      'productId': serializer.toJson<String>(productId),
+      'userId': serializer.toJson<String>(userId),
       'type': serializer.toJson<String>(type),
       'qtyChange': serializer.toJson<int>(qtyChange),
       'reason': serializer.toJson<String?>(reason),
@@ -3272,9 +3274,9 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
   }
 
   StockAdjustment copyWith({
-    int? id,
-    int? productId,
-    int? userId,
+    String? id,
+    String? productId,
+    String? userId,
     String? type,
     int? qtyChange,
     Value<String?> reason = const Value.absent(),
@@ -3331,13 +3333,14 @@ class StockAdjustment extends DataClass implements Insertable<StockAdjustment> {
 }
 
 class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
-  final Value<int> id;
-  final Value<int> productId;
-  final Value<int> userId;
+  final Value<String> id;
+  final Value<String> productId;
+  final Value<String> userId;
   final Value<String> type;
   final Value<int> qtyChange;
   final Value<String?> reason;
   final Value<DateTime> createdAt;
+  final Value<int> rowid;
   const StockAdjustmentsCompanion({
     this.id = const Value.absent(),
     this.productId = const Value.absent(),
@@ -3346,27 +3349,31 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     this.qtyChange = const Value.absent(),
     this.reason = const Value.absent(),
     this.createdAt = const Value.absent(),
+    this.rowid = const Value.absent(),
   });
   StockAdjustmentsCompanion.insert({
-    this.id = const Value.absent(),
-    required int productId,
-    required int userId,
+    required String id,
+    required String productId,
+    required String userId,
     required String type,
     required int qtyChange,
     this.reason = const Value.absent(),
     this.createdAt = const Value.absent(),
-  }) : productId = Value(productId),
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       productId = Value(productId),
        userId = Value(userId),
        type = Value(type),
        qtyChange = Value(qtyChange);
   static Insertable<StockAdjustment> custom({
-    Expression<int>? id,
-    Expression<int>? productId,
-    Expression<int>? userId,
+    Expression<String>? id,
+    Expression<String>? productId,
+    Expression<String>? userId,
     Expression<String>? type,
     Expression<int>? qtyChange,
     Expression<String>? reason,
     Expression<DateTime>? createdAt,
+    Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3376,17 +3383,19 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       if (qtyChange != null) 'qty_change': qtyChange,
       if (reason != null) 'reason': reason,
       if (createdAt != null) 'created_at': createdAt,
+      if (rowid != null) 'rowid': rowid,
     });
   }
 
   StockAdjustmentsCompanion copyWith({
-    Value<int>? id,
-    Value<int>? productId,
-    Value<int>? userId,
+    Value<String>? id,
+    Value<String>? productId,
+    Value<String>? userId,
     Value<String>? type,
     Value<int>? qtyChange,
     Value<String?>? reason,
     Value<DateTime>? createdAt,
+    Value<int>? rowid,
   }) {
     return StockAdjustmentsCompanion(
       id: id ?? this.id,
@@ -3396,6 +3405,7 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
       qtyChange: qtyChange ?? this.qtyChange,
       reason: reason ?? this.reason,
       createdAt: createdAt ?? this.createdAt,
+      rowid: rowid ?? this.rowid,
     );
   }
 
@@ -3403,13 +3413,13 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     if (id.present) {
-      map['id'] = Variable<int>(id.value);
+      map['id'] = Variable<String>(id.value);
     }
     if (productId.present) {
-      map['product_id'] = Variable<int>(productId.value);
+      map['product_id'] = Variable<String>(productId.value);
     }
     if (userId.present) {
-      map['user_id'] = Variable<int>(userId.value);
+      map['user_id'] = Variable<String>(userId.value);
     }
     if (type.present) {
       map['type'] = Variable<String>(type.value);
@@ -3423,6 +3433,9 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
     if (createdAt.present) {
       map['created_at'] = Variable<DateTime>(createdAt.value);
     }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
     return map;
   }
 
@@ -3435,7 +3448,8 @@ class StockAdjustmentsCompanion extends UpdateCompanion<StockAdjustment> {
           ..write('type: $type, ')
           ..write('qtyChange: $qtyChange, ')
           ..write('reason: $reason, ')
-          ..write('createdAt: $createdAt')
+          ..write('createdAt: $createdAt, ')
+          ..write('rowid: $rowid')
           ..write(')'))
         .toString();
   }
@@ -3475,11 +3489,11 @@ class $SyncQueueTable extends SyncQueue
     'recordId',
   );
   @override
-  late final GeneratedColumn<int> recordId = GeneratedColumn<int>(
+  late final GeneratedColumn<String> recordId = GeneratedColumn<String>(
     'record_id',
     aliasedName,
     false,
-    type: DriftSqlType.int,
+    type: DriftSqlType.string,
     requiredDuringInsert: true,
   );
   static const VerificationMeta _operationMeta = const VerificationMeta(
@@ -3527,6 +3541,29 @@ class $SyncQueueTable extends SyncQueue
     ),
     defaultValue: const Constant(false),
   );
+  static const VerificationMeta _retryCountMeta = const VerificationMeta(
+    'retryCount',
+  );
+  @override
+  late final GeneratedColumn<int> retryCount = GeneratedColumn<int>(
+    'retry_count',
+    aliasedName,
+    false,
+    type: DriftSqlType.int,
+    requiredDuringInsert: false,
+    defaultValue: const Constant(0),
+  );
+  static const VerificationMeta _lastErrorMeta = const VerificationMeta(
+    'lastError',
+  );
+  @override
+  late final GeneratedColumn<String> lastError = GeneratedColumn<String>(
+    'last_error',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3536,6 +3573,8 @@ class $SyncQueueTable extends SyncQueue
     data,
     createdAt,
     synced,
+    retryCount,
+    lastError,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3599,6 +3638,18 @@ class $SyncQueueTable extends SyncQueue
         synced.isAcceptableOrUnknown(data['synced']!, _syncedMeta),
       );
     }
+    if (data.containsKey('retry_count')) {
+      context.handle(
+        _retryCountMeta,
+        retryCount.isAcceptableOrUnknown(data['retry_count']!, _retryCountMeta),
+      );
+    }
+    if (data.containsKey('last_error')) {
+      context.handle(
+        _lastErrorMeta,
+        lastError.isAcceptableOrUnknown(data['last_error']!, _lastErrorMeta),
+      );
+    }
     return context;
   }
 
@@ -3617,7 +3668,7 @@ class $SyncQueueTable extends SyncQueue
         data['${effectivePrefix}sync_table_name'],
       )!,
       recordId: attachedDatabase.typeMapping.read(
-        DriftSqlType.int,
+        DriftSqlType.string,
         data['${effectivePrefix}record_id'],
       )!,
       operation: attachedDatabase.typeMapping.read(
@@ -3636,6 +3687,14 @@ class $SyncQueueTable extends SyncQueue
         DriftSqlType.bool,
         data['${effectivePrefix}synced'],
       )!,
+      retryCount: attachedDatabase.typeMapping.read(
+        DriftSqlType.int,
+        data['${effectivePrefix}retry_count'],
+      )!,
+      lastError: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}last_error'],
+      ),
     );
   }
 
@@ -3648,11 +3707,13 @@ class $SyncQueueTable extends SyncQueue
 class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
   final int id;
   final String syncTableName;
-  final int recordId;
+  final String recordId;
   final String operation;
   final String data;
   final DateTime createdAt;
   final bool synced;
+  final int retryCount;
+  final String? lastError;
   const SyncQueueData({
     required this.id,
     required this.syncTableName,
@@ -3661,17 +3722,23 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
     required this.data,
     required this.createdAt,
     required this.synced,
+    required this.retryCount,
+    this.lastError,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
     final map = <String, Expression>{};
     map['id'] = Variable<int>(id);
     map['sync_table_name'] = Variable<String>(syncTableName);
-    map['record_id'] = Variable<int>(recordId);
+    map['record_id'] = Variable<String>(recordId);
     map['operation'] = Variable<String>(operation);
     map['data'] = Variable<String>(data);
     map['created_at'] = Variable<DateTime>(createdAt);
     map['synced'] = Variable<bool>(synced);
+    map['retry_count'] = Variable<int>(retryCount);
+    if (!nullToAbsent || lastError != null) {
+      map['last_error'] = Variable<String>(lastError);
+    }
     return map;
   }
 
@@ -3684,6 +3751,10 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
       data: Value(data),
       createdAt: Value(createdAt),
       synced: Value(synced),
+      retryCount: Value(retryCount),
+      lastError: lastError == null && nullToAbsent
+          ? const Value.absent()
+          : Value(lastError),
     );
   }
 
@@ -3695,11 +3766,13 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
     return SyncQueueData(
       id: serializer.fromJson<int>(json['id']),
       syncTableName: serializer.fromJson<String>(json['syncTableName']),
-      recordId: serializer.fromJson<int>(json['recordId']),
+      recordId: serializer.fromJson<String>(json['recordId']),
       operation: serializer.fromJson<String>(json['operation']),
       data: serializer.fromJson<String>(json['data']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       synced: serializer.fromJson<bool>(json['synced']),
+      retryCount: serializer.fromJson<int>(json['retryCount']),
+      lastError: serializer.fromJson<String?>(json['lastError']),
     );
   }
   @override
@@ -3708,22 +3781,26 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
     return <String, dynamic>{
       'id': serializer.toJson<int>(id),
       'syncTableName': serializer.toJson<String>(syncTableName),
-      'recordId': serializer.toJson<int>(recordId),
+      'recordId': serializer.toJson<String>(recordId),
       'operation': serializer.toJson<String>(operation),
       'data': serializer.toJson<String>(data),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'synced': serializer.toJson<bool>(synced),
+      'retryCount': serializer.toJson<int>(retryCount),
+      'lastError': serializer.toJson<String?>(lastError),
     };
   }
 
   SyncQueueData copyWith({
     int? id,
     String? syncTableName,
-    int? recordId,
+    String? recordId,
     String? operation,
     String? data,
     DateTime? createdAt,
     bool? synced,
+    int? retryCount,
+    Value<String?> lastError = const Value.absent(),
   }) => SyncQueueData(
     id: id ?? this.id,
     syncTableName: syncTableName ?? this.syncTableName,
@@ -3732,6 +3809,8 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
     data: data ?? this.data,
     createdAt: createdAt ?? this.createdAt,
     synced: synced ?? this.synced,
+    retryCount: retryCount ?? this.retryCount,
+    lastError: lastError.present ? lastError.value : this.lastError,
   );
   SyncQueueData copyWithCompanion(SyncQueueCompanion data) {
     return SyncQueueData(
@@ -3744,6 +3823,10 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
       data: data.data.present ? data.data.value : this.data,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       synced: data.synced.present ? data.synced.value : this.synced,
+      retryCount: data.retryCount.present
+          ? data.retryCount.value
+          : this.retryCount,
+      lastError: data.lastError.present ? data.lastError.value : this.lastError,
     );
   }
 
@@ -3756,7 +3839,9 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
           ..write('operation: $operation, ')
           ..write('data: $data, ')
           ..write('createdAt: $createdAt, ')
-          ..write('synced: $synced')
+          ..write('synced: $synced, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('lastError: $lastError')
           ..write(')'))
         .toString();
   }
@@ -3770,6 +3855,8 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
     data,
     createdAt,
     synced,
+    retryCount,
+    lastError,
   );
   @override
   bool operator ==(Object other) =>
@@ -3781,17 +3868,21 @@ class SyncQueueData extends DataClass implements Insertable<SyncQueueData> {
           other.operation == this.operation &&
           other.data == this.data &&
           other.createdAt == this.createdAt &&
-          other.synced == this.synced);
+          other.synced == this.synced &&
+          other.retryCount == this.retryCount &&
+          other.lastError == this.lastError);
 }
 
 class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
   final Value<int> id;
   final Value<String> syncTableName;
-  final Value<int> recordId;
+  final Value<String> recordId;
   final Value<String> operation;
   final Value<String> data;
   final Value<DateTime> createdAt;
   final Value<bool> synced;
+  final Value<int> retryCount;
+  final Value<String?> lastError;
   const SyncQueueCompanion({
     this.id = const Value.absent(),
     this.syncTableName = const Value.absent(),
@@ -3800,15 +3891,19 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
     this.data = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.synced = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.lastError = const Value.absent(),
   });
   SyncQueueCompanion.insert({
     this.id = const Value.absent(),
     required String syncTableName,
-    required int recordId,
+    required String recordId,
     required String operation,
     required String data,
     this.createdAt = const Value.absent(),
     this.synced = const Value.absent(),
+    this.retryCount = const Value.absent(),
+    this.lastError = const Value.absent(),
   }) : syncTableName = Value(syncTableName),
        recordId = Value(recordId),
        operation = Value(operation),
@@ -3816,11 +3911,13 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
   static Insertable<SyncQueueData> custom({
     Expression<int>? id,
     Expression<String>? syncTableName,
-    Expression<int>? recordId,
+    Expression<String>? recordId,
     Expression<String>? operation,
     Expression<String>? data,
     Expression<DateTime>? createdAt,
     Expression<bool>? synced,
+    Expression<int>? retryCount,
+    Expression<String>? lastError,
   }) {
     return RawValuesInsertable({
       if (id != null) 'id': id,
@@ -3830,17 +3927,21 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
       if (data != null) 'data': data,
       if (createdAt != null) 'created_at': createdAt,
       if (synced != null) 'synced': synced,
+      if (retryCount != null) 'retry_count': retryCount,
+      if (lastError != null) 'last_error': lastError,
     });
   }
 
   SyncQueueCompanion copyWith({
     Value<int>? id,
     Value<String>? syncTableName,
-    Value<int>? recordId,
+    Value<String>? recordId,
     Value<String>? operation,
     Value<String>? data,
     Value<DateTime>? createdAt,
     Value<bool>? synced,
+    Value<int>? retryCount,
+    Value<String?>? lastError,
   }) {
     return SyncQueueCompanion(
       id: id ?? this.id,
@@ -3850,6 +3951,8 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
       data: data ?? this.data,
       createdAt: createdAt ?? this.createdAt,
       synced: synced ?? this.synced,
+      retryCount: retryCount ?? this.retryCount,
+      lastError: lastError ?? this.lastError,
     );
   }
 
@@ -3863,7 +3966,7 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
       map['sync_table_name'] = Variable<String>(syncTableName.value);
     }
     if (recordId.present) {
-      map['record_id'] = Variable<int>(recordId.value);
+      map['record_id'] = Variable<String>(recordId.value);
     }
     if (operation.present) {
       map['operation'] = Variable<String>(operation.value);
@@ -3877,6 +3980,12 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
     if (synced.present) {
       map['synced'] = Variable<bool>(synced.value);
     }
+    if (retryCount.present) {
+      map['retry_count'] = Variable<int>(retryCount.value);
+    }
+    if (lastError.present) {
+      map['last_error'] = Variable<String>(lastError.value);
+    }
     return map;
   }
 
@@ -3889,7 +3998,9 @@ class SyncQueueCompanion extends UpdateCompanion<SyncQueueData> {
           ..write('operation: $operation, ')
           ..write('data: $data, ')
           ..write('createdAt: $createdAt, ')
-          ..write('synced: $synced')
+          ..write('synced: $synced, ')
+          ..write('retryCount: $retryCount, ')
+          ..write('lastError: $lastError')
           ..write(')'))
         .toString();
   }
@@ -4321,29 +4432,29 @@ abstract class _$AppDatabase extends GeneratedDatabase {
 
 typedef $$UsersTableCreateCompanionBuilder =
     UsersCompanion Function({
-      Value<int> id,
+      required String id,
       required String name,
       required String username,
       required String email,
       required String passwordHash,
-      Value<String> role,
       Value<String?> avatarUrl,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<String?> supabaseUid,
+      Value<int> rowid,
     });
 typedef $$UsersTableUpdateCompanionBuilder =
     UsersCompanion Function({
-      Value<int> id,
+      Value<String> id,
       Value<String> name,
       Value<String> username,
       Value<String> email,
       Value<String> passwordHash,
-      Value<String> role,
       Value<String?> avatarUrl,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<String?> supabaseUid,
+      Value<int> rowid,
     });
 
 final class $$UsersTableReferences
@@ -4353,14 +4464,14 @@ final class $$UsersTableReferences
   static MultiTypedResultKey<$TransactionsTable, List<Transaction>>
   _transactionsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
     db.transactions,
-    aliasName: $_aliasNameGenerator(db.users.id, db.transactions.cashierId),
+    aliasName: $_aliasNameGenerator(db.users.id, db.transactions.userId),
   );
 
   $$TransactionsTableProcessedTableManager get transactionsRefs {
     final manager = $$TransactionsTableTableManager(
       $_db,
       $_db.transactions,
-    ).filter((f) => f.cashierId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_transactionsRefsTable($_db));
     return ProcessedTableManager(
@@ -4378,7 +4489,7 @@ final class $$UsersTableReferences
     final manager = $$StockAdjustmentsTableTableManager(
       $_db,
       $_db.stockAdjustments,
-    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.userId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(
       _stockAdjustmentsRefsTable($_db),
@@ -4397,7 +4508,7 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -4419,11 +4530,6 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
 
   ColumnFilters<String> get passwordHash => $composableBuilder(
     column: $table.passwordHash,
-    builder: (column) => ColumnFilters(column),
-  );
-
-  ColumnFilters<String> get role => $composableBuilder(
-    column: $table.role,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -4454,7 +4560,7 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
       composer: this,
       getCurrentColumn: (t) => t.id,
       referencedTable: $db.transactions,
-      getReferencedColumn: (t) => t.cashierId,
+      getReferencedColumn: (t) => t.userId,
       builder:
           (
             joinBuilder, {
@@ -4507,7 +4613,7 @@ class $$UsersTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -4529,11 +4635,6 @@ class $$UsersTableOrderingComposer
 
   ColumnOrderings<String> get passwordHash => $composableBuilder(
     column: $table.passwordHash,
-    builder: (column) => ColumnOrderings(column),
-  );
-
-  ColumnOrderings<String> get role => $composableBuilder(
-    column: $table.role,
     builder: (column) => ColumnOrderings(column),
   );
 
@@ -4567,7 +4668,7 @@ class $$UsersTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
@@ -4583,9 +4684,6 @@ class $$UsersTableAnnotationComposer
     column: $table.passwordHash,
     builder: (column) => column,
   );
-
-  GeneratedColumn<String> get role =>
-      $composableBuilder(column: $table.role, builder: (column) => column);
 
   GeneratedColumn<String> get avatarUrl =>
       $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
@@ -4608,7 +4706,7 @@ class $$UsersTableAnnotationComposer
       composer: this,
       getCurrentColumn: (t) => t.id,
       referencedTable: $db.transactions,
-      getReferencedColumn: (t) => t.cashierId,
+      getReferencedColumn: (t) => t.userId,
       builder:
           (
             joinBuilder, {
@@ -4683,51 +4781,51 @@ class $$UsersTableTableManager
               $$UsersTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> username = const Value.absent(),
                 Value<String> email = const Value.absent(),
                 Value<String> passwordHash = const Value.absent(),
-                Value<String> role = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> supabaseUid = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => UsersCompanion(
                 id: id,
                 name: name,
                 username: username,
                 email: email,
                 passwordHash: passwordHash,
-                role: role,
                 avatarUrl: avatarUrl,
                 isActive: isActive,
                 createdAt: createdAt,
                 supabaseUid: supabaseUid,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                required String id,
                 required String name,
                 required String username,
                 required String email,
                 required String passwordHash,
-                Value<String> role = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> supabaseUid = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => UsersCompanion.insert(
                 id: id,
                 name: name,
                 username: username,
                 email: email,
                 passwordHash: passwordHash,
-                role: role,
                 avatarUrl: avatarUrl,
                 isActive: isActive,
                 createdAt: createdAt,
                 supabaseUid: supabaseUid,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -4763,7 +4861,7 @@ class $$UsersTableTableManager
                               ).transactionsRefs,
                           referencedItemsForCurrentItem:
                               (item, referencedItems) => referencedItems.where(
-                                (e) => e.cashierId == item.id,
+                                (e) => e.userId == item.id,
                               ),
                           typedResults: items,
                         ),
@@ -4812,17 +4910,19 @@ typedef $$UsersTableProcessedTableManager =
     >;
 typedef $$CategoriesTableCreateCompanionBuilder =
     CategoriesCompanion Function({
-      Value<int> id,
+      required String id,
       required String name,
       required String slug,
-      Value<int?> parentId,
+      Value<String?> parentId,
+      Value<int> rowid,
     });
 typedef $$CategoriesTableUpdateCompanionBuilder =
     CategoriesCompanion Function({
-      Value<int> id,
+      Value<String> id,
       Value<String> name,
       Value<String> slug,
-      Value<int?> parentId,
+      Value<String?> parentId,
+      Value<int> rowid,
     });
 
 final class $$CategoriesTableReferences
@@ -4840,7 +4940,7 @@ final class $$CategoriesTableReferences
     final manager = $$ProductsTableTableManager(
       $_db,
       $_db.products,
-    ).filter((f) => f.categoryId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.categoryId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(_productsRefsTable($_db));
     return ProcessedTableManager(
@@ -4858,7 +4958,7 @@ class $$CategoriesTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -4873,7 +4973,7 @@ class $$CategoriesTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get parentId => $composableBuilder(
+  ColumnFilters<String> get parentId => $composableBuilder(
     column: $table.parentId,
     builder: (column) => ColumnFilters(column),
   );
@@ -4913,7 +5013,7 @@ class $$CategoriesTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -4928,7 +5028,7 @@ class $$CategoriesTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get parentId => $composableBuilder(
+  ColumnOrderings<String> get parentId => $composableBuilder(
     column: $table.parentId,
     builder: (column) => ColumnOrderings(column),
   );
@@ -4943,7 +5043,7 @@ class $$CategoriesTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
@@ -4952,7 +5052,7 @@ class $$CategoriesTableAnnotationComposer
   GeneratedColumn<String> get slug =>
       $composableBuilder(column: $table.slug, builder: (column) => column);
 
-  GeneratedColumn<int> get parentId =>
+  GeneratedColumn<String> get parentId =>
       $composableBuilder(column: $table.parentId, builder: (column) => column);
 
   Expression<T> productsRefs<T extends Object>(
@@ -5009,27 +5109,31 @@ class $$CategoriesTableTableManager
               $$CategoriesTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String> slug = const Value.absent(),
-                Value<int?> parentId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion(
                 id: id,
                 name: name,
                 slug: slug,
                 parentId: parentId,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                required String id,
                 required String name,
                 required String slug,
-                Value<int?> parentId = const Value.absent(),
+                Value<String?> parentId = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => CategoriesCompanion.insert(
                 id: id,
                 name: name,
                 slug: slug,
                 parentId: parentId,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5089,11 +5193,11 @@ typedef $$CategoriesTableProcessedTableManager =
     >;
 typedef $$ProductsTableCreateCompanionBuilder =
     ProductsCompanion Function({
-      Value<int> id,
+      required String id,
       required String name,
       Value<String?> sku,
       Value<String?> barcode,
-      Value<int?> categoryId,
+      Value<String?> categoryId,
       Value<String?> brand,
       Value<String?> motorType,
       Value<int> stockQty,
@@ -5106,14 +5210,15 @@ typedef $$ProductsTableCreateCompanionBuilder =
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime?> updatedAt,
+      Value<int> rowid,
     });
 typedef $$ProductsTableUpdateCompanionBuilder =
     ProductsCompanion Function({
-      Value<int> id,
+      Value<String> id,
       Value<String> name,
       Value<String?> sku,
       Value<String?> barcode,
-      Value<int?> categoryId,
+      Value<String?> categoryId,
       Value<String?> brand,
       Value<String?> motorType,
       Value<int> stockQty,
@@ -5126,6 +5231,7 @@ typedef $$ProductsTableUpdateCompanionBuilder =
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<DateTime?> updatedAt,
+      Value<int> rowid,
     });
 
 final class $$ProductsTableReferences
@@ -5138,7 +5244,7 @@ final class $$ProductsTableReferences
       );
 
   $$CategoriesTableProcessedTableManager? get categoryId {
-    final $_column = $_itemColumn<int>('category_id');
+    final $_column = $_itemColumn<String>('category_id');
     if ($_column == null) return null;
     final manager = $$CategoriesTableTableManager(
       $_db,
@@ -5164,7 +5270,7 @@ final class $$ProductsTableReferences
     final manager = $$TransactionItemsTableTableManager(
       $_db,
       $_db.transactionItems,
-    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(
       _transactionItemsRefsTable($_db),
@@ -5187,7 +5293,7 @@ final class $$ProductsTableReferences
     final manager = $$StockAdjustmentsTableTableManager(
       $_db,
       $_db.stockAdjustments,
-    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.productId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(
       _stockAdjustmentsRefsTable($_db),
@@ -5207,7 +5313,7 @@ class $$ProductsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -5370,7 +5476,7 @@ class $$ProductsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -5483,7 +5589,7 @@ class $$ProductsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get name =>
@@ -5639,11 +5745,11 @@ class $$ProductsTableTableManager
               $$ProductsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> name = const Value.absent(),
                 Value<String?> sku = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
-                Value<int?> categoryId = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
                 Value<String?> brand = const Value.absent(),
                 Value<String?> motorType = const Value.absent(),
                 Value<int> stockQty = const Value.absent(),
@@ -5656,6 +5762,7 @@ class $$ProductsTableTableManager
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => ProductsCompanion(
                 id: id,
                 name: name,
@@ -5674,14 +5781,15 @@ class $$ProductsTableTableManager
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                required String id,
                 required String name,
                 Value<String?> sku = const Value.absent(),
                 Value<String?> barcode = const Value.absent(),
-                Value<int?> categoryId = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
                 Value<String?> brand = const Value.absent(),
                 Value<String?> motorType = const Value.absent(),
                 Value<int> stockQty = const Value.absent(),
@@ -5694,6 +5802,7 @@ class $$ProductsTableTableManager
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<DateTime?> updatedAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => ProductsCompanion.insert(
                 id: id,
                 name: name,
@@ -5712,6 +5821,7 @@ class $$ProductsTableTableManager
                 isActive: isActive,
                 createdAt: createdAt,
                 updatedAt: updatedAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -5837,10 +5947,10 @@ typedef $$ProductsTableProcessedTableManager =
     >;
 typedef $$TransactionsTableCreateCompanionBuilder =
     TransactionsCompanion Function({
-      Value<int> id,
+      required String id,
       required String invoiceNo,
-      required int cashierId,
-      Value<int?> customerId,
+      required String userId,
+      Value<String?> customerId,
       Value<String> paymentMethod,
       Value<double> subtotal,
       Value<double> discount,
@@ -5849,13 +5959,14 @@ typedef $$TransactionsTableCreateCompanionBuilder =
       Value<double> changeAmount,
       Value<String> status,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 typedef $$TransactionsTableUpdateCompanionBuilder =
     TransactionsCompanion Function({
-      Value<int> id,
+      Value<String> id,
       Value<String> invoiceNo,
-      Value<int> cashierId,
-      Value<int?> customerId,
+      Value<String> userId,
+      Value<String?> customerId,
       Value<String> paymentMethod,
       Value<double> subtotal,
       Value<double> discount,
@@ -5864,24 +5975,25 @@ typedef $$TransactionsTableUpdateCompanionBuilder =
       Value<double> changeAmount,
       Value<String> status,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 
 final class $$TransactionsTableReferences
     extends BaseReferences<_$AppDatabase, $TransactionsTable, Transaction> {
   $$TransactionsTableReferences(super.$_db, super.$_table, super.$_typedResult);
 
-  static $UsersTable _cashierIdTable(_$AppDatabase db) => db.users.createAlias(
-    $_aliasNameGenerator(db.transactions.cashierId, db.users.id),
+  static $UsersTable _userIdTable(_$AppDatabase db) => db.users.createAlias(
+    $_aliasNameGenerator(db.transactions.userId, db.users.id),
   );
 
-  $$UsersTableProcessedTableManager get cashierId {
-    final $_column = $_itemColumn<int>('cashier_id')!;
+  $$UsersTableProcessedTableManager get userId {
+    final $_column = $_itemColumn<String>('user_id')!;
 
     final manager = $$UsersTableTableManager(
       $_db,
       $_db.users,
     ).filter((f) => f.id.sqlEquals($_column));
-    final item = $_typedResult.readTableOrNull(_cashierIdTable($_db));
+    final item = $_typedResult.readTableOrNull(_userIdTable($_db));
     if (item == null) return manager;
     return ProcessedTableManager(
       manager.$state.copyWith(prefetchedData: [item]),
@@ -5901,7 +6013,7 @@ final class $$TransactionsTableReferences
     final manager = $$TransactionItemsTableTableManager(
       $_db,
       $_db.transactionItems,
-    ).filter((f) => f.transactionId.id.sqlEquals($_itemColumn<int>('id')!));
+    ).filter((f) => f.transactionId.id.sqlEquals($_itemColumn<String>('id')!));
 
     final cache = $_typedResult.readTableOrNull(
       _transactionItemsRefsTable($_db),
@@ -5921,7 +6033,7 @@ class $$TransactionsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -5931,7 +6043,7 @@ class $$TransactionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get customerId => $composableBuilder(
+  ColumnFilters<String> get customerId => $composableBuilder(
     column: $table.customerId,
     builder: (column) => ColumnFilters(column),
   );
@@ -5976,10 +6088,10 @@ class $$TransactionsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  $$UsersTableFilterComposer get cashierId {
+  $$UsersTableFilterComposer get userId {
     final $$UsersTableFilterComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.cashierId,
+      getCurrentColumn: (t) => t.userId,
       referencedTable: $db.users,
       getReferencedColumn: (t) => t.id,
       builder:
@@ -6034,7 +6146,7 @@ class $$TransactionsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6044,7 +6156,7 @@ class $$TransactionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get customerId => $composableBuilder(
+  ColumnOrderings<String> get customerId => $composableBuilder(
     column: $table.customerId,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6089,10 +6201,10 @@ class $$TransactionsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  $$UsersTableOrderingComposer get cashierId {
+  $$UsersTableOrderingComposer get userId {
     final $$UsersTableOrderingComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.cashierId,
+      getCurrentColumn: (t) => t.userId,
       referencedTable: $db.users,
       getReferencedColumn: (t) => t.id,
       builder:
@@ -6122,13 +6234,13 @@ class $$TransactionsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get invoiceNo =>
       $composableBuilder(column: $table.invoiceNo, builder: (column) => column);
 
-  GeneratedColumn<int> get customerId => $composableBuilder(
+  GeneratedColumn<String> get customerId => $composableBuilder(
     column: $table.customerId,
     builder: (column) => column,
   );
@@ -6163,10 +6275,10 @@ class $$TransactionsTableAnnotationComposer
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
 
-  $$UsersTableAnnotationComposer get cashierId {
+  $$UsersTableAnnotationComposer get userId {
     final $$UsersTableAnnotationComposer composer = $composerBuilder(
       composer: this,
-      getCurrentColumn: (t) => t.cashierId,
+      getCurrentColumn: (t) => t.userId,
       referencedTable: $db.users,
       getReferencedColumn: (t) => t.id,
       builder:
@@ -6225,7 +6337,7 @@ class $$TransactionsTableTableManager
           $$TransactionsTableUpdateCompanionBuilder,
           (Transaction, $$TransactionsTableReferences),
           Transaction,
-          PrefetchHooks Function({bool cashierId, bool transactionItemsRefs})
+          PrefetchHooks Function({bool userId, bool transactionItemsRefs})
         > {
   $$TransactionsTableTableManager(_$AppDatabase db, $TransactionsTable table)
     : super(
@@ -6240,10 +6352,10 @@ class $$TransactionsTableTableManager
               $$TransactionsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                Value<String> id = const Value.absent(),
                 Value<String> invoiceNo = const Value.absent(),
-                Value<int> cashierId = const Value.absent(),
-                Value<int?> customerId = const Value.absent(),
+                Value<String> userId = const Value.absent(),
+                Value<String?> customerId = const Value.absent(),
                 Value<String> paymentMethod = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discount = const Value.absent(),
@@ -6252,10 +6364,11 @@ class $$TransactionsTableTableManager
                 Value<double> changeAmount = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => TransactionsCompanion(
                 id: id,
                 invoiceNo: invoiceNo,
-                cashierId: cashierId,
+                userId: userId,
                 customerId: customerId,
                 paymentMethod: paymentMethod,
                 subtotal: subtotal,
@@ -6265,13 +6378,14 @@ class $$TransactionsTableTableManager
                 changeAmount: changeAmount,
                 status: status,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
+                required String id,
                 required String invoiceNo,
-                required int cashierId,
-                Value<int?> customerId = const Value.absent(),
+                required String userId,
+                Value<String?> customerId = const Value.absent(),
                 Value<String> paymentMethod = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<double> discount = const Value.absent(),
@@ -6280,10 +6394,11 @@ class $$TransactionsTableTableManager
                 Value<double> changeAmount = const Value.absent(),
                 Value<String> status = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => TransactionsCompanion.insert(
                 id: id,
                 invoiceNo: invoiceNo,
-                cashierId: cashierId,
+                userId: userId,
                 customerId: customerId,
                 paymentMethod: paymentMethod,
                 subtotal: subtotal,
@@ -6293,6 +6408,7 @@ class $$TransactionsTableTableManager
                 changeAmount: changeAmount,
                 status: status,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -6303,7 +6419,7 @@ class $$TransactionsTableTableManager
               )
               .toList(),
           prefetchHooksCallback:
-              ({cashierId = false, transactionItemsRefs = false}) {
+              ({userId = false, transactionItemsRefs = false}) {
                 return PrefetchHooks(
                   db: db,
                   explicitlyWatchedTables: [
@@ -6325,17 +6441,17 @@ class $$TransactionsTableTableManager
                           dynamic
                         >
                       >(state) {
-                        if (cashierId) {
+                        if (userId) {
                           state =
                               state.withJoin(
                                     currentTable: table,
-                                    currentColumn: table.cashierId,
+                                    currentColumn: table.userId,
                                     referencedTable:
                                         $$TransactionsTableReferences
-                                            ._cashierIdTable(db),
+                                            ._userIdTable(db),
                                     referencedColumn:
                                         $$TransactionsTableReferences
-                                            ._cashierIdTable(db)
+                                            ._userIdTable(db)
                                             .id,
                                   )
                                   as T;
@@ -6386,27 +6502,29 @@ typedef $$TransactionsTableProcessedTableManager =
       $$TransactionsTableUpdateCompanionBuilder,
       (Transaction, $$TransactionsTableReferences),
       Transaction,
-      PrefetchHooks Function({bool cashierId, bool transactionItemsRefs})
+      PrefetchHooks Function({bool userId, bool transactionItemsRefs})
     >;
 typedef $$TransactionItemsTableCreateCompanionBuilder =
     TransactionItemsCompanion Function({
-      Value<int> id,
-      required int transactionId,
-      required int productId,
+      required String id,
+      required String transactionId,
+      required String productId,
       required int qty,
       required double unitPrice,
       Value<double> discount,
       required double subtotal,
+      Value<int> rowid,
     });
 typedef $$TransactionItemsTableUpdateCompanionBuilder =
     TransactionItemsCompanion Function({
-      Value<int> id,
-      Value<int> transactionId,
-      Value<int> productId,
+      Value<String> id,
+      Value<String> transactionId,
+      Value<String> productId,
       Value<int> qty,
       Value<double> unitPrice,
       Value<double> discount,
       Value<double> subtotal,
+      Value<int> rowid,
     });
 
 final class $$TransactionItemsTableReferences
@@ -6427,7 +6545,7 @@ final class $$TransactionItemsTableReferences
       );
 
   $$TransactionsTableProcessedTableManager get transactionId {
-    final $_column = $_itemColumn<int>('transaction_id')!;
+    final $_column = $_itemColumn<String>('transaction_id')!;
 
     final manager = $$TransactionsTableTableManager(
       $_db,
@@ -6446,7 +6564,7 @@ final class $$TransactionItemsTableReferences
       );
 
   $$ProductsTableProcessedTableManager get productId {
-    final $_column = $_itemColumn<int>('product_id')!;
+    final $_column = $_itemColumn<String>('product_id')!;
 
     final manager = $$ProductsTableTableManager(
       $_db,
@@ -6469,7 +6587,7 @@ class $$TransactionItemsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -6550,7 +6668,7 @@ class $$TransactionItemsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -6631,7 +6749,7 @@ class $$TransactionItemsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<int> get qty =>
@@ -6723,13 +6841,14 @@ class $$TransactionItemsTableTableManager
               $$TransactionItemsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                Value<int> transactionId = const Value.absent(),
-                Value<int> productId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> transactionId = const Value.absent(),
+                Value<String> productId = const Value.absent(),
                 Value<int> qty = const Value.absent(),
                 Value<double> unitPrice = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => TransactionItemsCompanion(
                 id: id,
                 transactionId: transactionId,
@@ -6738,16 +6857,18 @@ class $$TransactionItemsTableTableManager
                 unitPrice: unitPrice,
                 discount: discount,
                 subtotal: subtotal,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                required int transactionId,
-                required int productId,
+                required String id,
+                required String transactionId,
+                required String productId,
                 required int qty,
                 required double unitPrice,
                 Value<double> discount = const Value.absent(),
                 required double subtotal,
+                Value<int> rowid = const Value.absent(),
               }) => TransactionItemsCompanion.insert(
                 id: id,
                 transactionId: transactionId,
@@ -6756,6 +6877,7 @@ class $$TransactionItemsTableTableManager
                 unitPrice: unitPrice,
                 discount: discount,
                 subtotal: subtotal,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -6843,23 +6965,25 @@ typedef $$TransactionItemsTableProcessedTableManager =
     >;
 typedef $$StockAdjustmentsTableCreateCompanionBuilder =
     StockAdjustmentsCompanion Function({
-      Value<int> id,
-      required int productId,
-      required int userId,
+      required String id,
+      required String productId,
+      required String userId,
       required String type,
       required int qtyChange,
       Value<String?> reason,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 typedef $$StockAdjustmentsTableUpdateCompanionBuilder =
     StockAdjustmentsCompanion Function({
-      Value<int> id,
-      Value<int> productId,
-      Value<int> userId,
+      Value<String> id,
+      Value<String> productId,
+      Value<String> userId,
       Value<String> type,
       Value<int> qtyChange,
       Value<String?> reason,
       Value<DateTime> createdAt,
+      Value<int> rowid,
     });
 
 final class $$StockAdjustmentsTableReferences
@@ -6877,7 +7001,7 @@ final class $$StockAdjustmentsTableReferences
       );
 
   $$ProductsTableProcessedTableManager get productId {
-    final $_column = $_itemColumn<int>('product_id')!;
+    final $_column = $_itemColumn<String>('product_id')!;
 
     final manager = $$ProductsTableTableManager(
       $_db,
@@ -6895,7 +7019,7 @@ final class $$StockAdjustmentsTableReferences
   );
 
   $$UsersTableProcessedTableManager get userId {
-    final $_column = $_itemColumn<int>('user_id')!;
+    final $_column = $_itemColumn<String>('user_id')!;
 
     final manager = $$UsersTableTableManager(
       $_db,
@@ -6918,7 +7042,7 @@ class $$StockAdjustmentsTableFilterComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnFilters<int> get id => $composableBuilder(
+  ColumnFilters<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnFilters(column),
   );
@@ -6999,7 +7123,7 @@ class $$StockAdjustmentsTableOrderingComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  ColumnOrderings<int> get id => $composableBuilder(
+  ColumnOrderings<String> get id => $composableBuilder(
     column: $table.id,
     builder: (column) => ColumnOrderings(column),
   );
@@ -7080,7 +7204,7 @@ class $$StockAdjustmentsTableAnnotationComposer
     super.$addJoinBuilderToRootComposer,
     super.$removeJoinBuilderFromRootComposer,
   });
-  GeneratedColumn<int> get id =>
+  GeneratedColumn<String> get id =>
       $composableBuilder(column: $table.id, builder: (column) => column);
 
   GeneratedColumn<String> get type =>
@@ -7172,13 +7296,14 @@ class $$StockAdjustmentsTableTableManager
               $$StockAdjustmentsTableAnnotationComposer($db: db, $table: table),
           updateCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                Value<int> productId = const Value.absent(),
-                Value<int> userId = const Value.absent(),
+                Value<String> id = const Value.absent(),
+                Value<String> productId = const Value.absent(),
+                Value<String> userId = const Value.absent(),
                 Value<String> type = const Value.absent(),
                 Value<int> qtyChange = const Value.absent(),
                 Value<String?> reason = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => StockAdjustmentsCompanion(
                 id: id,
                 productId: productId,
@@ -7187,16 +7312,18 @@ class $$StockAdjustmentsTableTableManager
                 qtyChange: qtyChange,
                 reason: reason,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           createCompanionCallback:
               ({
-                Value<int> id = const Value.absent(),
-                required int productId,
-                required int userId,
+                required String id,
+                required String productId,
+                required String userId,
                 required String type,
                 required int qtyChange,
                 Value<String?> reason = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
               }) => StockAdjustmentsCompanion.insert(
                 id: id,
                 productId: productId,
@@ -7205,6 +7332,7 @@ class $$StockAdjustmentsTableTableManager
                 qtyChange: qtyChange,
                 reason: reason,
                 createdAt: createdAt,
+                rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
               .map(
@@ -7294,21 +7422,25 @@ typedef $$SyncQueueTableCreateCompanionBuilder =
     SyncQueueCompanion Function({
       Value<int> id,
       required String syncTableName,
-      required int recordId,
+      required String recordId,
       required String operation,
       required String data,
       Value<DateTime> createdAt,
       Value<bool> synced,
+      Value<int> retryCount,
+      Value<String?> lastError,
     });
 typedef $$SyncQueueTableUpdateCompanionBuilder =
     SyncQueueCompanion Function({
       Value<int> id,
       Value<String> syncTableName,
-      Value<int> recordId,
+      Value<String> recordId,
       Value<String> operation,
       Value<String> data,
       Value<DateTime> createdAt,
       Value<bool> synced,
+      Value<int> retryCount,
+      Value<String?> lastError,
     });
 
 class $$SyncQueueTableFilterComposer
@@ -7330,7 +7462,7 @@ class $$SyncQueueTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
-  ColumnFilters<int> get recordId => $composableBuilder(
+  ColumnFilters<String> get recordId => $composableBuilder(
     column: $table.recordId,
     builder: (column) => ColumnFilters(column),
   );
@@ -7354,6 +7486,16 @@ class $$SyncQueueTableFilterComposer
     column: $table.synced,
     builder: (column) => ColumnFilters(column),
   );
+
+  ColumnFilters<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnFilters(column),
+  );
 }
 
 class $$SyncQueueTableOrderingComposer
@@ -7375,7 +7517,7 @@ class $$SyncQueueTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
-  ColumnOrderings<int> get recordId => $composableBuilder(
+  ColumnOrderings<String> get recordId => $composableBuilder(
     column: $table.recordId,
     builder: (column) => ColumnOrderings(column),
   );
@@ -7399,6 +7541,16 @@ class $$SyncQueueTableOrderingComposer
     column: $table.synced,
     builder: (column) => ColumnOrderings(column),
   );
+
+  ColumnOrderings<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get lastError => $composableBuilder(
+    column: $table.lastError,
+    builder: (column) => ColumnOrderings(column),
+  );
 }
 
 class $$SyncQueueTableAnnotationComposer
@@ -7418,7 +7570,7 @@ class $$SyncQueueTableAnnotationComposer
     builder: (column) => column,
   );
 
-  GeneratedColumn<int> get recordId =>
+  GeneratedColumn<String> get recordId =>
       $composableBuilder(column: $table.recordId, builder: (column) => column);
 
   GeneratedColumn<String> get operation =>
@@ -7432,6 +7584,14 @@ class $$SyncQueueTableAnnotationComposer
 
   GeneratedColumn<bool> get synced =>
       $composableBuilder(column: $table.synced, builder: (column) => column);
+
+  GeneratedColumn<int> get retryCount => $composableBuilder(
+    column: $table.retryCount,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get lastError =>
+      $composableBuilder(column: $table.lastError, builder: (column) => column);
 }
 
 class $$SyncQueueTableTableManager
@@ -7467,11 +7627,13 @@ class $$SyncQueueTableTableManager
               ({
                 Value<int> id = const Value.absent(),
                 Value<String> syncTableName = const Value.absent(),
-                Value<int> recordId = const Value.absent(),
+                Value<String> recordId = const Value.absent(),
                 Value<String> operation = const Value.absent(),
                 Value<String> data = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
               }) => SyncQueueCompanion(
                 id: id,
                 syncTableName: syncTableName,
@@ -7480,16 +7642,20 @@ class $$SyncQueueTableTableManager
                 data: data,
                 createdAt: createdAt,
                 synced: synced,
+                retryCount: retryCount,
+                lastError: lastError,
               ),
           createCompanionCallback:
               ({
                 Value<int> id = const Value.absent(),
                 required String syncTableName,
-                required int recordId,
+                required String recordId,
                 required String operation,
                 required String data,
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<bool> synced = const Value.absent(),
+                Value<int> retryCount = const Value.absent(),
+                Value<String?> lastError = const Value.absent(),
               }) => SyncQueueCompanion.insert(
                 id: id,
                 syncTableName: syncTableName,
@@ -7498,6 +7664,8 @@ class $$SyncQueueTableTableManager
                 data: data,
                 createdAt: createdAt,
                 synced: synced,
+                retryCount: retryCount,
+                lastError: lastError,
               ),
           withReferenceMapper: (p0) => p0
               .map((e) => (e.readTable(table), BaseReferences(db, table, e)))

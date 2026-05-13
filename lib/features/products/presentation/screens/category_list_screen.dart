@@ -5,6 +5,7 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../shared/utils/app_toast.dart';
+import 'package:uuid/uuid.dart';
 import '../providers/product_provider.dart';
 
 class CategoryListScreen extends ConsumerWidget {
@@ -95,7 +96,9 @@ class CategoryListScreen extends ConsumerWidget {
                     data: {'id': category.id, 'name': name, 'slug': slug},
                   );
                 } else {
-                  final id = await db.insertCategory(CategoriesCompanion.insert(
+                  final id = const Uuid().v4();
+                  await db.insertCategory(CategoriesCompanion.insert(
+                    id: id,
                     name: name,
                     slug: slug,
                   ));

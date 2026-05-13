@@ -13,6 +13,7 @@ import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../reports/presentation/screens/report_screen.dart';
 import '../../../dashboard/presentation/screens/notification_screen.dart';
+import 'package:uuid/uuid.dart';
 import '../providers/cart_provider.dart';
 
 /// Layar keranjang & pembayaran
@@ -49,14 +50,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final subtotal = ref.read(cartSubtotalProvider);
     final discount = ref.read(cartDiscountProvider);
     final change = method == 'cash' ? paid - total : 0.0;
+    final uuid = const Uuid();
+    final txnId = uuid.v4();
     final invoiceNo = 'INV-${DateTime.now().millisecondsSinceEpoch}';
 
     try {
       await db.transaction(() async {
         // 1. Insert transaksi header
         final txnCompanion = TransactionsCompanion.insert(
+          id: txnId,
           invoiceNo: invoiceNo,
-          cashierId: user?.id ?? 1,
+          userId: user?.id ?? '1', // Default ID as String
           paymentMethod: Value(method),
           subtotal: Value(subtotal),
           discount: Value(discount),
@@ -65,7 +69,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           changeAmount: Value(change),
           createdAt: Value(DateTime.now()),
         );
-        final txnId = await db.insertTransaction(txnCompanion);
+        await db.insertTransaction(txnCompanion);
 
         // Enqueue sync untuk header
         final syncService = ref.read(syncServiceProvider);
@@ -76,7 +80,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           data: {
             'id': txnId,
             'invoice_no': invoiceNo,
-            'cashier_id': user?.id ?? 1,
+            'user_id': user?.id ?? '1',
             'payment_method': method,
             'subtotal': subtotal,
             'discount': discount,
@@ -89,7 +93,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
         // 2. Insert items & kurangi stok
         for (final item in cart) {
+          final itemId = uuid.v4();
           final itemCompanion = TransactionItemsCompanion.insert(
+            id: itemId,
             transactionId: txnId,
             productId: item.productId,
             qty: item.qty,
@@ -97,7 +103,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             discount: Value(item.discount),
             subtotal: item.subtotal,
           );
-          final itemId = await db.insertTransactionItem(itemCompanion);
+          await db.insertTransactionItem(itemCompanion);
 
           // Enqueue sync untuk item
           await syncService.enqueue(

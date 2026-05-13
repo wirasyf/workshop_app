@@ -27,7 +27,7 @@ class SettingsService {
   String get storeAddress => _prefs.getString(keyStoreAddress) ?? 'Alamat Toko Belum Diatur';
   String get storePhone => _prefs.getString(keyStorePhone) ?? '-';
   String get receiptFooter => _prefs.getString(keyReceiptFooter) ?? 'Terima Kasih Atas Kunjungan Anda';
-  int? get userId => _prefs.getInt(keyUserId);
+  String? get userId => _prefs.getString(keyUserId);
   String get themeMode => _prefs.getString(keyThemeMode) ?? 'light';
 
   Future<void> setStoreInfo(String name, String address, String phone) async {
@@ -40,11 +40,11 @@ class SettingsService {
     await _prefs.setString(keyReceiptFooter, footer);
   }
 
-  Future<void> setUserId(int? id) async {
+  Future<void> setUserId(String? id) async {
     if (id == null) {
       await _prefs.remove(keyUserId);
     } else {
-      await _prefs.setInt(keyUserId, id);
+      await _prefs.setString(keyUserId, id);
     }
   }
 

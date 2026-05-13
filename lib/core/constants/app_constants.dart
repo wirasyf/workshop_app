@@ -17,8 +17,6 @@ class AppConstants {
   // Database
   static const String dbName = 'spareart_db';
 
-  // Roles
-  static const String roleOwner = 'owner';
 
   // Stock thresholds
   static const int stockCriticalThreshold = 0;

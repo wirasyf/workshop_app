@@ -65,7 +65,7 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     }
   }
 
-  Future<String?> _uploadAvatar(int userId) async {
+  Future<String?> _uploadAvatar(String userId) async {
     if (_imageFile == null) return _currentAvatarUrl;
 
     try {

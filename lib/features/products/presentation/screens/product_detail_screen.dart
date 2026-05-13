@@ -10,7 +10,7 @@ import '../widgets/stock_badge.dart';
 
 /// Detail produk
 class ProductDetailScreen extends ConsumerWidget {
-  final int productId;
+  final String productId;
   const ProductDetailScreen({super.key, required this.productId});
 
   @override
