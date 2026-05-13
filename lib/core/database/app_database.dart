@@ -123,6 +123,13 @@ class AppDatabase extends _$AppDatabase {
   Future<List<TransactionItem>> getTransactionItems(String txnId) =>
       (select(transactionItems)..where((i) => i.transactionId.equals(txnId))).get();
 
+  /// Ambil item transaksi dengan info produk
+  Future<List<TypedResult>> getTransactionItemsWithProduct(String txnId) {
+    return (select(transactionItems).join([
+      innerJoin(products, products.id.equalsExp(transactionItems.productId)),
+    ])..where(transactionItems.transactionId.equals(txnId))).get();
+  }
+
   /// Total omzet
   Future<double> getTotalSales(DateTime start, DateTime end) async {
     final r = await customSelect(

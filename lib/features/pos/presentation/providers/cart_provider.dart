@@ -24,6 +24,14 @@ class CartItem {
           unit: unit, qty: qty ?? this.qty, discount: discount ?? this.discount);
 }
 
+/// Detail item transaksi (untuk riwayat)
+class TransactionDetail {
+  final TransactionItem item;
+  final String productName;
+
+  TransactionDetail({required this.item, required this.productName});
+}
+
 /// Provider keranjang belanja
 final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>((ref) => CartNotifier());
 
@@ -74,6 +82,16 @@ class CartConstants {
 final transactionHistoryProvider = FutureProvider.family<List<Transaction>, ({DateTime start, DateTime end})>((ref, range) {
   final db = ref.watch(databaseProvider);
   return db.getTransactionsByDate(range.start, range.end);
+});
+
+/// Provider detail item transaksi
+final transactionItemsProvider = FutureProvider.family<List<TransactionDetail>, String>((ref, txnId) async {
+  final db = ref.watch(databaseProvider);
+  final results = await db.getTransactionItemsWithProduct(txnId);
+  return results.map((r) => TransactionDetail(
+    item: r.readTable(db.transactionItems),
+    productName: r.readTable(db.products).name,
+  )).toList();
 });
 
 class CartNotifier extends StateNotifier<List<CartItem>> {

@@ -3,13 +3,76 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
-
+import '../../../../main.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import '../providers/cart_provider.dart';
+import '../widgets/receipt_widget.dart';
 
 /// Riwayat transaksi
 class TransactionHistoryScreen extends ConsumerWidget {
   const TransactionHistoryScreen({super.key});
+
+  void _showReceipt(BuildContext context, WidgetRef ref, dynamic txn) {
+    final settings = ref.read(settingsServiceProvider);
+    
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.8,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (context, scrollController) => Container(
+          decoration: const BoxDecoration(
+            color: AppColors.background,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          child: Column(
+            children: [
+              Container(
+                width: 40, height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2)),
+              ),
+              Expanded(
+                child: Consumer(
+                  builder: (context, ref, _) {
+                    final itemsAsync = ref.watch(transactionItemsProvider(txn.id));
+                    return itemsAsync.when(
+                      loading: () => const Center(child: CircularProgressIndicator()),
+                      error: (e, _) => Center(child: Text('Error: $e')),
+                      data: (details) => SingleChildScrollView(
+                        controller: scrollController,
+                        padding: const EdgeInsets.all(16),
+                        child: ReceiptWidget(
+                          storeName: settings.storeName,
+                          storeAddress: settings.storeAddress,
+                          storePhone: settings.storePhone,
+                          invoiceNo: txn.invoiceNo,
+                          date: txn.createdAt,
+                          items: details.map((d) => ReceiptItem(
+                            name: d.productName,
+                            qty: d.item.qty,
+                            unitPrice: d.item.unitPrice,
+                            subtotal: d.item.subtotal,
+                          )).toList(),
+                          total: txn.total,
+                          paid: txn.paidAmount,
+                          change: txn.changeAmount,
+                          footer: settings.receiptFooter,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -34,38 +97,42 @@ class TransactionHistoryScreen extends ConsumerWidget {
             separatorBuilder: (_, __) => const SizedBox(height: 10),
             itemBuilder: (_, i) {
               final txn = items[i];
-              return Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: theme.cardTheme.color,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Row(children: [
-                  Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: AppColors.success.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: const Icon(Icons.receipt_rounded, color: AppColors.success, size: 22),
+              return InkWell(
+                onTap: () => _showReceipt(context, ref, txn),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: theme.cardTheme.color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(txn.invoiceNo, style: theme.textTheme.titleSmall),
-                    const SizedBox(height: 2),
-                    Text(DateFormatter.formatWithTime(txn.createdAt), style: theme.textTheme.labelSmall),
-                  ])),
-                  Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                    Text(CurrencyFormatter.format(txn.total), style: theme.textTheme.titleSmall?.copyWith(color: AppColors.primary)),
-                    const SizedBox(height: 2),
+                  child: Row(children: [
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      decoration: BoxDecoration(color: AppColors.successLight, borderRadius: BorderRadius.circular(20)),
-                      child: Text(txn.paymentMethod.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.success)),
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.receipt_rounded, color: AppColors.success, size: 22),
                     ),
+                    const SizedBox(width: 12),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(txn.invoiceNo, style: theme.textTheme.titleSmall),
+                      const SizedBox(height: 2),
+                      Text(DateFormatter.formatWithTime(txn.createdAt), style: theme.textTheme.labelSmall),
+                    ])),
+                    Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                      Text(CurrencyFormatter.format(txn.total), style: theme.textTheme.titleSmall?.copyWith(color: AppColors.primary)),
+                      const SizedBox(height: 2),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(color: AppColors.successLight, borderRadius: BorderRadius.circular(20)),
+                        child: Text(txn.paymentMethod.toUpperCase(), style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.success)),
+                      ),
+                    ]),
                   ]),
-                ]),
+                ),
               );
             },
           );

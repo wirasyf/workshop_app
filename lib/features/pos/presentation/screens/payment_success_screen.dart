@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../main.dart';
-import '../widgets/receipt_preview_dialog.dart';
+import '../widgets/receipt_widget.dart';
 
 /// Layar konfirmasi pembayaran berhasil
 class PaymentSuccessScreen extends ConsumerWidget {
@@ -13,62 +13,87 @@ class PaymentSuccessScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
+    final settings = ref.watch(settingsServiceProvider);
+    
+    final items = (data?['items'] as List?)?.map((e) => ReceiptItem(
+      name: e.name,
+      qty: e.qty,
+      unitPrice: e.unitPrice,
+      subtotal: e.subtotal,
+    )).toList() ?? [];
+
     return Scaffold(
+      backgroundColor: Colors.white,
       body: SafeArea(
-        child: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(32),
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: BoxDecoration(
-                  color: AppColors.successLight,
-                  shape: BoxShape.circle,
-                ),
-                child: const Icon(Icons.check_circle_rounded, size: 72, color: AppColors.success),
-              ),
-              const SizedBox(height: 24),
-              Text('Pembayaran Berhasil!', style: theme.textTheme.headlineMedium),
-              const SizedBox(height: 8),
-              Text('Transaksi telah disimpan', style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary)),
-              const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity, height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: () => context.go('/pos'),
-                  icon: const Icon(Icons.add_shopping_cart_rounded),
-                  label: const Text('Transaksi Baru'),
+        child: Column(
+          children: [
+            Expanded(
+              child: SingleChildScrollView(
+                child: Column(
+                  children: [
+                    ReceiptWidget(
+                      storeName: settings.storeName,
+                      storeAddress: settings.storeAddress,
+                      storePhone: settings.storePhone,
+                      invoiceNo: data?['invoiceNo'] ?? 'INV-000',
+                      date: DateTime.now(),
+                      items: items,
+                      total: data?['total'] ?? 0,
+                      paid: data?['paid'] ?? 0,
+                      change: data?['change'] ?? 0,
+                      footer: settings.receiptFooter,
+                      showSuccessIcon: true,
+                    ),
+                    const SizedBox(height: 40),
+                  ],
                 ),
               ),
-              const SizedBox(height: 12),
-              SizedBox(
-                width: double.infinity, height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    final settings = ref.read(settingsServiceProvider);
-                    showDialog(
-                      context: context,
-                      builder: (context) => ReceiptPreviewDialog(
-                        storeInfo: {
-                          'name': settings.storeName,
-                          'address': settings.storeAddress,
-                          'phone': settings.storePhone,
-                          'footer': settings.receiptFooter,
-                        },
-                        items: data?['items'] ?? [],
-                        total: data?['total'] ?? 0,
-                        paid: data?['paid'] ?? 0,
-                        change: data?['change'] ?? 0,
-                        invoiceNo: data?['invoiceNo'] ?? 'INV-000',
+            ),
+            Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.white,
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 15, offset: const Offset(0, -5)),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.go('/pos'),
+                      icon: const Icon(Icons.add_shopping_cart_rounded),
+                      label: const Text('Transaksi Baru', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        elevation: 0,
                       ),
-                    );
-                  },
-                  icon: const Icon(Icons.receipt_long_rounded),
-                  label: const Text('Lihat Struk'),
-                ),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 56,
+                    child: OutlinedButton.icon(
+                      onPressed: () => context.go('/dashboard'),
+                      icon: const Icon(Icons.home_rounded),
+                      label: const Text('Kembali ke Beranda', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.primary, width: 1.5),
+                        foregroundColor: AppColors.primary,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                      ),
+                    ),
+                  ),
+                ],
               ),
-            ]),
-          ),
+            ),
+          ],
         ),
       ),
     );
