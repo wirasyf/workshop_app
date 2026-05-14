@@ -60,7 +60,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         final txnCompanion = TransactionsCompanion.insert(
           id: txnId,
           invoiceNo: invoiceNo,
-          userId: user?.id ?? '1', // Default ID as String
+          userId: user?.id ?? '1',
           paymentMethod: Value(method),
           subtotal: Value(subtotal),
           discount: Value(discount),
@@ -91,13 +91,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           },
         );
 
-        // 2. Insert items & kurangi stok
+        // 2. Insert items & kurangi stok (hanya untuk produk)
         for (final item in cart) {
           final itemId = uuid.v4();
           final itemCompanion = TransactionItemsCompanion.insert(
             id: itemId,
             transactionId: txnId,
-            productId: item.productId,
+            itemType: Value(item.type == CartItemType.service ? 'service' : 'product'),
+            productId: item.type == CartItemType.product ? Value(item.productId) : const Value(null),
+            serviceId: item.type == CartItemType.service ? Value(item.productId) : const Value(null),
             qty: item.qty,
             unitPrice: item.unitPrice,
             discount: Value(item.discount),
@@ -113,7 +115,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             data: {
               'id': itemId,
               'transaction_id': txnId,
-              'product_id': item.productId,
+              'item_type': item.type == CartItemType.service ? 'service' : 'product',
+              'product_id': item.type == CartItemType.product ? item.productId : null,
+              'service_id': item.type == CartItemType.service ? item.productId : null,
               'qty': item.qty,
               'unit_price': item.unitPrice,
               'discount': item.discount,
@@ -121,17 +125,19 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             },
           );
 
-          await db.updateStock(item.productId, -item.qty);
-          
-          // Ambil stok terbaru untuk dikirim ke sync
-          final updatedProduct = await db.getProductById(item.productId);
-          if (updatedProduct != null) {
-            await syncService.enqueue(
-              tableName: 'products',
-              recordId: item.productId,
-              operation: 'update',
-              data: {'stock_qty': updatedProduct.stockQty},
-            );
+          // Kurangi stok hanya untuk produk (bukan jasa)
+          if (item.type == CartItemType.product) {
+            await db.updateStock(item.productId, -item.qty);
+            
+            final updatedProduct = await db.getProductById(item.productId);
+            if (updatedProduct != null) {
+              await syncService.enqueue(
+                tableName: 'products',
+                recordId: item.productId,
+                operation: 'update',
+                data: {'stock_qty': updatedProduct.stockQty},
+              );
+            }
           }
         }
       });
@@ -144,15 +150,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ref.read(cartDiscountProvider.notifier).state = 0;
       ref.read(paidAmountProvider.notifier).state = 0;
 
-      // Cek stok menipis
+      // Cek stok menipis (hanya produk)
       bool hasLowStock = false;
       List<String> lowStockNames = [];
       for (final item in cart) {
-         final p = await db.getProductById(item.productId);
-         if (p != null && p.stockQty <= p.stockMin) {
+        if (item.type == CartItemType.product) {
+          final p = await db.getProductById(item.productId);
+          if (p != null && p.stockQty <= p.stockMin) {
             hasLowStock = true;
             lowStockNames.add(p.name);
-         }
+          }
+        }
       }
 
       // Invalidate providers to refresh data
@@ -188,11 +196,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   Widget build(BuildContext context) {
     final cart = ref.watch(cartProvider);
     final subtotal = ref.watch(cartSubtotalProvider);
+    final serviceSubtotal = ref.watch(cartServiceSubtotalProvider);
+    final partsSubtotal = ref.watch(cartPartsSubtotalProvider);
     final discount = ref.watch(cartDiscountProvider);
-    final tax = ref.watch(cartTaxProvider);
     final total = ref.watch(cartTotalProvider);
     final method = ref.watch(paymentMethodProvider);
     final theme = Theme.of(context);
+
+    final hasServices = cart.any((i) => i.type == CartItemType.service);
+    final hasParts = cart.any((i) => i.type == CartItemType.product);
 
     return Scaffold(
       appBar: AppBar(
@@ -214,8 +226,23 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     separatorBuilder: (_, __) => const Divider(height: 20),
                     itemBuilder: (_, i) {
                       final item = cart[i];
+                      final isService = item.type == CartItemType.service;
                       return Row(
                         children: [
+                          // Icon tipe
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
+                              color: (isService ? AppColors.info : AppColors.primary).withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Icon(
+                              isService ? Icons.build_rounded : Icons.settings_rounded,
+                              size: 16,
+                              color: isService ? AppColors.info : AppColors.primary,
+                            ),
+                          ),
                           Expanded(
                             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                               Text(item.name, style: theme.textTheme.titleSmall),
@@ -224,12 +251,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                           // Qty controls
                           Row(children: [
-                            _qtyButton(Icons.remove_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty - 1)),
+                            _qtyButton(Icons.remove_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty - 1, item.type)),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: Text('${item.qty}', style: theme.textTheme.titleSmall),
                             ),
-                            _qtyButton(Icons.add_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1)),
+                            _qtyButton(Icons.add_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1, item.type)),
                           ]),
                           const SizedBox(width: 12),
                           SizedBox(
@@ -241,8 +268,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     },
                   ),
                 ),
-                
-
 
                 // Payment section
                 Container(
@@ -253,6 +278,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    if (hasServices && hasParts) ...[
+                      _summaryRow('Subtotal Jasa', CurrencyFormatter.format(serviceSubtotal), color: AppColors.info),
+                      _summaryRow('Subtotal Sparepart', CurrencyFormatter.format(partsSubtotal)),
+                      const Divider(height: 12),
+                    ],
                     _summaryRow('Subtotal', CurrencyFormatter.format(subtotal)),
                     // Diskon Global
                     InkWell(
@@ -263,12 +293,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         color: discount > 0 ? AppColors.error : AppColors.primary,
                       ),
                     ),
-                    _summaryRow('Pajak (11%)', CurrencyFormatter.format(tax)),
                     const Divider(),
                     _summaryRow('Total', CurrencyFormatter.format(total), bold: true),
                     const SizedBox(height: 12),
-
-
 
                     // Jumlah bayar (tunai)
                     if (method == 'cash') ...[
@@ -285,7 +312,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         ),
                       ),
                       const SizedBox(height: 12),
-
                     ],
                     const SizedBox(height: 16),
                     SizedBox(
@@ -313,7 +339,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     ),
   );
 
-
   Widget _summaryRow(String label, String value, {bool bold = false, Color? color}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 4),
     child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
@@ -321,7 +346,6 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       Text(value, style: TextStyle(fontSize: bold ? 18 : 14, fontWeight: bold ? FontWeight.w700 : FontWeight.w500, color: color ?? (bold ? AppColors.primary : null))),
     ]),
   );
-
 
   void _showDiscountDialog(BuildContext context, WidgetRef ref) {
     final ctrl = TextEditingController(text: ref.read(cartDiscountProvider).toStringAsFixed(0));

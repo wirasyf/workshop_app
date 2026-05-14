@@ -101,7 +101,14 @@ class SettingsScreen extends ConsumerWidget {
           const Divider(height: 32),
           _settingsTile(Icons.store_rounded, 'Profil Toko', subtitle: 'SpareArt Motor', onTap: () => context.go('/settings/store-profile')),
           _settingsTile(Icons.receipt_long_rounded, 'Template Struk', subtitle: 'Konfigurasi struk thermal', onTap: () => context.go('/settings/receipt-template')),
-          _settingsTile(Icons.lock_rounded, 'Ganti Password', onTap: () => context.go('/settings/change-password')),
+          _settingsTile(Icons.print_rounded, 'Printer Bluetooth', subtitle: 'Hubungkan printer thermal', onTap: () => context.go('/settings/bluetooth-printer')),
+          const Divider(height: 32),
+
+          // Menu yang dipindah dari bottom nav
+          _settingsTile(Icons.bar_chart_rounded, 'Laporan Keuangan', subtitle: 'Omzet, profit, ekspor Excel', onTap: () => context.go('/reports')),
+          _settingsTile(Icons.history_rounded, 'Riwayat Transaksi', subtitle: 'Semua transaksi selesai', onTap: () => context.go('/history')),
+          _settingsTile(Icons.build_circle_rounded, 'Manajemen Jasa', subtitle: 'Katalog jasa bengkel', onTap: () => context.go('/services')),
+          _settingsTile(Icons.notifications_rounded, 'Notifikasi', subtitle: 'Stok menipis & aktivitas', onTap: () => context.go('/notifications')),
           const Divider(height: 32),
           _settingsTile(Icons.info_rounded, 'Tentang Aplikasi', subtitle: 'SpareArt Motor v1.0.0'),
           const SizedBox(height: 16),

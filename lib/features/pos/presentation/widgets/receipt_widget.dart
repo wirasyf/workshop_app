@@ -33,6 +33,10 @@ class ReceiptWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final serviceItems = items.where((i) => i.type == 'service').toList();
+    final productItems = items.where((i) => i.type != 'service').toList();
+    final hasBothTypes = serviceItems.isNotEmpty && productItems.isNotEmpty;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -104,29 +108,32 @@ class ReceiptWidget extends StatelessWidget {
           const SizedBox(height: 8),
           const _DashedDivider(),
           const SizedBox(height: 16),
-          ...items.map((item) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black)),
-                const SizedBox(height: 2),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      '${item.qty} x ${CurrencyFormatter.format(item.unitPrice)}',
-                      style: const TextStyle(fontSize: 12, color: Colors.black54),
-                    ),
-                    Text(
-                      CurrencyFormatter.format(item.subtotal),
-                      style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          )),
+
+          // Jasa section
+          if (serviceItems.isNotEmpty) ...[
+            if (hasBothTypes)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('— JASA —', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54, letterSpacing: 1)),
+              ),
+            ...serviceItems.map(_buildItemRow),
+            if (hasBothTypes) ...[
+              const SizedBox(height: 8),
+              const _DashedDivider(),
+              const SizedBox(height: 8),
+            ],
+          ],
+
+          // Sparepart section
+          if (productItems.isNotEmpty) ...[
+            if (hasBothTypes)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text('— SPAREPART —', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.black54, letterSpacing: 1)),
+              ),
+            ...productItems.map(_buildItemRow),
+          ],
+
           const SizedBox(height: 16),
           const _DashedDivider(),
           const SizedBox(height: 16),
@@ -154,27 +161,39 @@ class ReceiptWidget extends StatelessWidget {
     );
   }
 
+  Widget _buildItemRow(ReceiptItem item) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black)),
+          const SizedBox(height: 2),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '${item.qty} x ${CurrencyFormatter.format(item.unitPrice)}',
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              ),
+              Text(
+                CurrencyFormatter.format(item.subtotal),
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _row(String label, String value, {bool isBold = false, double fontSize = 13}) => Padding(
     padding: const EdgeInsets.symmetric(vertical: 2),
     child: Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: isBold ? Colors.black : Colors.black87,
-          ),
-        ),
-        Text(
-          value,
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.normal,
-            color: isBold ? AppColors.primary : Colors.black,
-          ),
-        ),
+        Text(label, style: TextStyle(fontSize: fontSize, fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: isBold ? Colors.black : Colors.black87)),
+        Text(value, style: TextStyle(fontSize: fontSize, fontWeight: isBold ? FontWeight.bold : FontWeight.normal, color: isBold ? AppColors.primary : Colors.black)),
       ],
     ),
   );
@@ -185,12 +204,14 @@ class ReceiptItem {
   final int qty;
   final double unitPrice;
   final double subtotal;
+  final String type; // 'product' atau 'service'
 
   ReceiptItem({
     required this.name,
     required this.qty,
     required this.unitPrice,
     required this.subtotal,
+    this.type = 'product',
   });
 }
 

@@ -55,6 +55,39 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
         reason: Value(_reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim()),
       ));
       await db.updateStock(widget.productId, change);
+      
+      // Enqueue sync
+      final syncService = ref.read(syncServiceProvider);
+      final now = DateTime.now();
+      
+      await syncService.enqueue(
+        tableName: 'stock_adjustments',
+        recordId: id,
+        operation: 'create',
+        data: {
+          'id': id,
+          'product_id': widget.productId,
+          'user_id': user?.id ?? '1',
+          'type': _type,
+          'qty_change': change,
+          'reason': _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+          'created_at': now.toIso8601String(),
+        },
+      );
+
+      final updatedProduct = await db.getProductById(widget.productId);
+      if (updatedProduct != null) {
+        await syncService.enqueue(
+          tableName: 'products',
+          recordId: widget.productId,
+          operation: 'update',
+          data: {
+            'stock_qty': updatedProduct.stockQty,
+            'updated_at': now.toIso8601String(),
+          },
+        );
+      }
+
       ref.invalidate(productsProvider);
       ref.invalidate(productDetailProvider(widget.productId));
       ref.invalidate(notificationNotifierProvider);

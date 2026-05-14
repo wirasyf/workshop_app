@@ -1,7 +1,7 @@
 import 'package:drift/drift.dart';
 
 // ═══════════════════════════════════════════════════════════════
-// TABLE DEFINITIONS — 14 tabel + 1 sync queue
+// TABLE DEFINITIONS — Sistem Manajemen Bengkel
 // ═══════════════════════════════════════════════════════════════
 
 /// Tabel pengguna (Owner)
@@ -55,12 +55,45 @@ class Products extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Katalog Jasa Bengkel
+class Services extends Table {
+  TextColumn get id => text()();           // UUID
+  TextColumn get name => text().withLength(max: 200)();
+  TextColumn get description => text().nullable()();
+  RealColumn get price => real().withDefault(const Constant(0.0))();
+  IntColumn get estimatedMinutes => integer().withDefault(const Constant(30))();
+  TextColumn get category => text().withDefault(const Constant('umum'))();
+  // category: 'servis_rutin', 'perbaikan', 'tune_up', 'body', 'umum'
+  BoolColumn get isActive => boolean().withDefault(const Constant(true))();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Kendaraan Pelanggan
+class Vehicles extends Table {
+  TextColumn get id => text()();           // UUID
+  TextColumn get customerName => text().withLength(max: 200)();
+  TextColumn get phoneNumber => text().nullable()();
+  TextColumn get plateNumber => text().withLength(max: 15)();
+  TextColumn get vehicleBrand => text().nullable()(); // Honda, Yamaha, dst
+  TextColumn get vehicleType => text().nullable()();  // Beat, Vario, NMAX, dst
+  IntColumn get vehicleYear => integer().nullable()();
+  TextColumn get notes => text().nullable()();
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Transaksi penjualan (header)
 class Transactions extends Table {
   TextColumn get id => text()();
   TextColumn get invoiceNo => text().unique()();
   TextColumn get userId => text().references(Users, #id)();
   TextColumn get customerId => text().nullable()();
+  TextColumn get customerName => text().nullable()(); // Nama pelanggan langsung
   TextColumn get paymentMethod => text().withDefault(const Constant('cash'))();
   RealColumn get subtotal => real().withDefault(const Constant(0.0))();
   RealColumn get discount => real().withDefault(const Constant(0.0))();
@@ -74,15 +107,42 @@ class Transactions extends Table {
   Set<Column> get primaryKey => {id};
 }
 
-/// Item transaksi (detail)
+/// Item transaksi (detail) — mendukung produk DAN jasa
 class TransactionItems extends Table {
   TextColumn get id => text()();
   TextColumn get transactionId => text().references(Transactions, #id)();
-  TextColumn get productId => text().references(Products, #id)();
+  TextColumn get itemType => text().withDefault(const Constant('product'))();
+  // 'product' atau 'service'
+  TextColumn get productId => text().nullable().references(Products, #id)();
+  // Null jika itemType = 'service'
+  TextColumn get serviceId => text().nullable().references(Services, #id)();
+  // Null jika itemType = 'product'
   IntColumn get qty => integer()();
   RealColumn get unitPrice => real()();
   RealColumn get discount => real().withDefault(const Constant(0.0))();
   RealColumn get subtotal => real()();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
+/// Work Order (Antrian Bengkel)
+class WorkOrders extends Table {
+  TextColumn get id => text()();           // UUID
+  TextColumn get orderNo => text().unique()();   // WO-001, WO-002
+  TextColumn get vehicleId => text().references(Vehicles, #id)();
+  TextColumn get userId => text().references(Users, #id)(); // kasir/admin
+  TextColumn get status => text().withDefault(const Constant('waiting'))();
+  // status: 'waiting', 'in_progress', 'completed', 'paid', 'cancelled'
+  TextColumn get complaint => text().nullable()(); // keluhan pelanggan
+  TextColumn get diagnosis => text().nullable()(); // diagnosa mekanik
+  RealColumn get totalService => real().withDefault(const Constant(0.0))();
+  RealColumn get totalParts => real().withDefault(const Constant(0.0))();
+  RealColumn get grandTotal => real().withDefault(const Constant(0.0))();
+  TextColumn get transactionId => text().nullable().references(Transactions, #id)();
+  // Link ke transaksi POS setelah pembayaran
+  DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
+  DateTimeColumn get completedAt => dateTime().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

@@ -21,6 +21,12 @@ import '../../features/settings/presentation/screens/store_profile_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
 import '../../features/settings/presentation/screens/receipt_template_screen.dart';
+import '../../features/settings/presentation/screens/bluetooth_printer_screen.dart';
+import '../../features/services/presentation/screens/service_list_screen.dart';
+import '../../features/services/presentation/screens/service_form_screen.dart';
+import '../../features/workshop/presentation/screens/workshop_screen.dart';
+import '../../features/workshop/presentation/screens/work_order_form_screen.dart';
+import '../../features/workshop/presentation/screens/work_order_detail_screen.dart';
 import '../../shared/screens/shell_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -65,6 +71,18 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(path: 'success', builder: (_, state) => PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?)),
             ],
           ),
+
+          // Bengkel / Workshop
+          GoRoute(
+            path: '/workshop',
+            builder: (_, __) => const WorkshopScreen(),
+            routes: [
+              GoRoute(path: 'new-order', builder: (_, __) => const WorkOrderFormScreen()),
+              GoRoute(path: ':id', builder: (_, state) =>
+                  WorkOrderDetailScreen(workOrderId: state.pathParameters['id']!)),
+            ],
+          ),
+
           GoRoute(
             path: '/products',
             builder: (_, __) => const ProductListScreen(),
@@ -79,6 +97,18 @@ final routerProvider = Provider<GoRouter>((ref) {
                   StockAdjustmentScreen(productId: state.pathParameters['id']!)),
             ],
           ),
+
+          // Manajemen Jasa
+          GoRoute(
+            path: '/services',
+            builder: (_, __) => const ServiceListScreen(),
+            routes: [
+              GoRoute(path: 'add', builder: (_, __) => const ServiceFormScreen()),
+              GoRoute(path: ':id/edit', builder: (_, state) =>
+                  ServiceFormScreen(serviceId: state.pathParameters['id']!)),
+            ],
+          ),
+
           GoRoute(path: '/history', builder: (_, __) => const TransactionHistoryScreen()),
           GoRoute(path: '/reports', builder: (_, __) => const ReportScreen()),
           GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
@@ -90,6 +120,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(path: 'edit-profile', builder: (_, __) => const EditProfileScreen()),
               GoRoute(path: 'change-password', builder: (_, __) => const ChangePasswordScreen()),
               GoRoute(path: 'receipt-template', builder: (_, __) => const ReceiptTemplateScreen()),
+              GoRoute(path: 'bluetooth-printer', builder: (_, __) => const BluetoothPrinterScreen()),
             ],
           ),
         ],

@@ -65,9 +65,6 @@ class SyncService {
     final isOnline = await ConnectivityService.isOnline();
     if (!isOnline) return;
 
-    // final session = SupabaseService.client.auth.currentSession;
-    // if (session == null) return; // Harus login untuk sync
-
     final pendingItems = await _db.getPendingSyncItems();
     if (pendingItems.isEmpty) return;
 
@@ -81,7 +78,7 @@ class SyncService {
 
         switch (item.operation) {
           case 'create':
-            await client.from(item.syncTableName).upsert(data); // Gunakan upsert agar lebih aman
+            await client.from(item.syncTableName).upsert(data);
             break;
           case 'update':
             await client
@@ -109,9 +106,6 @@ class SyncService {
   Future<void> downloadUserData() async {
     final isOnline = await ConnectivityService.isOnline();
     if (!isOnline) return;
-
-    // final session = SupabaseService.client.auth.currentSession;
-    // if (session == null) return;
 
     final client = SupabaseService.client;
 
@@ -143,19 +137,51 @@ class SyncService {
             stockMin: Value(row['stock_min'] ?? 5),
             costPrice: Value((row['cost_price'] as num?)?.toDouble() ?? 0.0),
             sellPrice: Value((row['sell_price'] as num?)?.toDouble() ?? 0.0),
+            sellPriceWholesale: Value((row['sell_price_wholesale'] as num?)?.toDouble()),
             unit: Value(row['unit'] ?? 'pcs'),
             imageUrl: Value(row['image_url']),
+            isActive: Value(row['is_active'] ?? true),
+            updatedAt: Value(row['updated_at'] != null ? DateTime.parse(row['updated_at']) : null),
+          ), mode: InsertMode.insertOrReplace);
+        }
+
+        // 3. Download Services (New)
+        final serviceData = await client.from('services').select();
+        for (final row in serviceData) {
+          batch.insert(_db.services, ServicesCompanion.insert(
+            id: row['id'],
+            name: row['name'],
+            description: Value(row['description']),
+            price: Value((row['price'] as num?)?.toDouble() ?? 0.0),
+            estimatedMinutes: Value(row['estimated_minutes'] ?? 30),
+            category: Value(row['category'] ?? 'umum'),
             isActive: Value(row['is_active'] ?? true),
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 3. Download Transactions
+        // 4. Download Vehicles (New)
+        final vehicleData = await client.from('vehicles').select();
+        for (final row in vehicleData) {
+          batch.insert(_db.vehicles, VehiclesCompanion.insert(
+            id: row['id'],
+            customerName: row['customer_name'],
+            phoneNumber: Value(row['phone_number']),
+            plateNumber: row['plate_number'],
+            vehicleBrand: Value(row['vehicle_brand']),
+            vehicleType: Value(row['vehicle_type']),
+            vehicleYear: Value(row['vehicle_year']),
+            notes: Value(row['notes']),
+          ), mode: InsertMode.insertOrReplace);
+        }
+
+        // 5. Download Transactions
         final txnData = await client.from('transactions').select();
         for (final row in txnData) {
           batch.insert(_db.transactions, TransactionsCompanion.insert(
             id: row['id'],
             invoiceNo: row['invoice_no'],
             userId: row['user_id'],
+            customerName: Value(row['customer_name']),
             paymentMethod: Value(row['payment_method'] ?? 'cash'),
             subtotal: Value((row['subtotal'] as num?)?.toDouble() ?? 0.0),
             discount: Value((row['discount'] as num?)?.toDouble() ?? 0.0),
@@ -167,17 +193,52 @@ class SyncService {
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 4. Download Transaction Items
+        // 6. Download Transaction Items
         final itemData = await client.from('transaction_items').select();
         for (final row in itemData) {
           batch.insert(_db.transactionItems, TransactionItemsCompanion.insert(
             id: row['id'],
             transactionId: row['transaction_id'],
-            productId: row['product_id'],
+            itemType: Value(row['item_type'] ?? 'product'),
+            productId: Value(row['product_id']),
+            serviceId: Value(row['service_id']),
             qty: row['qty'],
             unitPrice: (row['unit_price'] as num).toDouble(),
             discount: Value((row['discount'] as num?)?.toDouble() ?? 0.0),
             subtotal: (row['subtotal'] as num).toDouble(),
+          ), mode: InsertMode.insertOrReplace);
+        }
+
+        // 7. Download Work Orders (New)
+        final woData = await client.from('work_orders').select();
+        for (final row in woData) {
+          batch.insert(_db.workOrders, WorkOrdersCompanion.insert(
+            id: row['id'],
+            orderNo: row['order_no'],
+            vehicleId: row['vehicle_id'],
+            userId: row['user_id'],
+            status: Value(row['status'] ?? 'waiting'),
+            complaint: Value(row['complaint']),
+            diagnosis: Value(row['diagnosis']),
+            totalService: Value((row['total_service'] as num?)?.toDouble() ?? 0.0),
+            totalParts: Value((row['total_parts'] as num?)?.toDouble() ?? 0.0),
+            grandTotal: Value((row['grand_total'] as num?)?.toDouble() ?? 0.0),
+            transactionId: Value(row['transaction_id']),
+            createdAt: Value(DateTime.parse(row['created_at'])),
+            completedAt: Value(row['completed_at'] != null ? DateTime.parse(row['completed_at']) : null),
+          ), mode: InsertMode.insertOrReplace);
+        }
+        // 8. Download Stock Adjustments (New)
+        final stockAdjData = await client.from('stock_adjustments').select();
+        for (final row in stockAdjData) {
+          batch.insert(_db.stockAdjustments, StockAdjustmentsCompanion.insert(
+            id: row['id'],
+            productId: row['product_id'],
+            userId: row['user_id'],
+            type: row['type'],
+            qtyChange: row['qty_change'],
+            reason: Value(row['reason']),
+            createdAt: Value(DateTime.parse(row['created_at'])),
           ), mode: InsertMode.insertOrReplace);
         }
       });
