@@ -71,6 +71,16 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     type: DriftSqlType.string,
     requiredDuringInsert: false,
   );
+  static const VerificationMeta _roleMeta = const VerificationMeta('role');
+  @override
+  late final GeneratedColumn<String> role = GeneratedColumn<String>(
+    'role',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultValue: const Constant('owner'),
+  );
   static const VerificationMeta _isActiveMeta = const VerificationMeta(
     'isActive',
   );
@@ -117,6 +127,7 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
     email,
     passwordHash,
     avatarUrl,
+    role,
     isActive,
     createdAt,
     supabaseUid,
@@ -179,6 +190,12 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         avatarUrl.isAcceptableOrUnknown(data['avatar_url']!, _avatarUrlMeta),
       );
     }
+    if (data.containsKey('role')) {
+      context.handle(
+        _roleMeta,
+        role.isAcceptableOrUnknown(data['role']!, _roleMeta),
+      );
+    }
     if (data.containsKey('is_active')) {
       context.handle(
         _isActiveMeta,
@@ -233,6 +250,10 @@ class $UsersTable extends Users with TableInfo<$UsersTable, User> {
         DriftSqlType.string,
         data['${effectivePrefix}avatar_url'],
       ),
+      role: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}role'],
+      )!,
       isActive: attachedDatabase.typeMapping.read(
         DriftSqlType.bool,
         data['${effectivePrefix}is_active'],
@@ -261,6 +282,7 @@ class User extends DataClass implements Insertable<User> {
   final String email;
   final String passwordHash;
   final String? avatarUrl;
+  final String role;
   final bool isActive;
   final DateTime createdAt;
   final String? supabaseUid;
@@ -271,6 +293,7 @@ class User extends DataClass implements Insertable<User> {
     required this.email,
     required this.passwordHash,
     this.avatarUrl,
+    required this.role,
     required this.isActive,
     required this.createdAt,
     this.supabaseUid,
@@ -286,6 +309,7 @@ class User extends DataClass implements Insertable<User> {
     if (!nullToAbsent || avatarUrl != null) {
       map['avatar_url'] = Variable<String>(avatarUrl);
     }
+    map['role'] = Variable<String>(role);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
     if (!nullToAbsent || supabaseUid != null) {
@@ -304,6 +328,7 @@ class User extends DataClass implements Insertable<User> {
       avatarUrl: avatarUrl == null && nullToAbsent
           ? const Value.absent()
           : Value(avatarUrl),
+      role: Value(role),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
       supabaseUid: supabaseUid == null && nullToAbsent
@@ -324,6 +349,7 @@ class User extends DataClass implements Insertable<User> {
       email: serializer.fromJson<String>(json['email']),
       passwordHash: serializer.fromJson<String>(json['passwordHash']),
       avatarUrl: serializer.fromJson<String?>(json['avatarUrl']),
+      role: serializer.fromJson<String>(json['role']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
       supabaseUid: serializer.fromJson<String?>(json['supabaseUid']),
@@ -339,6 +365,7 @@ class User extends DataClass implements Insertable<User> {
       'email': serializer.toJson<String>(email),
       'passwordHash': serializer.toJson<String>(passwordHash),
       'avatarUrl': serializer.toJson<String?>(avatarUrl),
+      'role': serializer.toJson<String>(role),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
       'supabaseUid': serializer.toJson<String?>(supabaseUid),
@@ -352,6 +379,7 @@ class User extends DataClass implements Insertable<User> {
     String? email,
     String? passwordHash,
     Value<String?> avatarUrl = const Value.absent(),
+    String? role,
     bool? isActive,
     DateTime? createdAt,
     Value<String?> supabaseUid = const Value.absent(),
@@ -362,6 +390,7 @@ class User extends DataClass implements Insertable<User> {
     email: email ?? this.email,
     passwordHash: passwordHash ?? this.passwordHash,
     avatarUrl: avatarUrl.present ? avatarUrl.value : this.avatarUrl,
+    role: role ?? this.role,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
     supabaseUid: supabaseUid.present ? supabaseUid.value : this.supabaseUid,
@@ -376,6 +405,7 @@ class User extends DataClass implements Insertable<User> {
           ? data.passwordHash.value
           : this.passwordHash,
       avatarUrl: data.avatarUrl.present ? data.avatarUrl.value : this.avatarUrl,
+      role: data.role.present ? data.role.value : this.role,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
       supabaseUid: data.supabaseUid.present
@@ -393,6 +423,7 @@ class User extends DataClass implements Insertable<User> {
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
           ..write('avatarUrl: $avatarUrl, ')
+          ..write('role: $role, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('supabaseUid: $supabaseUid')
@@ -408,6 +439,7 @@ class User extends DataClass implements Insertable<User> {
     email,
     passwordHash,
     avatarUrl,
+    role,
     isActive,
     createdAt,
     supabaseUid,
@@ -422,6 +454,7 @@ class User extends DataClass implements Insertable<User> {
           other.email == this.email &&
           other.passwordHash == this.passwordHash &&
           other.avatarUrl == this.avatarUrl &&
+          other.role == this.role &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt &&
           other.supabaseUid == this.supabaseUid);
@@ -434,6 +467,7 @@ class UsersCompanion extends UpdateCompanion<User> {
   final Value<String> email;
   final Value<String> passwordHash;
   final Value<String?> avatarUrl;
+  final Value<String> role;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
   final Value<String?> supabaseUid;
@@ -445,6 +479,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     this.email = const Value.absent(),
     this.passwordHash = const Value.absent(),
     this.avatarUrl = const Value.absent(),
+    this.role = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
@@ -457,6 +492,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     required String email,
     required String passwordHash,
     this.avatarUrl = const Value.absent(),
+    this.role = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
     this.supabaseUid = const Value.absent(),
@@ -473,6 +509,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Expression<String>? email,
     Expression<String>? passwordHash,
     Expression<String>? avatarUrl,
+    Expression<String>? role,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
     Expression<String>? supabaseUid,
@@ -485,6 +522,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       if (email != null) 'email': email,
       if (passwordHash != null) 'password_hash': passwordHash,
       if (avatarUrl != null) 'avatar_url': avatarUrl,
+      if (role != null) 'role': role,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
       if (supabaseUid != null) 'supabase_uid': supabaseUid,
@@ -499,6 +537,7 @@ class UsersCompanion extends UpdateCompanion<User> {
     Value<String>? email,
     Value<String>? passwordHash,
     Value<String?>? avatarUrl,
+    Value<String>? role,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
     Value<String?>? supabaseUid,
@@ -511,6 +550,7 @@ class UsersCompanion extends UpdateCompanion<User> {
       email: email ?? this.email,
       passwordHash: passwordHash ?? this.passwordHash,
       avatarUrl: avatarUrl ?? this.avatarUrl,
+      role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
       supabaseUid: supabaseUid ?? this.supabaseUid,
@@ -539,6 +579,9 @@ class UsersCompanion extends UpdateCompanion<User> {
     if (avatarUrl.present) {
       map['avatar_url'] = Variable<String>(avatarUrl.value);
     }
+    if (role.present) {
+      map['role'] = Variable<String>(role.value);
+    }
     if (isActive.present) {
       map['is_active'] = Variable<bool>(isActive.value);
     }
@@ -563,6 +606,7 @@ class UsersCompanion extends UpdateCompanion<User> {
           ..write('email: $email, ')
           ..write('passwordHash: $passwordHash, ')
           ..write('avatarUrl: $avatarUrl, ')
+          ..write('role: $role, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
           ..write('supabaseUid: $supabaseUid, ')
@@ -1827,6 +1871,265 @@ class ProductsCompanion extends UpdateCompanion<Product> {
   }
 }
 
+class $ServiceCategoriesTable extends ServiceCategories
+    with TableInfo<$ServiceCategoriesTable, ServiceCategory> {
+  @override
+  final GeneratedDatabase attachedDatabase;
+  final String? _alias;
+  $ServiceCategoriesTable(this.attachedDatabase, [this._alias]);
+  static const VerificationMeta _idMeta = const VerificationMeta('id');
+  @override
+  late final GeneratedColumn<String> id = GeneratedColumn<String>(
+    'id',
+    aliasedName,
+    false,
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _nameMeta = const VerificationMeta('name');
+  @override
+  late final GeneratedColumn<String> name = GeneratedColumn<String>(
+    'name',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 100),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  static const VerificationMeta _slugMeta = const VerificationMeta('slug');
+  @override
+  late final GeneratedColumn<String> slug = GeneratedColumn<String>(
+    'slug',
+    aliasedName,
+    false,
+    additionalChecks: GeneratedColumn.checkTextLength(maxTextLength: 100),
+    type: DriftSqlType.string,
+    requiredDuringInsert: true,
+  );
+  @override
+  List<GeneratedColumn> get $columns => [id, name, slug];
+  @override
+  String get aliasedName => _alias ?? actualTableName;
+  @override
+  String get actualTableName => $name;
+  static const String $name = 'service_categories';
+  @override
+  VerificationContext validateIntegrity(
+    Insertable<ServiceCategory> instance, {
+    bool isInserting = false,
+  }) {
+    final context = VerificationContext();
+    final data = instance.toColumns(true);
+    if (data.containsKey('id')) {
+      context.handle(_idMeta, id.isAcceptableOrUnknown(data['id']!, _idMeta));
+    } else if (isInserting) {
+      context.missing(_idMeta);
+    }
+    if (data.containsKey('name')) {
+      context.handle(
+        _nameMeta,
+        name.isAcceptableOrUnknown(data['name']!, _nameMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_nameMeta);
+    }
+    if (data.containsKey('slug')) {
+      context.handle(
+        _slugMeta,
+        slug.isAcceptableOrUnknown(data['slug']!, _slugMeta),
+      );
+    } else if (isInserting) {
+      context.missing(_slugMeta);
+    }
+    return context;
+  }
+
+  @override
+  Set<GeneratedColumn> get $primaryKey => {id};
+  @override
+  ServiceCategory map(Map<String, dynamic> data, {String? tablePrefix}) {
+    final effectivePrefix = tablePrefix != null ? '$tablePrefix.' : '';
+    return ServiceCategory(
+      id: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}id'],
+      )!,
+      name: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}name'],
+      )!,
+      slug: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}slug'],
+      )!,
+    );
+  }
+
+  @override
+  $ServiceCategoriesTable createAlias(String alias) {
+    return $ServiceCategoriesTable(attachedDatabase, alias);
+  }
+}
+
+class ServiceCategory extends DataClass implements Insertable<ServiceCategory> {
+  final String id;
+  final String name;
+  final String slug;
+  const ServiceCategory({
+    required this.id,
+    required this.name,
+    required this.slug,
+  });
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    map['id'] = Variable<String>(id);
+    map['name'] = Variable<String>(name);
+    map['slug'] = Variable<String>(slug);
+    return map;
+  }
+
+  ServiceCategoriesCompanion toCompanion(bool nullToAbsent) {
+    return ServiceCategoriesCompanion(
+      id: Value(id),
+      name: Value(name),
+      slug: Value(slug),
+    );
+  }
+
+  factory ServiceCategory.fromJson(
+    Map<String, dynamic> json, {
+    ValueSerializer? serializer,
+  }) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return ServiceCategory(
+      id: serializer.fromJson<String>(json['id']),
+      name: serializer.fromJson<String>(json['name']),
+      slug: serializer.fromJson<String>(json['slug']),
+    );
+  }
+  @override
+  Map<String, dynamic> toJson({ValueSerializer? serializer}) {
+    serializer ??= driftRuntimeOptions.defaultSerializer;
+    return <String, dynamic>{
+      'id': serializer.toJson<String>(id),
+      'name': serializer.toJson<String>(name),
+      'slug': serializer.toJson<String>(slug),
+    };
+  }
+
+  ServiceCategory copyWith({String? id, String? name, String? slug}) =>
+      ServiceCategory(
+        id: id ?? this.id,
+        name: name ?? this.name,
+        slug: slug ?? this.slug,
+      );
+  ServiceCategory copyWithCompanion(ServiceCategoriesCompanion data) {
+    return ServiceCategory(
+      id: data.id.present ? data.id.value : this.id,
+      name: data.name.present ? data.name.value : this.name,
+      slug: data.slug.present ? data.slug.value : this.slug,
+    );
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceCategory(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('slug: $slug')
+          ..write(')'))
+        .toString();
+  }
+
+  @override
+  int get hashCode => Object.hash(id, name, slug);
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      (other is ServiceCategory &&
+          other.id == this.id &&
+          other.name == this.name &&
+          other.slug == this.slug);
+}
+
+class ServiceCategoriesCompanion extends UpdateCompanion<ServiceCategory> {
+  final Value<String> id;
+  final Value<String> name;
+  final Value<String> slug;
+  final Value<int> rowid;
+  const ServiceCategoriesCompanion({
+    this.id = const Value.absent(),
+    this.name = const Value.absent(),
+    this.slug = const Value.absent(),
+    this.rowid = const Value.absent(),
+  });
+  ServiceCategoriesCompanion.insert({
+    required String id,
+    required String name,
+    required String slug,
+    this.rowid = const Value.absent(),
+  }) : id = Value(id),
+       name = Value(name),
+       slug = Value(slug);
+  static Insertable<ServiceCategory> custom({
+    Expression<String>? id,
+    Expression<String>? name,
+    Expression<String>? slug,
+    Expression<int>? rowid,
+  }) {
+    return RawValuesInsertable({
+      if (id != null) 'id': id,
+      if (name != null) 'name': name,
+      if (slug != null) 'slug': slug,
+      if (rowid != null) 'rowid': rowid,
+    });
+  }
+
+  ServiceCategoriesCompanion copyWith({
+    Value<String>? id,
+    Value<String>? name,
+    Value<String>? slug,
+    Value<int>? rowid,
+  }) {
+    return ServiceCategoriesCompanion(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      slug: slug ?? this.slug,
+      rowid: rowid ?? this.rowid,
+    );
+  }
+
+  @override
+  Map<String, Expression> toColumns(bool nullToAbsent) {
+    final map = <String, Expression>{};
+    if (id.present) {
+      map['id'] = Variable<String>(id.value);
+    }
+    if (name.present) {
+      map['name'] = Variable<String>(name.value);
+    }
+    if (slug.present) {
+      map['slug'] = Variable<String>(slug.value);
+    }
+    if (rowid.present) {
+      map['rowid'] = Variable<int>(rowid.value);
+    }
+    return map;
+  }
+
+  @override
+  String toString() {
+    return (StringBuffer('ServiceCategoriesCompanion(')
+          ..write('id: $id, ')
+          ..write('name: $name, ')
+          ..write('slug: $slug, ')
+          ..write('rowid: $rowid')
+          ..write(')'))
+        .toString();
+  }
+}
+
 class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
   @override
   final GeneratedDatabase attachedDatabase;
@@ -1884,6 +2187,20 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     requiredDuringInsert: false,
     defaultValue: const Constant(30),
   );
+  static const VerificationMeta _categoryIdMeta = const VerificationMeta(
+    'categoryId',
+  );
+  @override
+  late final GeneratedColumn<String> categoryId = GeneratedColumn<String>(
+    'category_id',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'REFERENCES service_categories (id)',
+    ),
+  );
   static const VerificationMeta _categoryMeta = const VerificationMeta(
     'category',
   );
@@ -1930,6 +2247,7 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
     description,
     price,
     estimatedMinutes,
+    categoryId,
     category,
     isActive,
     createdAt,
@@ -1983,6 +2301,12 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         ),
       );
     }
+    if (data.containsKey('category_id')) {
+      context.handle(
+        _categoryIdMeta,
+        categoryId.isAcceptableOrUnknown(data['category_id']!, _categoryIdMeta),
+      );
+    }
     if (data.containsKey('category')) {
       context.handle(
         _categoryMeta,
@@ -2030,6 +2354,10 @@ class $ServicesTable extends Services with TableInfo<$ServicesTable, Service> {
         DriftSqlType.int,
         data['${effectivePrefix}estimated_minutes'],
       )!,
+      categoryId: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}category_id'],
+      ),
       category: attachedDatabase.typeMapping.read(
         DriftSqlType.string,
         data['${effectivePrefix}category'],
@@ -2057,6 +2385,7 @@ class Service extends DataClass implements Insertable<Service> {
   final String? description;
   final double price;
   final int estimatedMinutes;
+  final String? categoryId;
   final String category;
   final bool isActive;
   final DateTime createdAt;
@@ -2066,6 +2395,7 @@ class Service extends DataClass implements Insertable<Service> {
     this.description,
     required this.price,
     required this.estimatedMinutes,
+    this.categoryId,
     required this.category,
     required this.isActive,
     required this.createdAt,
@@ -2080,6 +2410,9 @@ class Service extends DataClass implements Insertable<Service> {
     }
     map['price'] = Variable<double>(price);
     map['estimated_minutes'] = Variable<int>(estimatedMinutes);
+    if (!nullToAbsent || categoryId != null) {
+      map['category_id'] = Variable<String>(categoryId);
+    }
     map['category'] = Variable<String>(category);
     map['is_active'] = Variable<bool>(isActive);
     map['created_at'] = Variable<DateTime>(createdAt);
@@ -2095,6 +2428,9 @@ class Service extends DataClass implements Insertable<Service> {
           : Value(description),
       price: Value(price),
       estimatedMinutes: Value(estimatedMinutes),
+      categoryId: categoryId == null && nullToAbsent
+          ? const Value.absent()
+          : Value(categoryId),
       category: Value(category),
       isActive: Value(isActive),
       createdAt: Value(createdAt),
@@ -2112,6 +2448,7 @@ class Service extends DataClass implements Insertable<Service> {
       description: serializer.fromJson<String?>(json['description']),
       price: serializer.fromJson<double>(json['price']),
       estimatedMinutes: serializer.fromJson<int>(json['estimatedMinutes']),
+      categoryId: serializer.fromJson<String?>(json['categoryId']),
       category: serializer.fromJson<String>(json['category']),
       isActive: serializer.fromJson<bool>(json['isActive']),
       createdAt: serializer.fromJson<DateTime>(json['createdAt']),
@@ -2126,6 +2463,7 @@ class Service extends DataClass implements Insertable<Service> {
       'description': serializer.toJson<String?>(description),
       'price': serializer.toJson<double>(price),
       'estimatedMinutes': serializer.toJson<int>(estimatedMinutes),
+      'categoryId': serializer.toJson<String?>(categoryId),
       'category': serializer.toJson<String>(category),
       'isActive': serializer.toJson<bool>(isActive),
       'createdAt': serializer.toJson<DateTime>(createdAt),
@@ -2138,6 +2476,7 @@ class Service extends DataClass implements Insertable<Service> {
     Value<String?> description = const Value.absent(),
     double? price,
     int? estimatedMinutes,
+    Value<String?> categoryId = const Value.absent(),
     String? category,
     bool? isActive,
     DateTime? createdAt,
@@ -2147,6 +2486,7 @@ class Service extends DataClass implements Insertable<Service> {
     description: description.present ? description.value : this.description,
     price: price ?? this.price,
     estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+    categoryId: categoryId.present ? categoryId.value : this.categoryId,
     category: category ?? this.category,
     isActive: isActive ?? this.isActive,
     createdAt: createdAt ?? this.createdAt,
@@ -2162,6 +2502,9 @@ class Service extends DataClass implements Insertable<Service> {
       estimatedMinutes: data.estimatedMinutes.present
           ? data.estimatedMinutes.value
           : this.estimatedMinutes,
+      categoryId: data.categoryId.present
+          ? data.categoryId.value
+          : this.categoryId,
       category: data.category.present ? data.category.value : this.category,
       isActive: data.isActive.present ? data.isActive.value : this.isActive,
       createdAt: data.createdAt.present ? data.createdAt.value : this.createdAt,
@@ -2176,6 +2519,7 @@ class Service extends DataClass implements Insertable<Service> {
           ..write('description: $description, ')
           ..write('price: $price, ')
           ..write('estimatedMinutes: $estimatedMinutes, ')
+          ..write('categoryId: $categoryId, ')
           ..write('category: $category, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt')
@@ -2190,6 +2534,7 @@ class Service extends DataClass implements Insertable<Service> {
     description,
     price,
     estimatedMinutes,
+    categoryId,
     category,
     isActive,
     createdAt,
@@ -2203,6 +2548,7 @@ class Service extends DataClass implements Insertable<Service> {
           other.description == this.description &&
           other.price == this.price &&
           other.estimatedMinutes == this.estimatedMinutes &&
+          other.categoryId == this.categoryId &&
           other.category == this.category &&
           other.isActive == this.isActive &&
           other.createdAt == this.createdAt);
@@ -2214,6 +2560,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
   final Value<String?> description;
   final Value<double> price;
   final Value<int> estimatedMinutes;
+  final Value<String?> categoryId;
   final Value<String> category;
   final Value<bool> isActive;
   final Value<DateTime> createdAt;
@@ -2224,6 +2571,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     this.description = const Value.absent(),
     this.price = const Value.absent(),
     this.estimatedMinutes = const Value.absent(),
+    this.categoryId = const Value.absent(),
     this.category = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2235,6 +2583,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     this.description = const Value.absent(),
     this.price = const Value.absent(),
     this.estimatedMinutes = const Value.absent(),
+    this.categoryId = const Value.absent(),
     this.category = const Value.absent(),
     this.isActive = const Value.absent(),
     this.createdAt = const Value.absent(),
@@ -2247,6 +2596,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Expression<String>? description,
     Expression<double>? price,
     Expression<int>? estimatedMinutes,
+    Expression<String>? categoryId,
     Expression<String>? category,
     Expression<bool>? isActive,
     Expression<DateTime>? createdAt,
@@ -2258,6 +2608,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       if (description != null) 'description': description,
       if (price != null) 'price': price,
       if (estimatedMinutes != null) 'estimated_minutes': estimatedMinutes,
+      if (categoryId != null) 'category_id': categoryId,
       if (category != null) 'category': category,
       if (isActive != null) 'is_active': isActive,
       if (createdAt != null) 'created_at': createdAt,
@@ -2271,6 +2622,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     Value<String?>? description,
     Value<double>? price,
     Value<int>? estimatedMinutes,
+    Value<String?>? categoryId,
     Value<String>? category,
     Value<bool>? isActive,
     Value<DateTime>? createdAt,
@@ -2282,6 +2634,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
       description: description ?? this.description,
       price: price ?? this.price,
       estimatedMinutes: estimatedMinutes ?? this.estimatedMinutes,
+      categoryId: categoryId ?? this.categoryId,
       category: category ?? this.category,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
@@ -2307,6 +2660,9 @@ class ServicesCompanion extends UpdateCompanion<Service> {
     if (estimatedMinutes.present) {
       map['estimated_minutes'] = Variable<int>(estimatedMinutes.value);
     }
+    if (categoryId.present) {
+      map['category_id'] = Variable<String>(categoryId.value);
+    }
     if (category.present) {
       map['category'] = Variable<String>(category.value);
     }
@@ -2330,6 +2686,7 @@ class ServicesCompanion extends UpdateCompanion<Service> {
           ..write('description: $description, ')
           ..write('price: $price, ')
           ..write('estimatedMinutes: $estimatedMinutes, ')
+          ..write('categoryId: $categoryId, ')
           ..write('category: $category, ')
           ..write('isActive: $isActive, ')
           ..write('createdAt: $createdAt, ')
@@ -3798,6 +4155,21 @@ class $TransactionItemsTable extends TransactionItems
     type: DriftSqlType.double,
     requiredDuringInsert: true,
   );
+  static const VerificationMeta _isApprovedMeta = const VerificationMeta(
+    'isApproved',
+  );
+  @override
+  late final GeneratedColumn<bool> isApproved = GeneratedColumn<bool>(
+    'is_approved',
+    aliasedName,
+    false,
+    type: DriftSqlType.bool,
+    requiredDuringInsert: false,
+    defaultConstraints: GeneratedColumn.constraintIsAlways(
+      'CHECK ("is_approved" IN (0, 1))',
+    ),
+    defaultValue: const Constant(true),
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -3809,6 +4181,7 @@ class $TransactionItemsTable extends TransactionItems
     unitPrice,
     discount,
     subtotal,
+    isApproved,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -3886,6 +4259,12 @@ class $TransactionItemsTable extends TransactionItems
     } else if (isInserting) {
       context.missing(_subtotalMeta);
     }
+    if (data.containsKey('is_approved')) {
+      context.handle(
+        _isApprovedMeta,
+        isApproved.isAcceptableOrUnknown(data['is_approved']!, _isApprovedMeta),
+      );
+    }
     return context;
   }
 
@@ -3931,6 +4310,10 @@ class $TransactionItemsTable extends TransactionItems
         DriftSqlType.double,
         data['${effectivePrefix}subtotal'],
       )!,
+      isApproved: attachedDatabase.typeMapping.read(
+        DriftSqlType.bool,
+        data['${effectivePrefix}is_approved'],
+      )!,
     );
   }
 
@@ -3950,6 +4333,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
   final double unitPrice;
   final double discount;
   final double subtotal;
+  final bool isApproved;
   const TransactionItem({
     required this.id,
     required this.transactionId,
@@ -3960,6 +4344,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     required this.unitPrice,
     required this.discount,
     required this.subtotal,
+    required this.isApproved,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -3977,6 +4362,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     map['unit_price'] = Variable<double>(unitPrice);
     map['discount'] = Variable<double>(discount);
     map['subtotal'] = Variable<double>(subtotal);
+    map['is_approved'] = Variable<bool>(isApproved);
     return map;
   }
 
@@ -3995,6 +4381,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       unitPrice: Value(unitPrice),
       discount: Value(discount),
       subtotal: Value(subtotal),
+      isApproved: Value(isApproved),
     );
   }
 
@@ -4013,6 +4400,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       unitPrice: serializer.fromJson<double>(json['unitPrice']),
       discount: serializer.fromJson<double>(json['discount']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
+      isApproved: serializer.fromJson<bool>(json['isApproved']),
     );
   }
   @override
@@ -4028,6 +4416,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       'unitPrice': serializer.toJson<double>(unitPrice),
       'discount': serializer.toJson<double>(discount),
       'subtotal': serializer.toJson<double>(subtotal),
+      'isApproved': serializer.toJson<bool>(isApproved),
     };
   }
 
@@ -4041,6 +4430,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     double? unitPrice,
     double? discount,
     double? subtotal,
+    bool? isApproved,
   }) => TransactionItem(
     id: id ?? this.id,
     transactionId: transactionId ?? this.transactionId,
@@ -4051,6 +4441,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     unitPrice: unitPrice ?? this.unitPrice,
     discount: discount ?? this.discount,
     subtotal: subtotal ?? this.subtotal,
+    isApproved: isApproved ?? this.isApproved,
   );
   TransactionItem copyWithCompanion(TransactionItemsCompanion data) {
     return TransactionItem(
@@ -4065,6 +4456,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       unitPrice: data.unitPrice.present ? data.unitPrice.value : this.unitPrice,
       discount: data.discount.present ? data.discount.value : this.discount,
       subtotal: data.subtotal.present ? data.subtotal.value : this.subtotal,
+      isApproved: data.isApproved.present
+          ? data.isApproved.value
+          : this.isApproved,
     );
   }
 
@@ -4079,7 +4473,8 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
           ..write('qty: $qty, ')
           ..write('unitPrice: $unitPrice, ')
           ..write('discount: $discount, ')
-          ..write('subtotal: $subtotal')
+          ..write('subtotal: $subtotal, ')
+          ..write('isApproved: $isApproved')
           ..write(')'))
         .toString();
   }
@@ -4095,6 +4490,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     unitPrice,
     discount,
     subtotal,
+    isApproved,
   );
   @override
   bool operator ==(Object other) =>
@@ -4108,7 +4504,8 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
           other.qty == this.qty &&
           other.unitPrice == this.unitPrice &&
           other.discount == this.discount &&
-          other.subtotal == this.subtotal);
+          other.subtotal == this.subtotal &&
+          other.isApproved == this.isApproved);
 }
 
 class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
@@ -4121,6 +4518,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
   final Value<double> unitPrice;
   final Value<double> discount;
   final Value<double> subtotal;
+  final Value<bool> isApproved;
   final Value<int> rowid;
   const TransactionItemsCompanion({
     this.id = const Value.absent(),
@@ -4132,6 +4530,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     this.unitPrice = const Value.absent(),
     this.discount = const Value.absent(),
     this.subtotal = const Value.absent(),
+    this.isApproved = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TransactionItemsCompanion.insert({
@@ -4144,6 +4543,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     required double unitPrice,
     this.discount = const Value.absent(),
     required double subtotal,
+    this.isApproved = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        transactionId = Value(transactionId),
@@ -4160,6 +4560,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     Expression<double>? unitPrice,
     Expression<double>? discount,
     Expression<double>? subtotal,
+    Expression<bool>? isApproved,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4172,6 +4573,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       if (unitPrice != null) 'unit_price': unitPrice,
       if (discount != null) 'discount': discount,
       if (subtotal != null) 'subtotal': subtotal,
+      if (isApproved != null) 'is_approved': isApproved,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4186,6 +4588,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     Value<double>? unitPrice,
     Value<double>? discount,
     Value<double>? subtotal,
+    Value<bool>? isApproved,
     Value<int>? rowid,
   }) {
     return TransactionItemsCompanion(
@@ -4198,6 +4601,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       unitPrice: unitPrice ?? this.unitPrice,
       discount: discount ?? this.discount,
       subtotal: subtotal ?? this.subtotal,
+      isApproved: isApproved ?? this.isApproved,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4232,6 +4636,9 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     if (subtotal.present) {
       map['subtotal'] = Variable<double>(subtotal.value);
     }
+    if (isApproved.present) {
+      map['is_approved'] = Variable<bool>(isApproved.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4250,6 +4657,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
           ..write('unitPrice: $unitPrice, ')
           ..write('discount: $discount, ')
           ..write('subtotal: $subtotal, ')
+          ..write('isApproved: $isApproved, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -6435,6 +6843,8 @@ abstract class _$AppDatabase extends GeneratedDatabase {
   late final $UsersTable users = $UsersTable(this);
   late final $CategoriesTable categories = $CategoriesTable(this);
   late final $ProductsTable products = $ProductsTable(this);
+  late final $ServiceCategoriesTable serviceCategories =
+      $ServiceCategoriesTable(this);
   late final $ServicesTable services = $ServicesTable(this);
   late final $VehiclesTable vehicles = $VehiclesTable(this);
   late final $TransactionsTable transactions = $TransactionsTable(this);
@@ -6455,6 +6865,7 @@ abstract class _$AppDatabase extends GeneratedDatabase {
     users,
     categories,
     products,
+    serviceCategories,
     services,
     vehicles,
     transactions,
@@ -6474,6 +6885,7 @@ typedef $$UsersTableCreateCompanionBuilder =
       required String email,
       required String passwordHash,
       Value<String?> avatarUrl,
+      Value<String> role,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<String?> supabaseUid,
@@ -6487,6 +6899,7 @@ typedef $$UsersTableUpdateCompanionBuilder =
       Value<String> email,
       Value<String> passwordHash,
       Value<String?> avatarUrl,
+      Value<String> role,
       Value<bool> isActive,
       Value<DateTime> createdAt,
       Value<String?> supabaseUid,
@@ -6589,6 +7002,11 @@ class $$UsersTableFilterComposer extends Composer<_$AppDatabase, $UsersTable> {
 
   ColumnFilters<String> get avatarUrl => $composableBuilder(
     column: $table.avatarUrl,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get role => $composableBuilder(
+    column: $table.role,
     builder: (column) => ColumnFilters(column),
   );
 
@@ -6722,6 +7140,11 @@ class $$UsersTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get role => $composableBuilder(
+    column: $table.role,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   ColumnOrderings<bool> get isActive => $composableBuilder(
     column: $table.isActive,
     builder: (column) => ColumnOrderings(column),
@@ -6766,6 +7189,9 @@ class $$UsersTableAnnotationComposer
 
   GeneratedColumn<String> get avatarUrl =>
       $composableBuilder(column: $table.avatarUrl, builder: (column) => column);
+
+  GeneratedColumn<String> get role =>
+      $composableBuilder(column: $table.role, builder: (column) => column);
 
   GeneratedColumn<bool> get isActive =>
       $composableBuilder(column: $table.isActive, builder: (column) => column);
@@ -6892,6 +7318,7 @@ class $$UsersTableTableManager
                 Value<String> email = const Value.absent(),
                 Value<String> passwordHash = const Value.absent(),
                 Value<String?> avatarUrl = const Value.absent(),
+                Value<String> role = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> supabaseUid = const Value.absent(),
@@ -6903,6 +7330,7 @@ class $$UsersTableTableManager
                 email: email,
                 passwordHash: passwordHash,
                 avatarUrl: avatarUrl,
+                role: role,
                 isActive: isActive,
                 createdAt: createdAt,
                 supabaseUid: supabaseUid,
@@ -6916,6 +7344,7 @@ class $$UsersTableTableManager
                 required String email,
                 required String passwordHash,
                 Value<String?> avatarUrl = const Value.absent(),
+                Value<String> role = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
                 Value<String?> supabaseUid = const Value.absent(),
@@ -6927,6 +7356,7 @@ class $$UsersTableTableManager
                 email: email,
                 passwordHash: passwordHash,
                 avatarUrl: avatarUrl,
+                role: role,
                 isActive: isActive,
                 createdAt: createdAt,
                 supabaseUid: supabaseUid,
@@ -8076,6 +8506,287 @@ typedef $$ProductsTableProcessedTableManager =
         bool stockAdjustmentsRefs,
       })
     >;
+typedef $$ServiceCategoriesTableCreateCompanionBuilder =
+    ServiceCategoriesCompanion Function({
+      required String id,
+      required String name,
+      required String slug,
+      Value<int> rowid,
+    });
+typedef $$ServiceCategoriesTableUpdateCompanionBuilder =
+    ServiceCategoriesCompanion Function({
+      Value<String> id,
+      Value<String> name,
+      Value<String> slug,
+      Value<int> rowid,
+    });
+
+final class $$ServiceCategoriesTableReferences
+    extends
+        BaseReferences<
+          _$AppDatabase,
+          $ServiceCategoriesTable,
+          ServiceCategory
+        > {
+  $$ServiceCategoriesTableReferences(
+    super.$_db,
+    super.$_table,
+    super.$_typedResult,
+  );
+
+  static MultiTypedResultKey<$ServicesTable, List<Service>> _servicesRefsTable(
+    _$AppDatabase db,
+  ) => MultiTypedResultKey.fromTable(
+    db.services,
+    aliasName: $_aliasNameGenerator(
+      db.serviceCategories.id,
+      db.services.categoryId,
+    ),
+  );
+
+  $$ServicesTableProcessedTableManager get servicesRefs {
+    final manager = $$ServicesTableTableManager(
+      $_db,
+      $_db.services,
+    ).filter((f) => f.categoryId.id.sqlEquals($_itemColumn<String>('id')!));
+
+    final cache = $_typedResult.readTableOrNull(_servicesRefsTable($_db));
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: cache),
+    );
+  }
+}
+
+class $$ServiceCategoriesTableFilterComposer
+    extends Composer<_$AppDatabase, $ServiceCategoriesTable> {
+  $$ServiceCategoriesTableFilterComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnFilters<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  ColumnFilters<String> get slug => $composableBuilder(
+    column: $table.slug,
+    builder: (column) => ColumnFilters(column),
+  );
+
+  Expression<bool> servicesRefs(
+    Expression<bool> Function($$ServicesTableFilterComposer f) f,
+  ) {
+    final $$ServicesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.services,
+      getReferencedColumn: (t) => t.categoryId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServicesTableFilterComposer(
+            $db: $db,
+            $table: $db.services,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$ServiceCategoriesTableOrderingComposer
+    extends Composer<_$AppDatabase, $ServiceCategoriesTable> {
+  $$ServiceCategoriesTableOrderingComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  ColumnOrderings<String> get id => $composableBuilder(
+    column: $table.id,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get name => $composableBuilder(
+    column: $table.name,
+    builder: (column) => ColumnOrderings(column),
+  );
+
+  ColumnOrderings<String> get slug => $composableBuilder(
+    column: $table.slug,
+    builder: (column) => ColumnOrderings(column),
+  );
+}
+
+class $$ServiceCategoriesTableAnnotationComposer
+    extends Composer<_$AppDatabase, $ServiceCategoriesTable> {
+  $$ServiceCategoriesTableAnnotationComposer({
+    required super.$db,
+    required super.$table,
+    super.joinBuilder,
+    super.$addJoinBuilderToRootComposer,
+    super.$removeJoinBuilderFromRootComposer,
+  });
+  GeneratedColumn<String> get id =>
+      $composableBuilder(column: $table.id, builder: (column) => column);
+
+  GeneratedColumn<String> get name =>
+      $composableBuilder(column: $table.name, builder: (column) => column);
+
+  GeneratedColumn<String> get slug =>
+      $composableBuilder(column: $table.slug, builder: (column) => column);
+
+  Expression<T> servicesRefs<T extends Object>(
+    Expression<T> Function($$ServicesTableAnnotationComposer a) f,
+  ) {
+    final $$ServicesTableAnnotationComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.id,
+      referencedTable: $db.services,
+      getReferencedColumn: (t) => t.categoryId,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServicesTableAnnotationComposer(
+            $db: $db,
+            $table: $db.services,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return f(composer);
+  }
+}
+
+class $$ServiceCategoriesTableTableManager
+    extends
+        RootTableManager<
+          _$AppDatabase,
+          $ServiceCategoriesTable,
+          ServiceCategory,
+          $$ServiceCategoriesTableFilterComposer,
+          $$ServiceCategoriesTableOrderingComposer,
+          $$ServiceCategoriesTableAnnotationComposer,
+          $$ServiceCategoriesTableCreateCompanionBuilder,
+          $$ServiceCategoriesTableUpdateCompanionBuilder,
+          (ServiceCategory, $$ServiceCategoriesTableReferences),
+          ServiceCategory,
+          PrefetchHooks Function({bool servicesRefs})
+        > {
+  $$ServiceCategoriesTableTableManager(
+    _$AppDatabase db,
+    $ServiceCategoriesTable table,
+  ) : super(
+        TableManagerState(
+          db: db,
+          table: table,
+          createFilteringComposer: () =>
+              $$ServiceCategoriesTableFilterComposer($db: db, $table: table),
+          createOrderingComposer: () =>
+              $$ServiceCategoriesTableOrderingComposer($db: db, $table: table),
+          createComputedFieldComposer: () =>
+              $$ServiceCategoriesTableAnnotationComposer(
+                $db: db,
+                $table: table,
+              ),
+          updateCompanionCallback:
+              ({
+                Value<String> id = const Value.absent(),
+                Value<String> name = const Value.absent(),
+                Value<String> slug = const Value.absent(),
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceCategoriesCompanion(
+                id: id,
+                name: name,
+                slug: slug,
+                rowid: rowid,
+              ),
+          createCompanionCallback:
+              ({
+                required String id,
+                required String name,
+                required String slug,
+                Value<int> rowid = const Value.absent(),
+              }) => ServiceCategoriesCompanion.insert(
+                id: id,
+                name: name,
+                slug: slug,
+                rowid: rowid,
+              ),
+          withReferenceMapper: (p0) => p0
+              .map(
+                (e) => (
+                  e.readTable(table),
+                  $$ServiceCategoriesTableReferences(db, table, e),
+                ),
+              )
+              .toList(),
+          prefetchHooksCallback: ({servicesRefs = false}) {
+            return PrefetchHooks(
+              db: db,
+              explicitlyWatchedTables: [if (servicesRefs) db.services],
+              addJoins: null,
+              getPrefetchedDataCallback: (items) async {
+                return [
+                  if (servicesRefs)
+                    await $_getPrefetchedData<
+                      ServiceCategory,
+                      $ServiceCategoriesTable,
+                      Service
+                    >(
+                      currentTable: table,
+                      referencedTable: $$ServiceCategoriesTableReferences
+                          ._servicesRefsTable(db),
+                      managerFromTypedResult: (p0) =>
+                          $$ServiceCategoriesTableReferences(
+                            db,
+                            table,
+                            p0,
+                          ).servicesRefs,
+                      referencedItemsForCurrentItem: (item, referencedItems) =>
+                          referencedItems.where((e) => e.categoryId == item.id),
+                      typedResults: items,
+                    ),
+                ];
+              },
+            );
+          },
+        ),
+      );
+}
+
+typedef $$ServiceCategoriesTableProcessedTableManager =
+    ProcessedTableManager<
+      _$AppDatabase,
+      $ServiceCategoriesTable,
+      ServiceCategory,
+      $$ServiceCategoriesTableFilterComposer,
+      $$ServiceCategoriesTableOrderingComposer,
+      $$ServiceCategoriesTableAnnotationComposer,
+      $$ServiceCategoriesTableCreateCompanionBuilder,
+      $$ServiceCategoriesTableUpdateCompanionBuilder,
+      (ServiceCategory, $$ServiceCategoriesTableReferences),
+      ServiceCategory,
+      PrefetchHooks Function({bool servicesRefs})
+    >;
 typedef $$ServicesTableCreateCompanionBuilder =
     ServicesCompanion Function({
       required String id,
@@ -8083,6 +8794,7 @@ typedef $$ServicesTableCreateCompanionBuilder =
       Value<String?> description,
       Value<double> price,
       Value<int> estimatedMinutes,
+      Value<String?> categoryId,
       Value<String> category,
       Value<bool> isActive,
       Value<DateTime> createdAt,
@@ -8095,6 +8807,7 @@ typedef $$ServicesTableUpdateCompanionBuilder =
       Value<String?> description,
       Value<double> price,
       Value<int> estimatedMinutes,
+      Value<String?> categoryId,
       Value<String> category,
       Value<bool> isActive,
       Value<DateTime> createdAt,
@@ -8104,6 +8817,25 @@ typedef $$ServicesTableUpdateCompanionBuilder =
 final class $$ServicesTableReferences
     extends BaseReferences<_$AppDatabase, $ServicesTable, Service> {
   $$ServicesTableReferences(super.$_db, super.$_table, super.$_typedResult);
+
+  static $ServiceCategoriesTable _categoryIdTable(_$AppDatabase db) =>
+      db.serviceCategories.createAlias(
+        $_aliasNameGenerator(db.services.categoryId, db.serviceCategories.id),
+      );
+
+  $$ServiceCategoriesTableProcessedTableManager? get categoryId {
+    final $_column = $_itemColumn<String>('category_id');
+    if ($_column == null) return null;
+    final manager = $$ServiceCategoriesTableTableManager(
+      $_db,
+      $_db.serviceCategories,
+    ).filter((f) => f.id.sqlEquals($_column));
+    final item = $_typedResult.readTableOrNull(_categoryIdTable($_db));
+    if (item == null) return manager;
+    return ProcessedTableManager(
+      manager.$state.copyWith(prefetchedData: [item]),
+    );
+  }
 
   static MultiTypedResultKey<$TransactionItemsTable, List<TransactionItem>>
   _transactionItemsRefsTable(_$AppDatabase db) => MultiTypedResultKey.fromTable(
@@ -8177,6 +8909,29 @@ class $$ServicesTableFilterComposer
     column: $table.createdAt,
     builder: (column) => ColumnFilters(column),
   );
+
+  $$ServiceCategoriesTableFilterComposer get categoryId {
+    final $$ServiceCategoriesTableFilterComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.categoryId,
+      referencedTable: $db.serviceCategories,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServiceCategoriesTableFilterComposer(
+            $db: $db,
+            $table: $db.serviceCategories,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 
   Expression<bool> transactionItemsRefs(
     Expression<bool> Function($$TransactionItemsTableFilterComposer f) f,
@@ -8252,6 +9007,29 @@ class $$ServicesTableOrderingComposer
     column: $table.createdAt,
     builder: (column) => ColumnOrderings(column),
   );
+
+  $$ServiceCategoriesTableOrderingComposer get categoryId {
+    final $$ServiceCategoriesTableOrderingComposer composer = $composerBuilder(
+      composer: this,
+      getCurrentColumn: (t) => t.categoryId,
+      referencedTable: $db.serviceCategories,
+      getReferencedColumn: (t) => t.id,
+      builder:
+          (
+            joinBuilder, {
+            $addJoinBuilderToRootComposer,
+            $removeJoinBuilderFromRootComposer,
+          }) => $$ServiceCategoriesTableOrderingComposer(
+            $db: $db,
+            $table: $db.serviceCategories,
+            $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+            joinBuilder: joinBuilder,
+            $removeJoinBuilderFromRootComposer:
+                $removeJoinBuilderFromRootComposer,
+          ),
+    );
+    return composer;
+  }
 }
 
 class $$ServicesTableAnnotationComposer
@@ -8290,6 +9068,30 @@ class $$ServicesTableAnnotationComposer
 
   GeneratedColumn<DateTime> get createdAt =>
       $composableBuilder(column: $table.createdAt, builder: (column) => column);
+
+  $$ServiceCategoriesTableAnnotationComposer get categoryId {
+    final $$ServiceCategoriesTableAnnotationComposer composer =
+        $composerBuilder(
+          composer: this,
+          getCurrentColumn: (t) => t.categoryId,
+          referencedTable: $db.serviceCategories,
+          getReferencedColumn: (t) => t.id,
+          builder:
+              (
+                joinBuilder, {
+                $addJoinBuilderToRootComposer,
+                $removeJoinBuilderFromRootComposer,
+              }) => $$ServiceCategoriesTableAnnotationComposer(
+                $db: $db,
+                $table: $db.serviceCategories,
+                $addJoinBuilderToRootComposer: $addJoinBuilderToRootComposer,
+                joinBuilder: joinBuilder,
+                $removeJoinBuilderFromRootComposer:
+                    $removeJoinBuilderFromRootComposer,
+              ),
+        );
+    return composer;
+  }
 
   Expression<T> transactionItemsRefs<T extends Object>(
     Expression<T> Function($$TransactionItemsTableAnnotationComposer a) f,
@@ -8330,7 +9132,7 @@ class $$ServicesTableTableManager
           $$ServicesTableUpdateCompanionBuilder,
           (Service, $$ServicesTableReferences),
           Service,
-          PrefetchHooks Function({bool transactionItemsRefs})
+          PrefetchHooks Function({bool categoryId, bool transactionItemsRefs})
         > {
   $$ServicesTableTableManager(_$AppDatabase db, $ServicesTable table)
     : super(
@@ -8350,6 +9152,7 @@ class $$ServicesTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<double> price = const Value.absent(),
                 Value<int> estimatedMinutes = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
                 Value<String> category = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -8360,6 +9163,7 @@ class $$ServicesTableTableManager
                 description: description,
                 price: price,
                 estimatedMinutes: estimatedMinutes,
+                categoryId: categoryId,
                 category: category,
                 isActive: isActive,
                 createdAt: createdAt,
@@ -8372,6 +9176,7 @@ class $$ServicesTableTableManager
                 Value<String?> description = const Value.absent(),
                 Value<double> price = const Value.absent(),
                 Value<int> estimatedMinutes = const Value.absent(),
+                Value<String?> categoryId = const Value.absent(),
                 Value<String> category = const Value.absent(),
                 Value<bool> isActive = const Value.absent(),
                 Value<DateTime> createdAt = const Value.absent(),
@@ -8382,6 +9187,7 @@ class $$ServicesTableTableManager
                 description: description,
                 price: price,
                 estimatedMinutes: estimatedMinutes,
+                categoryId: categoryId,
                 category: category,
                 isActive: isActive,
                 createdAt: createdAt,
@@ -8395,37 +9201,72 @@ class $$ServicesTableTableManager
                 ),
               )
               .toList(),
-          prefetchHooksCallback: ({transactionItemsRefs = false}) {
-            return PrefetchHooks(
-              db: db,
-              explicitlyWatchedTables: [
-                if (transactionItemsRefs) db.transactionItems,
-              ],
-              addJoins: null,
-              getPrefetchedDataCallback: (items) async {
-                return [
-                  if (transactionItemsRefs)
-                    await $_getPrefetchedData<
-                      Service,
-                      $ServicesTable,
-                      TransactionItem
-                    >(
-                      currentTable: table,
-                      referencedTable: $$ServicesTableReferences
-                          ._transactionItemsRefsTable(db),
-                      managerFromTypedResult: (p0) => $$ServicesTableReferences(
-                        db,
-                        table,
-                        p0,
-                      ).transactionItemsRefs,
-                      referencedItemsForCurrentItem: (item, referencedItems) =>
-                          referencedItems.where((e) => e.serviceId == item.id),
-                      typedResults: items,
-                    ),
-                ];
+          prefetchHooksCallback:
+              ({categoryId = false, transactionItemsRefs = false}) {
+                return PrefetchHooks(
+                  db: db,
+                  explicitlyWatchedTables: [
+                    if (transactionItemsRefs) db.transactionItems,
+                  ],
+                  addJoins:
+                      <
+                        T extends TableManagerState<
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic,
+                          dynamic
+                        >
+                      >(state) {
+                        if (categoryId) {
+                          state =
+                              state.withJoin(
+                                    currentTable: table,
+                                    currentColumn: table.categoryId,
+                                    referencedTable: $$ServicesTableReferences
+                                        ._categoryIdTable(db),
+                                    referencedColumn: $$ServicesTableReferences
+                                        ._categoryIdTable(db)
+                                        .id,
+                                  )
+                                  as T;
+                        }
+
+                        return state;
+                      },
+                  getPrefetchedDataCallback: (items) async {
+                    return [
+                      if (transactionItemsRefs)
+                        await $_getPrefetchedData<
+                          Service,
+                          $ServicesTable,
+                          TransactionItem
+                        >(
+                          currentTable: table,
+                          referencedTable: $$ServicesTableReferences
+                              ._transactionItemsRefsTable(db),
+                          managerFromTypedResult: (p0) =>
+                              $$ServicesTableReferences(
+                                db,
+                                table,
+                                p0,
+                              ).transactionItemsRefs,
+                          referencedItemsForCurrentItem:
+                              (item, referencedItems) => referencedItems.where(
+                                (e) => e.serviceId == item.id,
+                              ),
+                          typedResults: items,
+                        ),
+                    ];
+                  },
+                );
               },
-            );
-          },
         ),
       );
 }
@@ -8442,7 +9283,7 @@ typedef $$ServicesTableProcessedTableManager =
       $$ServicesTableUpdateCompanionBuilder,
       (Service, $$ServicesTableReferences),
       Service,
-      PrefetchHooks Function({bool transactionItemsRefs})
+      PrefetchHooks Function({bool categoryId, bool transactionItemsRefs})
     >;
 typedef $$VehiclesTableCreateCompanionBuilder =
     VehiclesCompanion Function({
@@ -9528,6 +10369,7 @@ typedef $$TransactionItemsTableCreateCompanionBuilder =
       required double unitPrice,
       Value<double> discount,
       required double subtotal,
+      Value<bool> isApproved,
       Value<int> rowid,
     });
 typedef $$TransactionItemsTableUpdateCompanionBuilder =
@@ -9541,6 +10383,7 @@ typedef $$TransactionItemsTableUpdateCompanionBuilder =
       Value<double> unitPrice,
       Value<double> discount,
       Value<double> subtotal,
+      Value<bool> isApproved,
       Value<int> rowid,
     });
 
@@ -9653,6 +10496,11 @@ class $$TransactionItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<bool> get isApproved => $composableBuilder(
+    column: $table.isApproved,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$TransactionsTableFilterComposer get transactionId {
     final $$TransactionsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -9762,6 +10610,11 @@ class $$TransactionItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<bool> get isApproved => $composableBuilder(
+    column: $table.isApproved,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TransactionsTableOrderingComposer get transactionId {
     final $$TransactionsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -9858,6 +10711,11 @@ class $$TransactionItemsTableAnnotationComposer
 
   GeneratedColumn<double> get subtotal =>
       $composableBuilder(column: $table.subtotal, builder: (column) => column);
+
+  GeneratedColumn<bool> get isApproved => $composableBuilder(
+    column: $table.isApproved,
+    builder: (column) => column,
+  );
 
   $$TransactionsTableAnnotationComposer get transactionId {
     final $$TransactionsTableAnnotationComposer composer = $composerBuilder(
@@ -9972,6 +10830,7 @@ class $$TransactionItemsTableTableManager
                 Value<double> unitPrice = const Value.absent(),
                 Value<double> discount = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
+                Value<bool> isApproved = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionItemsCompanion(
                 id: id,
@@ -9983,6 +10842,7 @@ class $$TransactionItemsTableTableManager
                 unitPrice: unitPrice,
                 discount: discount,
                 subtotal: subtotal,
+                isApproved: isApproved,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -9996,6 +10856,7 @@ class $$TransactionItemsTableTableManager
                 required double unitPrice,
                 Value<double> discount = const Value.absent(),
                 required double subtotal,
+                Value<bool> isApproved = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionItemsCompanion.insert(
                 id: id,
@@ -10007,6 +10868,7 @@ class $$TransactionItemsTableTableManager
                 unitPrice: unitPrice,
                 discount: discount,
                 subtotal: subtotal,
+                isApproved: isApproved,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0
@@ -11727,6 +12589,8 @@ class $AppDatabaseManager {
       $$CategoriesTableTableManager(_db, _db.categories);
   $$ProductsTableTableManager get products =>
       $$ProductsTableTableManager(_db, _db.products);
+  $$ServiceCategoriesTableTableManager get serviceCategories =>
+      $$ServiceCategoriesTableTableManager(_db, _db.serviceCategories);
   $$ServicesTableTableManager get services =>
       $$ServicesTableTableManager(_db, _db.services);
   $$VehiclesTableTableManager get vehicles =>

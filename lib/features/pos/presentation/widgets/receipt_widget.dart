@@ -172,9 +172,19 @@ class ReceiptWidget extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                '${item.qty} x ${CurrencyFormatter.format(item.unitPrice)}',
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '${item.qty} x ${CurrencyFormatter.format(item.unitPrice)}',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  ),
+                  if (!item.isApproved && item.type == 'service')
+                    const Text(
+                      '(Menunggu Persetujuan)',
+                      style: TextStyle(fontSize: 10, color: AppColors.error, fontWeight: FontWeight.bold),
+                    ),
+                ],
               ),
               Text(
                 CurrencyFormatter.format(item.subtotal),
@@ -205,6 +215,7 @@ class ReceiptItem {
   final double unitPrice;
   final double subtotal;
   final String type; // 'product' atau 'service'
+  final bool isApproved;
 
   ReceiptItem({
     required this.name,
@@ -212,6 +223,7 @@ class ReceiptItem {
     required this.unitPrice,
     required this.subtotal,
     this.type = 'product',
+    this.isApproved = true,
   });
 }
 

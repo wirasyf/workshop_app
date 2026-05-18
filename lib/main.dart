@@ -7,6 +7,7 @@ import 'core/router/app_router.dart';
 import 'core/services/sync_service.dart';
 import 'core/services/supabase_service.dart';
 import 'core/services/settings_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/theme/app_theme.dart';
 
 final settingsServiceProvider = Provider<SettingsService>((ref) => throw UnimplementedError());
@@ -22,6 +23,10 @@ void main() async {
 
   final settingsService = SettingsService();
   await settingsService.init();
+
+  // Inisialisasi Notification Service
+  final notificationService = NotificationService();
+  await notificationService.init();
 
   // Inisialisasi Supabase (aman gagal di offline)
   try {
@@ -41,6 +46,7 @@ void main() async {
       overrides: [
         databaseProvider.overrideWithValue(database),
         settingsServiceProvider.overrideWithValue(settingsService),
+        notificationServiceProvider.overrideWithValue(notificationService),
       ],
       child: const SpareArtApp(),
     ),

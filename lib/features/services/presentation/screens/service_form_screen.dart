@@ -26,6 +26,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
   final _priceCtrl = TextEditingController();
   final _timeCtrl = TextEditingController(text: '30');
   String _category = 'umum';
+  String? _categoryId;
   bool _isActive = true;
   bool _isLoading = false;
 
@@ -47,6 +48,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
         _priceCtrl.text = service.price.toStringAsFixed(0);
         _timeCtrl.text = service.estimatedMinutes.toString();
         _category = service.category;
+        _categoryId = service.categoryId;
         _isActive = service.isActive;
       });
     }
@@ -79,6 +81,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
           price: Value(price),
           estimatedMinutes: Value(estimatedMinutes),
           category: Value(_category),
+          categoryId: Value(_categoryId),
           isActive: Value(_isActive),
         );
         await db.updateService(companion);
@@ -94,6 +97,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
             'price': price,
             'estimated_minutes': estimatedMinutes,
             'category': _category,
+            'category_id': _categoryId,
             'is_active': _isActive,
           },
         );
@@ -106,6 +110,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
           price: Value(price),
           estimatedMinutes: Value(estimatedMinutes),
           category: Value(_category),
+          categoryId: Value(_categoryId),
           isActive: Value(_isActive),
         );
         await db.insertService(companion);
@@ -121,6 +126,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
             'price': price,
             'estimated_minutes': estimatedMinutes,
             'category': _category,
+            'category_id': _categoryId,
             'is_active': _isActive,
             'created_at': DateTime.now().toIso8601String(),
           },
@@ -257,16 +263,46 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
             const SizedBox(height: 16),
 
             // Kategori
-            DropdownButtonFormField<String>(
-              value: _category,
-              decoration: const InputDecoration(
-                labelText: 'Kategori',
-                prefixIcon: Icon(Icons.category_rounded),
-              ),
-              items: ServiceCategories.all.map((c) =>
-                DropdownMenuItem(value: c['value'], child: Text(c['label']!)),
-              ).toList(),
-              onChanged: (v) => setState(() => _category = v ?? 'umum'),
+            Consumer(
+              builder: (context, ref, _) {
+                final catsAsync = ref.watch(serviceCategoriesProvider);
+                
+                return catsAsync.when(
+                  loading: () => const LinearProgressIndicator(),
+                  error: (e, _) => Text('Error loading categories: $e'),
+                  data: (cats) {
+                    if (cats.isEmpty) {
+                      return OutlinedButton.icon(
+                        onPressed: () => context.push('/services/categories'),
+                        icon: const Icon(Icons.add_rounded),
+                        label: const Text('Buat Kategori Jasa'),
+                      );
+                    }
+
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        DropdownButtonFormField<String>(
+                          value: _categoryId,
+                          decoration: InputDecoration(
+                            labelText: 'Kategori',
+                            prefixIcon: const Icon(Icons.category_rounded),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.settings_rounded, size: 20),
+                              onPressed: () => context.push('/services/categories'),
+                              tooltip: 'Kelola Kategori',
+                            ),
+                          ),
+                          items: cats.map((c) =>
+                            DropdownMenuItem(value: c.id, child: Text(c.name)),
+                          ).toList(),
+                          onChanged: (v) => setState(() => _categoryId = v),
+                        ),
+                      ],
+                    );
+                  },
+                );
+              },
             ),
             const SizedBox(height: 16),
 

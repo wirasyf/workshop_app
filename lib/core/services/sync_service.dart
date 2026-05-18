@@ -145,7 +145,17 @@ class SyncService {
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 3. Download Services (New)
+        // 3. Download Service Categories (New)
+        final serviceCatData = await client.from('service_categories').select();
+        for (final row in serviceCatData) {
+          batch.insert(_db.serviceCategories, ServiceCategoriesCompanion.insert(
+            id: row['id'],
+            name: row['name'],
+            slug: row['slug'],
+          ), mode: InsertMode.insertOrReplace);
+        }
+
+        // 4. Download Services (Updated)
         final serviceData = await client.from('services').select();
         for (final row in serviceData) {
           batch.insert(_db.services, ServicesCompanion.insert(
@@ -154,12 +164,13 @@ class SyncService {
             description: Value(row['description']),
             price: Value((row['price'] as num?)?.toDouble() ?? 0.0),
             estimatedMinutes: Value(row['estimated_minutes'] ?? 30),
+            categoryId: Value(row['category_id']),
             category: Value(row['category'] ?? 'umum'),
             isActive: Value(row['is_active'] ?? true),
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 4. Download Vehicles (New)
+        // 5. Download Vehicles (New)
         final vehicleData = await client.from('vehicles').select();
         for (final row in vehicleData) {
           batch.insert(_db.vehicles, VehiclesCompanion.insert(
@@ -174,7 +185,7 @@ class SyncService {
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 5. Download Transactions
+        // 6. Download Transactions
         final txnData = await client.from('transactions').select();
         for (final row in txnData) {
           batch.insert(_db.transactions, TransactionsCompanion.insert(
@@ -193,7 +204,7 @@ class SyncService {
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 6. Download Transaction Items
+        // 7. Download Transaction Items
         final itemData = await client.from('transaction_items').select();
         for (final row in itemData) {
           batch.insert(_db.transactionItems, TransactionItemsCompanion.insert(
@@ -206,10 +217,11 @@ class SyncService {
             unitPrice: (row['unit_price'] as num).toDouble(),
             discount: Value((row['discount'] as num?)?.toDouble() ?? 0.0),
             subtotal: (row['subtotal'] as num).toDouble(),
+            isApproved: Value(row['is_approved'] ?? true),
           ), mode: InsertMode.insertOrReplace);
         }
 
-        // 7. Download Work Orders (New)
+        // 8. Download Work Orders (New)
         final woData = await client.from('work_orders').select();
         for (final row in woData) {
           batch.insert(_db.workOrders, WorkOrdersCompanion.insert(
@@ -228,7 +240,7 @@ class SyncService {
             completedAt: Value(row['completed_at'] != null ? DateTime.parse(row['completed_at']) : null),
           ), mode: InsertMode.insertOrReplace);
         }
-        // 8. Download Stock Adjustments (New)
+        // 9. Download Stock Adjustments (New)
         final stockAdjData = await client.from('stock_adjustments').select();
         for (final row in stockAdjData) {
           batch.insert(_db.stockAdjustments, StockAdjustmentsCompanion.insert(

@@ -22,10 +22,15 @@ final ownerDashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async 
   final start = DateFormatter.startOfDay(now);
   final end = DateFormatter.endOfDay(now);
 
-  final totalSales = await db.getTotalSales(start, end);
-  final txnCount = await db.getTransactionCount(start, end);
+  final todayTxns = await db.getTransactionsByDate(start, end);
   final lowStock = await db.getLowStockProducts();
   final dailySales = await db.getDailySales(7);
+  final summaryProfit = await db.getSummaryProfit(start, end);
+  final activeWOCount = await db.getActiveWorkOrderCount();
+  final pendingApprovals = await db.getPendingServiceApprovals();
+
+  final totalSales = todayTxns.fold(0.0, (sum, t) => sum + t.total);
+  final txnCount = todayTxns.length;
 
   return {
     'totalSales': totalSales,
@@ -33,6 +38,10 @@ final ownerDashboardProvider = FutureProvider<Map<String, dynamic>>((ref) async 
     'lowStockCount': lowStock.length,
     'lowStockItems': lowStock,
     'dailySales': dailySales,
+    'summaryProfit': summaryProfit,
+    'activeWOCount': activeWOCount,
+    'recentTxns': todayTxns.take(5).toList(),
+    'pendingApprovalCount': pendingApprovals.length,
   };
 });
 
@@ -102,6 +111,94 @@ class OwnerDashboardScreen extends ConsumerWidget {
                 ),
                 const SizedBox(height: 24),
 
+                // Approval Alert (only for Owner)
+                if (user?.role == 'owner' && (data['pendingApprovalCount'] ?? 0) > 0) ...[
+                  InkWell(
+                    onTap: () => context.go('/service-approval'),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.warning.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.pending_actions_rounded, color: AppColors.warning),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Persetujuan Jasa', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: AppColors.warning)),
+                                Text('Ada ${data['pendingApprovalCount']} jasa menunggu persetujuan Anda', style: theme.textTheme.bodySmall),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: AppColors.warning),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
+                // Quick Actions
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    _QuickActionBtn(
+                      label: 'Penjualan', icon: Icons.shopping_cart_rounded, color: AppColors.primary,
+                      onTap: () => context.go('/pos'),
+                    ),
+                    _QuickActionBtn(
+                      label: 'Bengkel', icon: Icons.build_rounded, color: AppColors.secondary,
+                      onTap: () => context.go('/workshop'),
+                    ),
+                    _QuickActionBtn(
+                      label: 'Barang', icon: Icons.inventory_2_rounded, color: AppColors.info,
+                      onTap: () => context.go('/products'),
+                    ),
+                    _QuickActionBtn(
+                      label: 'Laporan', icon: Icons.bar_chart_rounded, color: AppColors.success,
+                      onTap: () => context.go('/reports'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 24),
+
+                // Staff Management Shortcut (Owner only)
+                if (user?.role == 'owner') ...[
+                  InkWell(
+                    onTap: () => context.go('/staff'),
+                    child: Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.info.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: AppColors.info.withValues(alpha: 0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.people_alt_rounded, color: AppColors.info),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text('Kelola Karyawan', style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: AppColors.info)),
+                                const Text('Buat dan kelola akun kasir untuk karyawan Anda', style: TextStyle(fontSize: 11)),
+                              ],
+                            ),
+                          ),
+                          const Icon(Icons.chevron_right_rounded, color: AppColors.info),
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+
                 // Metric cards
                 GridView.count(
                   crossAxisCount: 2, shrinkWrap: true,
@@ -111,7 +208,12 @@ class OwnerDashboardScreen extends ConsumerWidget {
                     MetricCard(
                       label: 'Omzet Hari Ini', value: CurrencyFormatter.formatCompact(data['totalSales'] ?? 0),
                       icon: Icons.monetization_on_rounded, iconColor: AppColors.success,
-                      subtitle: '+12%',
+                      onTap: () => context.go('/reports'),
+                    ),
+                    MetricCard(
+                      label: 'Estimasi Laba', value: CurrencyFormatter.formatCompact(data['summaryProfit']['grossProfit'] ?? 0),
+                      icon: Icons.trending_up_rounded, iconColor: AppColors.primary,
+                      subtitle: '${(data['summaryProfit']['margin'] as double).toStringAsFixed(1)}%',
                       onTap: () => context.go('/reports'),
                     ),
                     MetricCard(
@@ -120,13 +222,9 @@ class OwnerDashboardScreen extends ConsumerWidget {
                       onTap: () => context.go('/history'),
                     ),
                     MetricCard(
-                      label: 'Stok Menipis', value: '${data['lowStockCount'] ?? 0}',
-                      icon: Icons.warning_rounded, iconColor: AppColors.warning,
-                      onTap: () => context.go('/products'),
-                    ),
-                    MetricCard(
-                      label: 'PO Aktif', value: '0',
-                      icon: Icons.local_shipping_rounded, iconColor: AppColors.secondary,
+                      label: 'Antrian Bengkel', value: '${data['activeWOCount'] ?? 0}',
+                      icon: Icons.engineering_rounded, iconColor: AppColors.warning,
+                      onTap: () => context.go('/workshop'),
                     ),
                   ],
                 ),
@@ -245,6 +343,52 @@ class OwnerDashboardScreen extends ConsumerWidget {
                           },
                         ),
                 ),
+                // Recent Activity
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Aktivitas Terbaru', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
+                    TextButton(onPressed: () => context.go('/history'), child: const Text('Lihat Semua', style: TextStyle(fontSize: 12))),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Container(
+                  decoration: BoxDecoration(
+                    color: theme.cardTheme.color,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
+                  ),
+                  child: Column(
+                    children: (data['recentTxns'] as List<Transaction>).asMap().entries.map((entry) {
+                      final txn = entry.value;
+                      final isLast = entry.key == (data['recentTxns'] as List).length - 1;
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withValues(alpha: 0.1),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(Icons.receipt_rounded, size: 18, color: AppColors.primary),
+                            ),
+                            title: Text(txn.invoiceNo, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
+                            subtitle: Text(DateFormatter.formatShort(txn.createdAt)),
+                            trailing: Text(
+                              CurrencyFormatter.format(txn.total),
+                              style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold, color: AppColors.success),
+                            ),
+                            onTap: () => context.go('/history?id=${txn.id}'),
+                            dense: true,
+                          ),
+                          if (!isLast)
+                            const Divider(height: 1, indent: 60, endIndent: 16),
+                        ],
+                      );
+                    }).toList(),
+                  ),
+                ),
                 const SizedBox(height: 32),
 
                 // Stok kritis
@@ -302,6 +446,42 @@ class OwnerDashboardScreen extends ConsumerWidget {
           );
         },
       ),
+    );
+  }
+}
+
+class _QuickActionBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _QuickActionBtn({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Icon(icon, color: color, size: 24),
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(label, style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+      ],
     );
   }
 }

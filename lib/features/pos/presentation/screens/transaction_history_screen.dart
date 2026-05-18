@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_riverpod/legacy.dart';
+import 'package:spareart_app/core/services/sync_service.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/bluetooth_printer_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
@@ -11,13 +13,49 @@ import '../../../../shared/widgets/empty_state_widget.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/receipt_widget.dart';
 
+final historyDateRangeProvider = StateProvider<DateTimeRange>((ref) {
+  final now = DateTime.now();
+  return DateTimeRange(
+    start: DateFormatter.startOfDay(now),
+    end: DateFormatter.endOfDay(now),
+  );
+});
+
 /// Riwayat transaksi
-class TransactionHistoryScreen extends ConsumerWidget {
-  const TransactionHistoryScreen({super.key});
+class TransactionHistoryScreen extends ConsumerStatefulWidget {
+  final String? transactionId;
+  const TransactionHistoryScreen({super.key, this.transactionId});
+
+  @override
+  ConsumerState<TransactionHistoryScreen> createState() => _TransactionHistoryScreenState();
+}
+
+class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScreen> {
+  bool _hasCheckedInitialId = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.transactionId != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _checkInitialId();
+      });
+    }
+  }
+
+  Future<void> _checkInitialId() async {
+    if (_hasCheckedInitialId || widget.transactionId == null) return;
+    _hasCheckedInitialId = true;
+
+    final db = ref.read(databaseProvider);
+    final txn = await db.getTransactionById(widget.transactionId!);
+    if (txn != null && mounted) {
+      _showReceipt(context, txn);
+    }
+  }
 
   Future<void> _printReceipt(
     BuildContext context,
-    WidgetRef ref,
     dynamic settings,
     dynamic txn,
     List<dynamic> details,
@@ -92,7 +130,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
     }
   }
 
-  void _showReceipt(BuildContext context, WidgetRef ref, dynamic txn) {
+  void _showReceipt(BuildContext context, dynamic txn) {
     final settings = ref.read(settingsServiceProvider);
 
     showModalBottomSheet(
@@ -143,14 +181,15 @@ class TransactionHistoryScreen extends ConsumerWidget {
                                 invoiceNo: txn.invoiceNo,
                                 date: txn.createdAt,
                                 items: details
-                                    .map((d) => ReceiptItem(
-                                          name: d.productName,
-                                          qty: d.item.qty,
-                                          unitPrice: d.item.unitPrice,
-                                          subtotal: d.item.subtotal,
-                                          type: d.itemType,
-                                        ))
-                                    .toList(),
+                                        .map((d) => ReceiptItem(
+                                              name: d.productName,
+                                              qty: d.item.qty,
+                                              unitPrice: d.item.unitPrice,
+                                              subtotal: d.item.subtotal,
+                                              type: d.itemType,
+                                              isApproved: d.item.isApproved,
+                                            ))
+                                        .toList(),
                                 total: txn.total,
                                 paid: txn.paidAmount,
                                 change: txn.changeAmount,
@@ -176,7 +215,6 @@ class TransactionHistoryScreen extends ConsumerWidget {
                               child: ElevatedButton.icon(
                                 onPressed: () => _printReceipt(
                                   context,
-                                  ref,
                                   settings,
                                   txn,
                                   details,
@@ -220,17 +258,78 @@ class TransactionHistoryScreen extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final today = DateTime.now();
-    final start = DateFormatter.startOfDay(today);
-    final end = DateFormatter.endOfDay(today);
-    final txns =
-        ref.watch(transactionHistoryProvider((start: start, end: end)));
+  Widget build(BuildContext context) {
+    final dateRange = ref.watch(historyDateRangeProvider);
+    final txns = ref.watch(transactionHistoryProvider((
+      start: dateRange.start,
+      end: dateRange.end,
+    )));
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Riwayat Transaksi')),
-      body: txns.when(
+      appBar: AppBar(
+        title: const Text('Riwayat Transaksi'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.date_range_rounded),
+            onPressed: () async {
+              final newRange = await showDateRangePicker(
+                context: context,
+                initialDateRange: dateRange,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now().add(const Duration(days: 1)),
+                builder: (context, child) => Theme(
+                  data: theme.copyWith(
+                    colorScheme: theme.colorScheme.copyWith(
+                      primary: AppColors.primary,
+                      onPrimary: Colors.white,
+                    ),
+                  ),
+                  child: child!,
+                ),
+              );
+              if (newRange != null) {
+                ref.read(historyDateRangeProvider.notifier).state = DateTimeRange(
+                  start: DateFormatter.startOfDay(newRange.start),
+                  end: DateFormatter.endOfDay(newRange.end),
+                );
+              }
+            },
+          ),
+        ],
+      ),
+      body: Column(
+        children: [
+          // Filter Summary
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            color: AppColors.primary.withValues(alpha: 0.05),
+            child: Row(
+              children: [
+                const Icon(Icons.filter_list_rounded, size: 14, color: AppColors.primary),
+                const SizedBox(width: 8),
+                Text(
+                  '${DateFormatter.formatShort(dateRange.start)} - ${DateFormatter.formatShort(dateRange.end)}',
+                  style: theme.textTheme.labelSmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold),
+                ),
+                const Spacer(),
+                if (dateRange.start.day != DateTime.now().day || dateRange.start.month != DateTime.now().month)
+                  TextButton(
+                    onPressed: () {
+                      final now = DateTime.now();
+                      ref.read(historyDateRangeProvider.notifier).state = DateTimeRange(
+                        start: DateFormatter.startOfDay(now),
+                        end: DateFormatter.endOfDay(now),
+                      );
+                    },
+                    style: TextButton.styleFrom(visualDensity: VisualDensity.compact),
+                    child: const Text('Reset', style: TextStyle(fontSize: 10)),
+                  ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: txns.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
         data: (items) {
@@ -247,7 +346,7 @@ class TransactionHistoryScreen extends ConsumerWidget {
             itemBuilder: (_, i) {
               final txn = items[i];
               return InkWell(
-                onTap: () => _showReceipt(context, ref, txn),
+                onTap: () => _showReceipt(context, txn),
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
                   padding: const EdgeInsets.all(14),
@@ -320,6 +419,9 @@ class TransactionHistoryScreen extends ConsumerWidget {
             },
           );
         },
+          ),
+          )
+        ],
       ),
     );
   }

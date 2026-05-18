@@ -18,6 +18,7 @@ part 'app_database.g.dart';
     StockAdjustments,
     SyncQueue,
     Notifications,
+    ServiceCategories,
   ],
 )
 class AppDatabase extends _$AppDatabase {
@@ -25,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 8;
 
   @override
   MigrationStrategy get migration {
@@ -113,6 +114,14 @@ class AppDatabase extends _$AppDatabase {
             'ALTER TABLE transaction_items_new RENAME TO transaction_items',
           );
         }
+        if (from < 7) {
+          await m.addColumn(users, users.role);
+          await m.addColumn(transactionItems, transactionItems.isApproved);
+        }
+        if (from < 8) {
+          await m.createTable(serviceCategories);
+          await m.addColumn(services, services.categoryId);
+        }
       },
       beforeOpen: (details) async {
         // Optional: Logika tambahan sebelum database dibuka
@@ -135,8 +144,14 @@ class AppDatabase extends _$AppDatabase {
   )..where((u) => u.username.equals(username))).getSingleOrNull();
   Future<User?> getUserById(String id) =>
       (select(users)..where((u) => u.id.equals(id))).getSingleOrNull();
+  Future<List<User>> getUsersByRole(String role) =>
+      (select(users)..where((u) => u.role.equals(role))).get();
   Future<String> insertUser(UsersCompanion user) =>
       into(users).insert(user).then((_) => user.id.value);
+  Future<bool> updateUser(UsersCompanion user) =>
+      update(users).replace(user);
+  Future<void> deleteUser(String id) =>
+      (delete(users)..where((u) => u.id.equals(id))).go();
 
   // ══════════════════════════════════════════════
   // ── Categories ──
@@ -229,6 +244,22 @@ class AppDatabase extends _$AppDatabase {
   Future<List<Service>> getServicesByCategory(String category) => (select(
     services,
   )..where((s) => s.category.equals(category) & s.isActive.equals(true))).get();
+
+  // ══════════════════════════════════════════════
+  // ── Service Categories ──
+  // ══════════════════════════════════════════════
+  Future<List<ServiceCategory>> getAllServiceCategories() =>
+      select(serviceCategories).get();
+  Future<String> insertServiceCategory(ServiceCategoriesCompanion c) =>
+      into(serviceCategories).insert(c).then((_) => c.id.value);
+  Future<bool> updateServiceCategory(ServiceCategoriesCompanion c) =>
+      update(serviceCategories).replace(c);
+  Future<int> deleteServiceCategory(String id) =>
+      (delete(serviceCategories)..where((c) => c.id.equals(id))).go();
+
+  // ══════════════════════════════════════════════
+  // ── Services ──
+  // ══════════════════════════════════════════════
 
   Future<String> insertService(ServicesCompanion s) =>
       into(services).insert(s).then((_) => s.id.value);
@@ -401,13 +432,15 @@ class AppDatabase extends _$AppDatabase {
   /// Total omzet
   Future<double> getTotalSales(DateTime start, DateTime end) async {
     final r = await customSelect(
-      'SELECT COALESCE(SUM(total), 0.0) as total FROM transactions WHERE created_at>=? AND created_at<=? AND status=?',
+      'SELECT COALESCE(SUM(ti.subtotal), 0.0) as total '
+      'FROM transaction_items ti JOIN transactions t ON t.id=ti.transaction_id '
+      'WHERE t.created_at>=? AND t.created_at<=? AND t.status=? AND ti.is_approved=1',
       variables: [
         Variable.withDateTime(start),
         Variable.withDateTime(end),
         Variable.withString('completed'),
       ],
-      readsFrom: {transactions},
+      readsFrom: {transactionItems, transactions},
     ).getSingle();
     return r.read<double>('total');
   }
@@ -424,6 +457,16 @@ class AppDatabase extends _$AppDatabase {
     ).getSingle();
     return r.read<int>('cnt');
   }
+
+  /// Ambil transaksi berdasarkan ID
+  Future<Transaction?> getTransactionById(String id) =>
+      (select(transactions)..where((t) => t.id.equals(id))).getSingleOrNull();
+
+  /// Transaksi terbaru
+  Future<List<Transaction>> getRecentTransactions(int limit) => (select(transactions)
+        ..orderBy([(t) => OrderingTerm.desc(t.createdAt)])
+        ..limit(limit))
+      .get();
 
   /// Produk terlaris
   Future<List<Map<String, dynamic>>> getTopProducts(
@@ -461,13 +504,14 @@ class AppDatabase extends _$AppDatabase {
   /// Penjualan harian (chart)
   Future<List<Map<String, dynamic>>> getDailySales(int days) async {
     final rows = await customSelect(
-      'SELECT DATE(created_at, \'unixepoch\', \'localtime\') as sale_date,COALESCE(SUM(total),0.0) as daily_total,COUNT(*) as txn_count '
-      'FROM transactions WHERE created_at>=? AND status=\'completed\' '
-      'GROUP BY DATE(created_at, \'unixepoch\', \'localtime\') ORDER BY sale_date ASC',
+      'SELECT DATE(t.created_at, \'unixepoch\', \'localtime\') as sale_date, COALESCE(SUM(ti.subtotal), 0.0) as daily_total, COUNT(DISTINCT t.id) as txn_count '
+      'FROM transactions t JOIN transaction_items ti ON t.id=ti.transaction_id '
+      'WHERE t.created_at>=? AND t.status=\'completed\' AND ti.is_approved=1 '
+      'GROUP BY DATE(t.created_at, \'unixepoch\', \'localtime\') ORDER BY sale_date ASC',
       variables: [
         Variable.withDateTime(DateTime.now().subtract(Duration(days: days))),
       ],
-      readsFrom: {transactions},
+      readsFrom: {transactions, transactionItems},
     ).get();
     return rows
         .map(
@@ -495,7 +539,7 @@ class AppDatabase extends _$AppDatabase {
          COALESCE(SUM(CASE WHEN ti.item_type='product' THEN ti.subtotal ELSE 0 END), 0.0) as parts_revenue
          FROM transaction_items ti
          JOIN transactions t ON t.id=ti.transaction_id
-         WHERE t.created_at>=? AND t.created_at<=? AND t.status='completed' ''',
+         WHERE t.created_at>=? AND t.created_at<=? AND t.status='completed' AND ti.is_approved=1 ''',
       variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
       readsFrom: {transactionItems, transactions},
     ).getSingle();
@@ -555,7 +599,7 @@ class AppDatabase extends _$AppDatabase {
          LEFT JOIN products p ON p.id = ti.product_id
          LEFT JOIN services s ON s.id = ti.service_id
          JOIN transactions t ON t.id = ti.transaction_id
-         WHERE t.created_at >= ? AND t.created_at <= ? AND t.status = 'completed'
+         WHERE t.created_at >= ? AND t.created_at <= ? AND t.status = 'completed' AND ti.is_approved = 1
          ORDER BY t.created_at DESC''',
       variables: [Variable.withDateTime(start), Variable.withDateTime(end)],
       readsFrom: {transactionItems, products, services, transactions},
@@ -599,6 +643,22 @@ class AppDatabase extends _$AppDatabase {
       readsFrom: {workOrders},
     ).getSingle();
     return r.read<int>('cnt');
+  }
+
+  /// Get all pending service approvals for admin
+  Future<List<TypedResult>> getPendingServiceApprovals() {
+    return (select(transactionItems).join([
+      innerJoin(transactions, transactions.id.equalsExp(transactionItems.transactionId)),
+      leftOuterJoin(services, services.id.equalsExp(transactionItems.serviceId)),
+    ])..where(transactionItems.itemType.equals('service') & transactionItems.isApproved.equals(false)))
+        .get();
+  }
+
+  /// Approve a specific transaction item (service)
+  Future<void> approveTransactionItem(String itemId) async {
+    await (update(transactionItems)..where((ti) => ti.id.equals(itemId))).write(
+      const TransactionItemsCompanion(isApproved: Value(true)),
+    );
   }
 
   // ══════════════════════════════════════════════

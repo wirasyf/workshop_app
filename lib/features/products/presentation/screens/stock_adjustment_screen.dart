@@ -9,6 +9,7 @@ import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../dashboard/presentation/screens/notification_screen.dart';
 import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
+import '../../../../core/services/notification_service.dart';
 import '../providers/product_provider.dart';
 import 'package:uuid/uuid.dart';
 /// Form penyesuaian stok manual
@@ -86,6 +87,19 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
             'updated_at': now.toIso8601String(),
           },
         );
+
+        // Cek jika penyesuaian membuat stok menipis/habis, picu notifikasi OS
+        if (updatedProduct.stockQty <= updatedProduct.stockMin) {
+          final isZero = updatedProduct.stockQty == 0;
+          ref.read(notificationServiceProvider).showStockWarning(
+            id: updatedProduct.id.hashCode,
+            title: isZero ? 'Stok Habis: ${updatedProduct.name}' : 'Stok Menipis: ${updatedProduct.name}',
+            body: isZero 
+                ? 'Stok produk ${updatedProduct.name} sudah habis. Segera lakukan restok.'
+                : 'Sisa stok ${updatedProduct.name} tinggal ${updatedProduct.stockQty} ${updatedProduct.unit}.',
+            isCritical: isZero,
+          );
+        }
       }
 
       ref.invalidate(productsProvider);

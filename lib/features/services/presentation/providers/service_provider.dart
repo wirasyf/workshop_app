@@ -23,11 +23,10 @@ final serviceSelectedCategoryProvider = StateProvider<String?>((ref) => null);
 
 /// Provider filtered services (berdasarkan search + category)
 final filteredServicesProvider = FutureProvider<List<Service>>((ref) {
-  final db = ref.watch(databaseProvider);
   final search = ref.watch(serviceSearchProvider);
-  final category = ref.watch(serviceSelectedCategoryProvider);
+  final categoryId = ref.watch(serviceSelectedCategoryProvider);
 
-  return db.getAllServices().then((allServices) {
+  return ref.watch(servicesProvider.future).then((allServices) {
     var filtered = allServices;
     
     if (search.isNotEmpty) {
@@ -37,28 +36,16 @@ final filteredServicesProvider = FutureProvider<List<Service>>((ref) {
       ).toList();
     }
     
-    if (category != null) {
-      filtered = filtered.where((s) => s.category == category).toList();
+    if (categoryId != null) {
+      filtered = filtered.where((s) => s.categoryId == categoryId).toList();
     }
     
     return filtered;
   });
 });
 
-/// Kategori jasa yang tersedia
-class ServiceCategories {
-  static const List<Map<String, String>> all = [
-    {'value': 'servis_rutin', 'label': 'Servis Rutin'},
-    {'value': 'perbaikan', 'label': 'Perbaikan'},
-    {'value': 'tune_up', 'label': 'Tune Up'},
-    {'value': 'body', 'label': 'Body & Cat'},
-    {'value': 'umum', 'label': 'Umum'},
-  ];
-
-  static String getLabel(String value) {
-    return all.firstWhere(
-      (c) => c['value'] == value,
-      orElse: () => {'label': value},
-    )['label']!;
-  }
-}
+/// Provider kategori jasa dari database
+final serviceCategoriesProvider = FutureProvider<List<ServiceCategory>>((ref) {
+  final db = ref.watch(databaseProvider);
+  return db.getAllServiceCategories();
+});

@@ -13,6 +13,7 @@ import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../../products/presentation/providers/product_provider.dart';
 import '../../../reports/presentation/screens/report_screen.dart';
 import '../../../dashboard/presentation/screens/notification_screen.dart';
+import '../../../../core/services/notification_service.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/cart_provider.dart';
 
@@ -94,16 +95,21 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         // 2. Insert items & kurangi stok (hanya untuk produk)
         for (final item in cart) {
           final itemId = uuid.v4();
+          final isService = item.type == CartItemType.service;
+          // Jasa perlu approval jika yang input adalah kasir
+          final isApproved = !isService || (user?.role == 'owner');
+
           final itemCompanion = TransactionItemsCompanion.insert(
             id: itemId,
             transactionId: txnId,
-            itemType: Value(item.type == CartItemType.service ? 'service' : 'product'),
-            productId: item.type == CartItemType.product ? Value(item.productId) : const Value(null),
-            serviceId: item.type == CartItemType.service ? Value(item.productId) : const Value(null),
+            itemType: Value(isService ? 'service' : 'product'),
+            productId: !isService ? Value(item.productId) : const Value(null),
+            serviceId: isService ? Value(item.productId) : const Value(null),
             qty: item.qty,
             unitPrice: item.unitPrice,
             discount: Value(item.discount),
             subtotal: item.subtotal,
+            isApproved: Value(isApproved),
           );
           await db.insertTransactionItem(itemCompanion);
 
@@ -115,13 +121,14 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             data: {
               'id': itemId,
               'transaction_id': txnId,
-              'item_type': item.type == CartItemType.service ? 'service' : 'product',
-              'product_id': item.type == CartItemType.product ? item.productId : null,
-              'service_id': item.type == CartItemType.service ? item.productId : null,
+              'item_type': isService ? 'service' : 'product',
+              'product_id': !isService ? item.productId : null,
+              'service_id': isService ? item.productId : null,
               'qty': item.qty,
               'unit_price': item.unitPrice,
               'discount': item.discount,
               'subtotal': item.subtotal,
+              'is_approved': isApproved,
             },
           );
 
@@ -150,15 +157,26 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ref.read(cartDiscountProvider.notifier).state = 0;
       ref.read(paidAmountProvider.notifier).state = 0;
 
-      // Cek stok menipis (hanya produk)
+      // Cek stok menipis (hanya produk) & picu notifikasi OS
       bool hasLowStock = false;
       List<String> lowStockNames = [];
+      final notifService = ref.read(notificationServiceProvider);
+
       for (final item in cart) {
         if (item.type == CartItemType.product) {
           final p = await db.getProductById(item.productId);
           if (p != null && p.stockQty <= p.stockMin) {
             hasLowStock = true;
             lowStockNames.add(p.name);
+            final isZero = p.stockQty == 0;
+            notifService.showStockWarning(
+              id: p.id.hashCode,
+              title: isZero ? 'Stok Habis: ${p.name}' : 'Stok Menipis: ${p.name}',
+              body: isZero 
+                  ? 'Stok produk ${p.name} sudah habis. Segera lakukan restok.'
+                  : 'Sisa stok ${p.name} tinggal ${p.stockQty} ${p.unit}.',
+              isCritical: isZero,
+            );
           }
         }
       }
@@ -169,6 +187,13 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       ref.invalidate(reportDataProvider);
       ref.invalidate(notificationNotifierProvider);
 
+      // Create processed items with approval status for the success screen
+      final processedItems = cart.map((item) {
+        final isService = item.type == CartItemType.service;
+        final isApproved = !isService || (user?.role == 'owner');
+        return item.copyWith(isApproved: isApproved);
+      }).toList();
+
       if (mounted) {
         if (hasLowStock) {
           AppToast.show(context, 'Peringatan: Stok menipis untuk ${lowStockNames.join(', ')}', type: ToastType.warning, duration: const Duration(seconds: 4));
@@ -176,7 +201,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         
         context.go('/pos/success', extra: {
           'invoiceNo': invoiceNo,
-          'items': cart.toList(),
+          'items': processedItems,
           'total': total,
           'paid': method == 'cash' ? paid : total,
           'change': change,

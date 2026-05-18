@@ -108,6 +108,8 @@ class SettingsScreen extends ConsumerWidget {
           _settingsTile(Icons.bar_chart_rounded, 'Laporan Keuangan', subtitle: 'Omzet, profit, ekspor Excel', onTap: () => context.go('/reports')),
           _settingsTile(Icons.history_rounded, 'Riwayat Transaksi', subtitle: 'Semua transaksi selesai', onTap: () => context.go('/history')),
           _settingsTile(Icons.build_circle_rounded, 'Manajemen Jasa', subtitle: 'Katalog jasa bengkel', onTap: () => context.go('/services')),
+          if (user?.role == 'owner')
+            _settingsTile(Icons.people_alt_rounded, 'Kelola Karyawan', subtitle: 'Manajemen akun kasir', onTap: () => context.go('/staff')),
           _settingsTile(Icons.notifications_rounded, 'Notifikasi', subtitle: 'Stok menipis & aktivitas', onTap: () => context.go('/notifications')),
           const Divider(height: 32),
           _settingsTile(Icons.info_rounded, 'Tentang Aplikasi', subtitle: 'SpareArt Motor v1.0.0'),

@@ -442,20 +442,27 @@ class _ServiceCategoryFilterBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedCategory = ref.watch(serviceSelectedCategoryProvider);
+    final categoriesAsync = ref.watch(serviceCategoriesProvider);
 
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          _ChipWidget(label: 'Semua', isSelected: selectedCategory == null,
-            onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = null),
-          ...ServiceCategories.all.map((c) => _ChipWidget(
-            label: c['label']!, isSelected: selectedCategory == c['value'],
-            onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = c['value'])),
-        ],
-      ),
+    return categoriesAsync.when(
+      loading: () => const SizedBox(height: 48),
+      error: (_, __) => const SizedBox(),
+      data: (items) {
+        return SizedBox(
+          height: 48,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _ChipWidget(label: 'Semua', isSelected: selectedCategory == null,
+                onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = null),
+              ...items.map((c) => _ChipWidget(
+                label: c.name, isSelected: selectedCategory == c.id,
+                onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = c.id)),
+            ],
+          ),
+        );
+      },
     );
   }
 }

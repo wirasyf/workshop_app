@@ -12,6 +12,7 @@ class Users extends Table {
   TextColumn get email => text().unique()();
   TextColumn get passwordHash => text()();
   TextColumn get avatarUrl => text().nullable()();
+  TextColumn get role => text().withDefault(const Constant('owner'))(); // 'owner', 'cashier'
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
   DateTimeColumn get createdAt => dateTime().withDefault(currentDateAndTime)();
   TextColumn get supabaseUid => text().nullable()();
@@ -55,6 +56,16 @@ class Products extends Table {
   Set<Column> get primaryKey => {id};
 }
 
+/// Kategori jasa
+class ServiceCategories extends Table {
+  TextColumn get id => text()();
+  TextColumn get name => text().withLength(max: 100)();
+  TextColumn get slug => text().withLength(max: 100)();
+
+  @override
+  Set<Column> get primaryKey => {id};
+}
+
 /// Katalog Jasa Bengkel
 class Services extends Table {
   TextColumn get id => text()();           // UUID
@@ -62,6 +73,7 @@ class Services extends Table {
   TextColumn get description => text().nullable()();
   RealColumn get price => real().withDefault(const Constant(0.0))();
   IntColumn get estimatedMinutes => integer().withDefault(const Constant(30))();
+  TextColumn get categoryId => text().nullable().references(ServiceCategories, #id)();
   TextColumn get category => text().withDefault(const Constant('umum'))();
   // category: 'servis_rutin', 'perbaikan', 'tune_up', 'body', 'umum'
   BoolColumn get isActive => boolean().withDefault(const Constant(true))();
@@ -121,6 +133,7 @@ class TransactionItems extends Table {
   RealColumn get unitPrice => real()();
   RealColumn get discount => real().withDefault(const Constant(0.0))();
   RealColumn get subtotal => real()();
+  BoolColumn get isApproved => boolean().withDefault(const Constant(true))();
 
   @override
   Set<Column> get primaryKey => {id};

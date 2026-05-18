@@ -126,7 +126,7 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
         orderNo: orderNo,
         vehicleId: vehicleId,
         userId: user?.id ?? '1',
-        complaint: Value(woData['complaint'] as String?),
+        complaint: Value(woData['complaint']),
       ));
       await syncService.enqueue(tableName: 'work_orders', recordId: woId, operation: 'create', data: woData);
       HapticFeedback.heavyImpact();

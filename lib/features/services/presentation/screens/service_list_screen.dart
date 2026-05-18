@@ -23,6 +23,13 @@ class ServiceListScreen extends ConsumerWidget {
           icon: const Icon(Icons.chevron_left_rounded),
           onPressed: () => context.go('/settings'),
         ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.category_rounded),
+            onPressed: () => context.go('/services/categories'),
+            tooltip: 'Kelola Kategori',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -149,9 +156,15 @@ class _ServiceCard extends ConsumerWidget {
                           color: AppColors.primary.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(6),
                         ),
-                        child: Text(
-                          ServiceCategories.getLabel(service.category),
-                          style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                        child: Consumer(
+                          builder: (context, ref, _) {
+                            final cats = ref.watch(serviceCategoriesProvider).value ?? [];
+                            final cat = cats.where((c) => c.id == service.categoryId).firstOrNull;
+                            return Text(
+                              cat?.name ?? service.category,
+                              style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                            );
+                          },
                         ),
                       ),
                       const SizedBox(width: 8),
@@ -197,24 +210,29 @@ class _ServiceCategoryFilterBar extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final selectedCategory = ref.watch(serviceSelectedCategoryProvider);
+    final categoriesAsync = ref.watch(serviceCategoriesProvider);
 
-    return SizedBox(
-      height: 48,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        children: [
-          _CategoryChip(
-            label: 'Semua',
-            isSelected: selectedCategory == null,
-            onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = null,
-          ),
-          ...ServiceCategories.all.map((c) => _CategoryChip(
-            label: c['label']!,
-            isSelected: selectedCategory == c['value'],
-            onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = c['value'],
-          )),
-        ],
+    return categoriesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (categories) => SizedBox(
+        height: 48,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          children: [
+            _CategoryChip(
+              label: 'Semua',
+              isSelected: selectedCategory == null,
+              onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = null,
+            ),
+            ...categories.map((c) => _CategoryChip(
+              label: c.name,
+              isSelected: selectedCategory == c.id,
+              onTap: () => ref.read(serviceSelectedCategoryProvider.notifier).state = c.id,
+            )),
+          ],
+        ),
       ),
     );
   }

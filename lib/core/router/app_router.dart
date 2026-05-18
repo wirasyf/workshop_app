@@ -6,6 +6,8 @@ import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/notification_screen.dart';
+import '../../features/dashboard/presentation/screens/service_approval_screen.dart';
+import '../../features/dashboard/presentation/screens/staff_list_screen.dart';
 import '../../features/pos/presentation/screens/pos_product_screen.dart';
 import '../../features/pos/presentation/screens/cart_screen.dart';
 import '../../features/pos/presentation/screens/payment_success_screen.dart';
@@ -24,6 +26,7 @@ import '../../features/settings/presentation/screens/receipt_template_screen.dar
 import '../../features/settings/presentation/screens/bluetooth_printer_screen.dart';
 import '../../features/services/presentation/screens/service_list_screen.dart';
 import '../../features/services/presentation/screens/service_form_screen.dart';
+import '../../features/services/presentation/screens/service_category_list_screen.dart';
 import '../../features/workshop/presentation/screens/workshop_screen.dart';
 import '../../features/workshop/presentation/screens/work_order_form_screen.dart';
 import '../../features/workshop/presentation/screens/work_order_detail_screen.dart';
@@ -106,12 +109,20 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(path: 'add', builder: (_, __) => const ServiceFormScreen()),
               GoRoute(path: ':id/edit', builder: (_, state) =>
                   ServiceFormScreen(serviceId: state.pathParameters['id']!)),
+              GoRoute(path: 'categories', builder: (_, __) => const ServiceCategoryListScreen()),
             ],
           ),
 
-          GoRoute(path: '/history', builder: (_, __) => const TransactionHistoryScreen()),
+          GoRoute(
+            path: '/history',
+            builder: (_, state) => TransactionHistoryScreen(
+              transactionId: state.uri.queryParameters['id'],
+            ),
+          ),
           GoRoute(path: '/reports', builder: (_, __) => const ReportScreen()),
           GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
+          GoRoute(path: '/service-approval', builder: (_, __) => const ServiceApprovalScreen()),
+          GoRoute(path: '/staff', builder: (_, __) => const StaffListScreen()),
           GoRoute(
             path: '/settings', 
             builder: (_, __) => const SettingsScreen(),

@@ -15,17 +15,20 @@ class CartItem {
   final CartItemType type;
   int qty;
   double discount;
+  bool isApproved;
 
   CartItem({
     required this.productId, required this.name, required this.unitPrice,
     required this.unit, this.type = CartItemType.product, this.qty = 1, this.discount = 0,
+    this.isApproved = true,
   });
 
   double get subtotal => (unitPrice * qty) - discount;
 
-  CartItem copyWith({int? qty, double? discount}) =>
+  CartItem copyWith({int? qty, double? discount, bool? isApproved}) =>
       CartItem(productId: productId, name: name, unitPrice: unitPrice,
-          unit: unit, type: type, qty: qty ?? this.qty, discount: discount ?? this.discount);
+          unit: unit, type: type, qty: qty ?? this.qty, discount: discount ?? this.discount,
+          isApproved: isApproved ?? this.isApproved);
 }
 
 /// Detail item transaksi (untuk riwayat)

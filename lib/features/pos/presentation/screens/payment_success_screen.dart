@@ -27,6 +27,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
                   type: e.type.toString().contains('service')
                       ? 'service'
                       : 'product',
+                  isApproved: e.isApproved,
                 ))
             .toList() ??
         [];
