@@ -26,7 +26,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(QueryExecutor e) : super(e);
 
   @override
-  int get schemaVersion => 8;
+  int get schemaVersion => 9;
 
   @override
   MigrationStrategy get migration {
@@ -122,6 +122,9 @@ class AppDatabase extends _$AppDatabase {
           await m.createTable(serviceCategories);
           await m.addColumn(services, services.categoryId);
         }
+        if (from < 9) {
+          await m.addColumn(transactionItems, transactionItems.workerName);
+        }
       },
       beforeOpen: (details) async {
         // Optional: Logika tambahan sebelum database dibuka
@@ -146,6 +149,10 @@ class AppDatabase extends _$AppDatabase {
       (select(users)..where((u) => u.id.equals(id))).getSingleOrNull();
   Future<List<User>> getUsersByRole(String role) =>
       (select(users)..where((u) => u.role.equals(role))).get();
+  Future<List<User>> getStaffUsers() =>
+      (select(users)..where((u) => u.role.equals('cashier') | u.role.equals('mechanic'))).get();
+  Future<List<User>> getMechanicUsers() =>
+      (select(users)..where((u) => u.role.equals('mechanic'))).get();
   Future<String> insertUser(UsersCompanion user) =>
       into(users).insert(user).then((_) => user.id.value);
   Future<bool> updateUser(UsersCompanion user) =>
@@ -591,7 +598,7 @@ class AppDatabase extends _$AppDatabase {
     DateTime end,
   ) async {
     final rows = await customSelect(
-      '''SELECT ti.id, ti.item_type, ti.qty, ti.unit_price, ti.subtotal, ti.discount,
+      '''SELECT ti.id, ti.item_type, ti.qty, ti.unit_price, ti.subtotal, ti.discount, ti.worker_name,
          CASE WHEN ti.item_type = 'product' THEN p.cost_price ELSE 0 END as cost_price,
          CASE WHEN ti.item_type = 'product' THEN p.name ELSE s.name END as item_name,
          t.invoice_no, t.created_at, t.customer_name
@@ -613,6 +620,7 @@ class AppDatabase extends _$AppDatabase {
             'unitPrice': r.read<double>('unit_price'),
             'subtotal': r.read<double>('subtotal'),
             'discount': r.read<double>('discount'),
+            'workerName': r.readNullable<String>('worker_name') ?? '-',
             'costPrice': r.read<double>('cost_price'),
             'itemName': r.readNullable<String>('item_name') ?? '-',
             'invoiceNo': r.read<String>('invoice_no'),
@@ -651,6 +659,18 @@ class AppDatabase extends _$AppDatabase {
       innerJoin(transactions, transactions.id.equalsExp(transactionItems.transactionId)),
       leftOuterJoin(services, services.id.equalsExp(transactionItems.serviceId)),
     ])..where(transactionItems.itemType.equals('service') & transactionItems.isApproved.equals(false)))
+        .get();
+  }
+
+  /// Get all approved service approvals for history (limited to 50 latest)
+  Future<List<TypedResult>> getApprovedServiceApprovals() {
+    return (select(transactionItems).join([
+      innerJoin(transactions, transactions.id.equalsExp(transactionItems.transactionId)),
+      leftOuterJoin(services, services.id.equalsExp(transactionItems.serviceId)),
+    ])
+      ..where(transactionItems.itemType.equals('service') & transactionItems.isApproved.equals(true))
+      ..orderBy([OrderingTerm.desc(transactions.createdAt)])
+      ..limit(50))
         .get();
   }
 

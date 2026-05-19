@@ -28,12 +28,31 @@ class PaymentSuccessScreen extends ConsumerWidget {
                       ? 'service'
                       : 'product',
                   isApproved: e.isApproved,
+                  workerName: e.workerName,
                 ))
             .toList() ??
         [];
 
-    return Scaffold(
-      backgroundColor: Colors.white,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/pos');
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        automaticallyImplyLeading: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.close_rounded, color: AppColors.textPrimary, size: 28),
+            onPressed: () => context.go('/pos'),
+            padding: const EdgeInsets.only(right: 16),
+          ),
+        ],
+      ),
       body: SafeArea(
         child: Column(
           children: [
@@ -135,39 +154,13 @@ class PaymentSuccessScreen extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(height: 12),
-                  SizedBox(
-                    width: double.infinity,
-                    height: 56,
-                    child: OutlinedButton.icon(
-                      onPressed: () => context.go('/dashboard'),
-                      icon: const Icon(Icons.home_rounded),
-                      label: const Text(
-                        'Kembali ke Beranda',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
-                        ),
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        side: const BorderSide(
-                          color: AppColors.primary,
-                          width: 1.5,
-                        ),
-                        foregroundColor: AppColors.primary,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
               ),
             ),
           ],
         ),
       ),
-    );
+    ));
   }
 
   Future<void> _printReceipt(

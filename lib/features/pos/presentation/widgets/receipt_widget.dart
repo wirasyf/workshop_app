@@ -167,7 +167,18 @@ class ReceiptWidget extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black)),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: Text(item.name, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Colors.black))),
+              if (item.workerName != null && item.workerName!.isNotEmpty && !item.name.contains('(${item.workerName})'))
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  decoration: BoxDecoration(color: Colors.black12, borderRadius: BorderRadius.circular(4)),
+                  child: Text(item.workerName!, style: const TextStyle(fontSize: 10, color: Colors.black87, fontWeight: FontWeight.bold)),
+                ),
+            ],
+          ),
           const SizedBox(height: 2),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -216,6 +227,7 @@ class ReceiptItem {
   final double subtotal;
   final String type; // 'product' atau 'service'
   final bool isApproved;
+  final String? workerName;
 
   ReceiptItem({
     required this.name,
@@ -224,6 +236,7 @@ class ReceiptItem {
     required this.subtotal,
     this.type = 'product',
     this.isApproved = true,
+    this.workerName,
   });
 }
 

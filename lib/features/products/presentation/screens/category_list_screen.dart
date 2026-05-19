@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
@@ -14,11 +15,23 @@ class CategoryListScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final categoriesAsync = ref.watch(categoriesProvider);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = from == 'dashboard' ? '/products?from=dashboard' : '/products';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kelola Kategori'),
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Kelola Kategori'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go(target),
+          ),
+        ),
       body: categoriesAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -51,7 +64,7 @@ class CategoryListScreen extends ConsumerWidget {
         icon: const Icon(Icons.add_rounded),
         label: const Text('Kategori Baru'),
       ),
-    );
+    ));
   }
 
   void _showCategoryDialog(BuildContext context, WidgetRef ref, {Category? category}) {

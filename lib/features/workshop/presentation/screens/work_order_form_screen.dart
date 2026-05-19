@@ -147,11 +147,17 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Work Order Baru'),
-        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/workshop')),
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/workshop');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Work Order Baru'),
+          leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/workshop')),
+        ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -209,6 +215,6 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 }

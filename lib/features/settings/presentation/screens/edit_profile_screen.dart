@@ -153,8 +153,20 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Edit Profil')),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/settings');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Edit Profil'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go('/settings'),
+          ),
+        ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -231,6 +243,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 }

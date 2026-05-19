@@ -15,6 +15,7 @@ import '../../../reports/presentation/screens/report_screen.dart';
 import '../../../dashboard/presentation/screens/notification_screen.dart';
 import '../../../../core/services/notification_service.dart';
 import 'package:uuid/uuid.dart';
+import '../../../dashboard/presentation/screens/staff_list_screen.dart';
 import '../providers/cart_provider.dart';
 
 /// Layar keranjang & pembayaran
@@ -36,9 +37,16 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final cart = ref.read(cartProvider);
     if (cart.isEmpty) return;
 
+    final hasServices = cart.any((i) => i.type == CartItemType.service);
+    final selectedWorker = ref.read(cartSelectedWorkerProvider);
+    if (hasServices && selectedWorker == null) {
+      AppToast.show(context, 'Pilih mekanik / pekerja untuk jasa', type: ToastType.error);
+      return;
+    }
+
     final total = ref.read(cartTotalProvider);
     final method = ref.read(paymentMethodProvider);
-    final paid = double.tryParse(_paidCtrl.text.replaceAll('.', '')) ?? 0;
+    final paid = CurrencyFormatter.parse(_paidCtrl.text);
 
     if (method == 'cash' && paid < total) {
       AppToast.show(context, 'Jumlah bayar kurang', type: ToastType.error);
@@ -98,6 +106,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           final isService = item.type == CartItemType.service;
           // Jasa perlu approval jika yang input adalah kasir
           final isApproved = !isService || (user?.role == 'owner');
+          final workerName = isService ? selectedWorker : null;
 
           final itemCompanion = TransactionItemsCompanion.insert(
             id: itemId,
@@ -110,6 +119,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             discount: Value(item.discount),
             subtotal: item.subtotal,
             isApproved: Value(isApproved),
+            workerName: Value(workerName),
           );
           await db.insertTransactionItem(itemCompanion);
 
@@ -129,6 +139,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               'discount': item.discount,
               'subtotal': item.subtotal,
               'is_approved': isApproved,
+              'worker_name': workerName,
             },
           );
 
@@ -169,17 +180,32 @@ class _CartScreenState extends ConsumerState<CartScreen> {
             hasLowStock = true;
             lowStockNames.add(p.name);
             final isZero = p.stockQty == 0;
+            final title = isZero ? 'Stok Habis: ${p.name}' : 'Stok Menipis: ${p.name}';
+            final body = isZero 
+                ? 'Stok produk ${p.name} sudah habis. Segera lakukan restok.'
+                : 'Sisa stok ${p.name} tinggal ${p.stockQty} ${p.unit}.';
             notifService.showStockWarning(
               id: p.id.hashCode,
-              title: isZero ? 'Stok Habis: ${p.name}' : 'Stok Menipis: ${p.name}',
-              body: isZero 
-                  ? 'Stok produk ${p.name} sudah habis. Segera lakukan restok.'
-                  : 'Sisa stok ${p.name} tinggal ${p.stockQty} ${p.unit}.',
+              title: title,
+              body: body,
               isCritical: isZero,
             );
+            await db.insertNotification(NotificationsCompanion.insert(
+              title: title,
+              message: body,
+              type: isZero ? 'stock_critical' : 'stock_low',
+              createdAt: Value(DateTime.now()),
+            ));
           }
         }
       }
+
+      await db.insertNotification(NotificationsCompanion.insert(
+        title: 'Transaksi Sukses',
+        message: 'Invoice $invoiceNo senilai ${CurrencyFormatter.format(total)} berhasil diproses.',
+        type: 'transaction',
+        createdAt: Value(DateTime.now()),
+      ));
 
       // Invalidate providers to refresh data
       ref.invalidate(productsProvider);
@@ -191,15 +217,17 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       final processedItems = cart.map((item) {
         final isService = item.type == CartItemType.service;
         final isApproved = !isService || (user?.role == 'owner');
-        return item.copyWith(isApproved: isApproved);
+        return item.copyWith(isApproved: isApproved, workerName: isService ? selectedWorker : null);
       }).toList();
+
+      ref.read(cartProvider.notifier).clear();
+      ref.read(cartSelectedWorkerProvider.notifier).state = null;
 
       if (mounted) {
         if (hasLowStock) {
           AppToast.show(context, 'Peringatan: Stok menipis untuk ${lowStockNames.join(', ')}', type: ToastType.warning, duration: const Duration(seconds: 4));
         }
-        
-        context.go('/pos/success', extra: {
+        context.go('/payment-success', extra: {
           'invoiceNo': invoiceNo,
           'items': processedItems,
           'total': total,
@@ -230,18 +258,45 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     final hasServices = cart.any((i) => i.type == CartItemType.service);
     final hasParts = cart.any((i) => i.type == CartItemType.product);
+    final staffAsync = ref.watch(staffProvider);
+    final selectedWorker = ref.watch(cartSelectedWorkerProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Keranjang'),
-        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/pos')),
-        actions: [
-          if (cart.isNotEmpty)
-            IconButton(icon: const Icon(Icons.delete_rounded), onPressed: () => ref.read(cartProvider.notifier).clear()),
-        ],
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/pos');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Keranjang'),
+          leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/pos')),
+          actions: [
+            if (cart.isNotEmpty)
+              IconButton(icon: const Icon(Icons.delete_rounded), onPressed: () => ref.read(cartProvider.notifier).clear()),
+          ],
+        ),
       body: cart.isEmpty
-          ? const Center(child: Text('Keranjang kosong'))
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.shopping_cart_outlined, size: 64, color: AppColors.textHint),
+                  const SizedBox(height: 16),
+                  const Text('Keranjang masih kosong', style: TextStyle(fontSize: 16, color: AppColors.textSecondary)),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () => context.go('/pos'),
+                    icon: const Icon(Icons.add_shopping_cart_rounded),
+                    label: const Text('Mulai Belanja'),
+                    style: ElevatedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ],
+              ),
+            )
           : Column(
               children: [
                 Expanded(
@@ -276,12 +331,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           ),
                           // Qty controls
                           Row(children: [
-                            _qtyButton(Icons.remove_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty - 1, item.type)),
+                            _qtyButton(Icons.remove_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty - 1, item.type, item.workerName)),
                             Padding(
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: Text('${item.qty}', style: theme.textTheme.titleSmall),
                             ),
-                            _qtyButton(Icons.add_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1, item.type)),
+                            _qtyButton(Icons.add_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1, item.type, item.workerName)),
                           ]),
                           const SizedBox(width: 12),
                           SizedBox(
@@ -303,6 +358,22 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
                   ),
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
+                    // Tombol tambah pesanan lainnya
+                    SizedBox(
+                      width: double.infinity,
+                      height: 46,
+                      child: OutlinedButton.icon(
+                        onPressed: () => context.go('/pos'),
+                        icon: const Icon(Icons.add_shopping_cart_rounded, size: 20),
+                        label: const Text('Tambah Pesanan Lainnya', style: TextStyle(fontWeight: FontWeight.w600)),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                          side: const BorderSide(color: AppColors.primary, width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 16),
                     if (hasServices && hasParts) ...[
                       _summaryRow('Subtotal Jasa', CurrencyFormatter.format(serviceSubtotal), color: AppColors.info),
                       _summaryRow('Subtotal Sparepart', CurrencyFormatter.format(partsSubtotal)),
@@ -327,6 +398,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       TextField(
                         controller: _paidCtrl,
                         keyboardType: TextInputType.number,
+                        inputFormatters: [RupiahInputFormatter()],
                         decoration: InputDecoration(
                           labelText: 'Jumlah Bayar',
                           prefixText: 'Rp ',
@@ -338,6 +410,46 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                       ),
                       const SizedBox(height: 12),
                     ],
+
+                    // Pilihan mekanik jika ada jasa
+                    if (hasServices) ...[
+                      const SizedBox(height: 4),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text('Pilih Mekanik / Pekerja *', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: AppColors.textSecondary)),
+                          const SizedBox(height: 6),
+                          staffAsync.when(
+                            loading: () => const LinearProgressIndicator(),
+                            error: (e, _) => Text('Error: $e'),
+                            data: (staff) {
+                              if (staff.isEmpty) {
+                                return const Text('Belum ada data mekanik. Tambahkan di menu Kelola Karyawan.', style: TextStyle(color: AppColors.error, fontSize: 12));
+                              }
+                              return DropdownButtonFormField<String>(
+                                value: selectedWorker,
+                                decoration: const InputDecoration(
+                                  prefixIcon: Icon(Icons.build_rounded, size: 18, color: AppColors.info),
+                                  hintText: 'Pilih Mekanik / Pekerja',
+                                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                ),
+                                items: staff.map((u) {
+                                  return DropdownMenuItem(
+                                    value: u.name,
+                                    child: Text('${u.name} (${u.role == 'mechanic' ? 'Mekanik' : 'Kasir'})', style: const TextStyle(fontSize: 14)),
+                                  );
+                                }).toList(),
+                                onChanged: (val) {
+                                  ref.read(cartSelectedWorkerProvider.notifier).state = val;
+                                },
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                    ],
+
                     const SizedBox(height: 16),
                     SizedBox(
                       width: double.infinity, height: 52,
@@ -352,7 +464,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                 ),
               ],
             ),
-    );
+    ));
   }
 
   Widget _qtyButton(IconData icon, VoidCallback onTap) => GestureDetector(
@@ -373,7 +485,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
   );
 
   void _showDiscountDialog(BuildContext context, WidgetRef ref) {
-    final ctrl = TextEditingController(text: ref.read(cartDiscountProvider).toStringAsFixed(0));
+    final currentVal = ref.read(cartDiscountProvider);
+    final ctrl = TextEditingController(text: currentVal > 0 ? CurrencyFormatter.formatNumber(currentVal) : '');
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -381,6 +494,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         content: TextField(
           controller: ctrl,
           keyboardType: TextInputType.number,
+          inputFormatters: [RupiahInputFormatter()],
           decoration: const InputDecoration(labelText: 'Jumlah Diskon', prefixText: 'Rp '),
           autofocus: true,
         ),
@@ -388,7 +502,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
           ElevatedButton(
             onPressed: () {
-              final d = double.tryParse(ctrl.text) ?? 0;
+              final d = CurrencyFormatter.parse(ctrl.text);
               ref.read(cartDiscountProvider.notifier).state = d;
               Navigator.pop(context);
             },

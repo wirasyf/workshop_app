@@ -22,7 +22,6 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/store_profile_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
-import '../../features/settings/presentation/screens/receipt_template_screen.dart';
 import '../../features/settings/presentation/screens/bluetooth_printer_screen.dart';
 import '../../features/services/presentation/screens/service_list_screen.dart';
 import '../../features/services/presentation/screens/service_form_screen.dart';
@@ -53,6 +52,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isLoggedIn && (isLogin || isSignup || isSplash)) {
         return '/dashboard';
       }
+
+      final user = authState.value;
+      if (user != null && user.role == 'cashier') {
+        final loc = state.matchedLocation;
+        if (loc.startsWith('/products') ||
+            loc.startsWith('/workshop') ||
+            loc.startsWith('/staff') ||
+            loc.startsWith('/service-approval')) {
+          return '/dashboard';
+        }
+      }
       
       return null;
     },
@@ -60,6 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
+      GoRoute(path: '/payment-success', builder: (_, state) => PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?)),
 
       // Shell route dengan bottom navigation
       ShellRoute(
@@ -71,7 +82,6 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const PosProductScreen(),
             routes: [
               GoRoute(path: 'cart', builder: (_, __) => const CartScreen()),
-              GoRoute(path: 'success', builder: (_, state) => PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?)),
             ],
           ),
 
@@ -130,7 +140,6 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(path: 'store-profile', builder: (_, __) => const StoreProfileScreen()),
               GoRoute(path: 'edit-profile', builder: (_, __) => const EditProfileScreen()),
               GoRoute(path: 'change-password', builder: (_, __) => const ChangePasswordScreen()),
-              GoRoute(path: 'receipt-template', builder: (_, __) => const ReceiptTemplateScreen()),
               GoRoute(path: 'bluetooth-printer', builder: (_, __) => const BluetoothPrinterScreen()),
             ],
           ),

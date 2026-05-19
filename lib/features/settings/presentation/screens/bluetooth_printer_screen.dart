@@ -137,21 +137,27 @@ class _BluetoothPrinterScreenState
     final printerState = ref.watch(printerStateProvider);
     final theme = Theme.of(context);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Printer Bluetooth'),
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left_rounded),
-          onPressed: () => context.go('/settings'),
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            tooltip: 'Scan ulang',
-            onPressed: _isScanning ? null : _scanDevices,
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/settings');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Printer Bluetooth'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go('/settings'),
           ),
-        ],
-      ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh_rounded),
+              tooltip: 'Scan ulang',
+              onPressed: _isScanning ? null : _scanDevices,
+            ),
+          ],
+        ),
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
@@ -430,6 +436,6 @@ class _BluetoothPrinterScreenState
             }),
         ],
       ),
-    );
+    ));
   }
 }

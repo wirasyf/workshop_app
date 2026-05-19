@@ -317,10 +317,16 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         final statusColor = _getStatusColor(wo.status);
         final canEdit = wo.status == 'waiting' || wo.status == 'in_progress';
 
-        return Scaffold(
-          appBar: AppBar(
-            title: Text(wo.orderNo),
-            leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/workshop')),
+        return PopScope(
+          canPop: false,
+          onPopInvokedWithResult: (didPop, _) {
+            if (didPop) return;
+            context.go('/workshop');
+          },
+          child: Scaffold(
+            appBar: AppBar(
+              title: Text(wo.orderNo),
+              leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/workshop')),
             actions: [
               IconButton(
                 icon: const Icon(Icons.print_rounded),
@@ -464,7 +470,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
               const SizedBox(height: 32),
             ],
           ),
-        );
+        ));
       },
     );
   }

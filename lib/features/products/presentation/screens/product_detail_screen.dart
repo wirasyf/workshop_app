@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
+import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
+import '../../../../shared/utils/app_toast.dart';
 import '../providers/product_provider.dart';
 import '../widgets/stock_badge.dart';
 
@@ -13,17 +15,82 @@ class ProductDetailScreen extends ConsumerWidget {
   final String productId;
   const ProductDetailScreen({super.key, required this.productId});
 
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref, dynamic product, String? from) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Hapus Produk / Stok'),
+        content: Text('Apakah Anda yakin ingin menghapus "${product.name}" beserta data stoknya? Tindakan ini tidak dapat dibatalkan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            child: const Text('Hapus'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true || !context.mounted) return;
+
+    final db = ref.read(databaseProvider);
+    final syncService = ref.read(syncServiceProvider);
+
+    try {
+      await db.deleteProduct(product.id);
+      await syncService.enqueue(
+        tableName: 'products',
+        recordId: product.id,
+        operation: 'delete',
+        data: {'id': product.id},
+      );
+
+      ref.invalidate(productsProvider);
+      ref.invalidate(lowStockProvider);
+
+      if (context.mounted) {
+        AppToast.show(context, '${product.name} berhasil dihapus', type: ToastType.success);
+        context.go(from == 'dashboard' ? '/products?from=dashboard' : '/products');
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(context, 'Gagal menghapus produk: $e', type: ToastType.error);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final productAsync = ref.watch(productDetailProvider(productId));
     final theme = Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Detail Produk'),
-        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/products')),
-        actions: [
-          IconButton(icon: const Icon(Icons.edit_rounded), onPressed: () => context.go('/products/$productId/edit')),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(from == 'dashboard' ? '/products?from=dashboard' : '/products');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Detail Produk'),
+          leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go(from == 'dashboard' ? '/products?from=dashboard' : '/products')),
+          actions: [
+          IconButton(icon: const Icon(Icons.edit_rounded), onPressed: () => context.go('/products/$productId/edit${from == 'dashboard' ? '?from=dashboard' : ''}')),
+          productAsync.maybeWhen(
+            data: (product) => product != null
+                ? IconButton(
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                    onPressed: () => _confirmDelete(context, ref, product, from),
+                    tooltip: 'Hapus Produk',
+                  )
+                : const SizedBox(),
+            orElse: () => const SizedBox(),
+          ),
         ],
       ),
       body: productAsync.when(
@@ -111,7 +178,7 @@ class ProductDetailScreen extends ConsumerWidget {
                   children: [
                     Expanded(
                       child: OutlinedButton.icon(
-                        onPressed: () => context.go('/products/$productId/adjust'),
+                        onPressed: () => context.go('/products/$productId/adjust${from == 'dashboard' ? '?from=dashboard' : ''}'),
                         icon: const Icon(Icons.tune_rounded, size: 18),
                         label: const Text('Sesuaikan Stok'),
                       ),
@@ -119,19 +186,35 @@ class ProductDetailScreen extends ConsumerWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: ElevatedButton.icon(
-                        onPressed: () => context.go('/products/$productId/edit'),
+                        onPressed: () => context.go('/products/$productId/edit${from == 'dashboard' ? '?from=dashboard' : ''}'),
                         icon: const Icon(Icons.edit_rounded, size: 18),
                         label: const Text('Edit Produk'),
                       ),
                     ),
                   ],
                 ),
+                const SizedBox(height: 12),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () => _confirmDelete(context, ref, product, from),
+                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
+                    label: const Text('Hapus Produk & Stok', style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w600)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        side: BorderSide(color: AppColors.error.withOpacity(0.3)),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
           );
         },
       ),
-    );
+    ));
   }
 
   Widget _buildInfoSection(ThemeData theme, String title, List<Widget> children) {

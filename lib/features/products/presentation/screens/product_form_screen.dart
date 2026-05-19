@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -12,6 +13,7 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/services/file_storage_service.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/services/supabase_service.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/utils/app_toast.dart';
 import 'package:uuid/uuid.dart';
 import '../providers/product_provider.dart';
@@ -59,10 +61,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
       _barcodeCtrl.text = product.barcode ?? '';
       _brandCtrl.text = product.brand ?? '';
       _motorTypeCtrl.text = product.motorType ?? '';
-      _costPriceCtrl.text = product.costPrice.toStringAsFixed(0);
-      _sellPriceCtrl.text = product.sellPrice.toStringAsFixed(0);
-      _wholesalePriceCtrl.text =
-          product.sellPriceWholesale?.toStringAsFixed(0) ?? '';
+      _costPriceCtrl.text = CurrencyFormatter.formatNumber(product.costPrice);
+      _sellPriceCtrl.text = CurrencyFormatter.formatNumber(product.sellPrice);
+      _wholesalePriceCtrl.text = product.sellPriceWholesale != null 
+          ? CurrencyFormatter.formatNumber(product.sellPriceWholesale!) 
+          : '';
       _stockQtyCtrl.text = product.stockQty.toString();
       _stockMinCtrl.text = product.stockMin.toString();
       _unitCtrl.text = product.unit;
@@ -180,12 +183,12 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         motorType: Value.absentIfNull(
           _motorTypeCtrl.text.trim().isEmpty ? null : _motorTypeCtrl.text.trim(),
         ),
-        costPrice: Value(double.tryParse(_costPriceCtrl.text) ?? 0),
-        sellPrice: Value(double.tryParse(_sellPriceCtrl.text) ?? 0),
+        costPrice: Value(CurrencyFormatter.parse(_costPriceCtrl.text)),
+        sellPrice: Value(CurrencyFormatter.parse(_sellPriceCtrl.text)),
         sellPriceWholesale: Value.absentIfNull(
           _wholesalePriceCtrl.text.isEmpty
               ? null
-              : double.tryParse(_wholesalePriceCtrl.text),
+              : CurrencyFormatter.parse(_wholesalePriceCtrl.text),
         ),
         stockQty: Value(int.tryParse(_stockQtyCtrl.text) ?? 0),
         stockMin: Value(int.tryParse(_stockMinCtrl.text) ?? 5),
@@ -214,9 +217,9 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           'category_id': _selectedCategoryId,
           'brand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
           'motor_type': _motorTypeCtrl.text.trim().isEmpty ? null : _motorTypeCtrl.text.trim(),
-          'cost_price': double.tryParse(_costPriceCtrl.text) ?? 0,
-          'sell_price': double.tryParse(_sellPriceCtrl.text) ?? 0,
-          'sell_price_wholesale': _wholesalePriceCtrl.text.isEmpty ? null : double.tryParse(_wholesalePriceCtrl.text),
+          'cost_price': CurrencyFormatter.parse(_costPriceCtrl.text),
+          'sell_price': CurrencyFormatter.parse(_sellPriceCtrl.text),
+          'sell_price_wholesale': _wholesalePriceCtrl.text.isEmpty ? null : CurrencyFormatter.parse(_wholesalePriceCtrl.text),
           'stock_qty': int.tryParse(_stockQtyCtrl.text) ?? 0,
           'stock_min': int.tryParse(_stockMinCtrl.text) ?? 5,
           'unit': _unitCtrl.text.trim(),
@@ -236,7 +239,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           _isEditing ? 'Produk diperbarui' : 'Produk ditambahkan',
           type: ToastType.success
         );
-        context.go('/products');
+        final from = GoRouterState.of(context).uri.queryParameters['from'];
+        context.go(widget.productId != null ? '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}' : '/products${from == 'dashboard' ? '?from=dashboard' : ''}');
       }
     } catch (e) {
       if (mounted) {
@@ -252,15 +256,23 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   @override
   Widget build(BuildContext context) {
     final categories = ref.watch(categoriesProvider);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = widget.productId != null ? '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}' : '/products${from == 'dashboard' ? '?from=dashboard' : ''}';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(_isEditing ? 'Edit Produk' : 'Tambah Produk'),
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left_rounded),
-          onPressed: () => context.go('/products'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(_isEditing ? 'Edit Produk' : 'Tambah Produk'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go(target),
+          ),
         ),
-      ),
       body: Form(
         key: _formKey,
         child: ListView(
@@ -383,6 +395,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     _costPriceCtrl,
                     'Harga Beli *',
                     keyboard: TextInputType.number,
+                    prefix: 'Rp ',
+                    formatters: [RupiahInputFormatter()],
                     validator: (v) => v!.isEmpty ? 'Wajib' : null,
                   ),
                 ),
@@ -392,6 +406,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     _sellPriceCtrl,
                     'Harga Jual *',
                     keyboard: TextInputType.number,
+                    prefix: 'Rp ',
+                    formatters: [RupiahInputFormatter()],
                     validator: (v) => v!.isEmpty ? 'Wajib' : null,
                   ),
                 ),
@@ -401,6 +417,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
               _wholesalePriceCtrl,
               'Harga Grosir (opsional)',
               keyboard: TextInputType.number,
+              prefix: 'Rp ',
+              formatters: [RupiahInputFormatter()],
             ),
 
             const SizedBox(height: 8),
@@ -447,7 +465,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 
   Widget _sectionTitle(String title) => Padding(
@@ -466,6 +484,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     TextInputType keyboard = TextInputType.text,
     String? Function(String?)? validator,
     Widget? suffix,
+    String? prefix,
+    List<TextInputFormatter>? formatters,
   }) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -473,7 +493,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         controller: ctrl,
         keyboardType: keyboard,
         validator: validator,
-        decoration: InputDecoration(labelText: label, suffixIcon: suffix),
+        inputFormatters: formatters,
+        decoration: InputDecoration(labelText: label, suffixIcon: suffix, prefixText: prefix),
       ),
     );
   }

@@ -15,6 +15,7 @@ import '../../../services/presentation/providers/service_provider.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/barcode_scanner_dialog.dart';
 
+
 /// Provider untuk toggle mode POS: sparepart atau jasa
 final posTabProvider = StateProvider<int>((ref) => 0); // 0 = sparepart, 1 = jasa
 
@@ -204,12 +205,12 @@ class _ServiceGrid extends ConsumerWidget {
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (items) {
         if (items.isEmpty) {
-          return const EmptyStateWidget(icon: Icons.build_circle_rounded, title: 'Tidak ada jasa');
+          return const EmptyStateWidget(icon: Icons.build_rounded, title: 'Tidak ada jasa');
         }
         return GridView.builder(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.1,
+            crossAxisCount: 2, mainAxisSpacing: 10, crossAxisSpacing: 10, childAspectRatio: 1.05,
           ),
           itemCount: items.length,
           itemBuilder: (_, i) => _PosServiceCard(service: items[i]),
@@ -341,8 +342,8 @@ class _PosServiceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final cart = ref.watch(cartProvider);
-    final cartItem = cart.where((i) => i.productId == service.id && i.type == CartItemType.service).firstOrNull;
-    final inCartQty = cartItem?.qty ?? 0;
+    final inCartItems = cart.where((i) => i.productId == service.id && i.type == CartItemType.service).toList();
+    final totalInCartQty = inCartItems.fold<int>(0, (sum, i) => sum + i.qty);
 
     return GestureDetector(
       onTap: () {
@@ -355,7 +356,7 @@ class _PosServiceCard extends ConsumerWidget {
           type: CartItemType.service,
         );
         notifier.toggleItem(item);
-        AppToast.show(context, inCartQty > 0 ? '${service.name} dihapus' : '${service.name} ditambah', type: ToastType.success, duration: const Duration(milliseconds: 1000));
+        AppToast.show(context, totalInCartQty > 0 ? '${service.name} dihapus dari keranjang' : '${service.name} ditambah ke keranjang', type: ToastType.success);
         HapticFeedback.lightImpact();
       },
       child: AnimatedContainer(
@@ -365,24 +366,25 @@ class _PosServiceCard extends ConsumerWidget {
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: inCartQty > 0 ? AppColors.info : AppColors.border,
-            width: inCartQty > 0 ? 1.5 : 1,
+            color: totalInCartQty > 0 ? AppColors.info : AppColors.border,
+            width: totalInCartQty > 0 ? 1.5 : 1,
           ),
-          boxShadow: inCartQty > 0 ? [BoxShadow(color: AppColors.info.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))] : null,
+          boxShadow: totalInCartQty > 0 ? [BoxShadow(color: AppColors.info.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))] : null,
         ),
         child: Stack(
           children: [
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Container(
-                  padding: const EdgeInsets.all(8),
-                  decoration: BoxDecoration(
-                    color: AppColors.info.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+                Expanded(
+                  child: Container(
+                    width: double.infinity,
+                    decoration: BoxDecoration(
+                      color: AppColors.info.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Icon(Icons.build_rounded, size: 36, color: AppColors.info),
                   ),
-                  child: const Icon(Icons.build_rounded, size: 24, color: AppColors.info),
                 ),
                 const SizedBox(height: 8),
                 Text(service.name, style: theme.textTheme.titleSmall, maxLines: 2, overflow: TextOverflow.ellipsis),
@@ -394,13 +396,13 @@ class _PosServiceCard extends ConsumerWidget {
                     style: theme.textTheme.labelSmall?.copyWith(color: AppColors.textSecondary)),
               ],
             ),
-            if (inCartQty > 0)
+            if (totalInCartQty > 0)
               Positioned(
                 top: 0, right: 0,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(color: AppColors.info, borderRadius: BorderRadius.circular(10)),
-                  child: Text('$inCartQty', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                  child: Text('$totalInCartQty', style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                 ),
               ),
           ],

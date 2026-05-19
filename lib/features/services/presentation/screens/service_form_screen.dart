@@ -140,7 +140,8 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
 
       if (mounted) {
         AppToast.show(context, isEditing ? 'Jasa berhasil diperbarui' : 'Jasa berhasil ditambahkan', type: ToastType.success);
-        context.pop();
+        final from = GoRouterState.of(context).uri.queryParameters['from'];
+        context.go('/services${from == 'dashboard' ? '?from=dashboard' : ''}');
       }
     } catch (e) {
       if (mounted) {
@@ -185,17 +186,30 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
 
     if (mounted) {
       AppToast.show(context, 'Jasa dihapus', type: ToastType.success);
-      context.pop();
+      final from = GoRouterState.of(context).uri.queryParameters['from'];
+      context.go('/services${from == 'dashboard' ? '?from=dashboard' : ''}');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = '/services${from == 'dashboard' ? '?from=dashboard' : ''}';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(isEditing ? 'Edit Jasa' : 'Tambah Jasa'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: Text(isEditing ? 'Edit Jasa' : 'Tambah Jasa'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go(target),
+          ),
         actions: [
           if (isEditing)
             IconButton(
@@ -331,6 +345,6 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
           ],
         ),
       ),
-    );
+    ));
   }
 }

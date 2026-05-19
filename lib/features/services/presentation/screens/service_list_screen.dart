@@ -15,18 +15,19 @@ class ServiceListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final servicesAsync = ref.watch(filteredServicesProvider);
     Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manajemen Jasa'),
         leading: IconButton(
           icon: const Icon(Icons.chevron_left_rounded),
-          onPressed: () => context.go('/settings'),
+          onPressed: () => context.go(from == 'dashboard' ? '/dashboard' : '/settings'),
         ),
         actions: [
           IconButton(
             icon: const Icon(Icons.category_rounded),
-            onPressed: () => context.go('/services/categories'),
+            onPressed: () => context.go('/services/categories${from == 'dashboard' ? '?from=dashboard' : ''}'),
             tooltip: 'Kelola Kategori',
           ),
         ],
@@ -57,7 +58,7 @@ class ServiceListScreen extends ConsumerWidget {
               data: (items) {
                 if (items.isEmpty) {
                   return const EmptyStateWidget(
-                    icon: Icons.build_circle_rounded,
+                    icon: Icons.build_rounded,
                     title: 'Belum ada jasa',
                     subtitle: 'Tambahkan jasa bengkel pertama Anda',
                   );
@@ -74,7 +75,7 @@ class ServiceListScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/services/add'),
+        onPressed: () => context.go('/services/add${from == 'dashboard' ? '?from=dashboard' : ''}'),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Tambah Jasa'),
         backgroundColor: AppColors.primary,
@@ -91,9 +92,13 @@ class _ServiceCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final isActive = service.isActive;
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+
+    final cats = ref.watch(serviceCategoriesProvider).value ?? [];
+    final cat = cats.where((c) => c.id == service.categoryId).firstOrNull;
 
     return InkWell(
-      onTap: () => context.go('/services/${service.id}/edit'),
+      onTap: () => context.go('/services/${service.id}/edit${from == 'dashboard' ? '?from=dashboard' : ''}'),
       borderRadius: BorderRadius.circular(14),
       child: Container(
         padding: const EdgeInsets.all(14),
@@ -113,7 +118,7 @@ class _ServiceCard extends ConsumerWidget {
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
-                _getCategoryIcon(service.category),
+                _getCategoryIcon(cat?.slug),
                 color: AppColors.info,
                 size: 22,
               ),
@@ -150,24 +155,20 @@ class _ServiceCard extends ConsumerWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(6),
+                      if (cat != null) ...[
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.primary.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            cat.name,
+                            style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
+                          ),
                         ),
-                        child: Consumer(
-                          builder: (context, ref, _) {
-                            final cats = ref.watch(serviceCategoriesProvider).value ?? [];
-                            final cat = cats.where((c) => c.id == service.categoryId).firstOrNull;
-                            return Text(
-                              cat?.name ?? service.category,
-                              style: const TextStyle(fontSize: 10, color: AppColors.primary, fontWeight: FontWeight.w600),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(width: 8),
+                        const SizedBox(width: 8),
+                      ],
                       Icon(Icons.timer_outlined, size: 12, color: AppColors.textSecondary),
                       const SizedBox(width: 2),
                       Text(
@@ -195,13 +196,21 @@ class _ServiceCard extends ConsumerWidget {
     );
   }
 
-  IconData _getCategoryIcon(String category) {
-    switch (category) {
-      case 'servis_rutin': return Icons.oil_barrel_rounded;
-      case 'perbaikan': return Icons.build_rounded;
-      case 'tune_up': return Icons.speed_rounded;
-      case 'body': return Icons.color_lens_rounded;
-      default: return Icons.miscellaneous_services_rounded;
+  IconData _getCategoryIcon(String? slug) {
+    if (slug == null) return Icons.build_rounded;
+    switch (slug) {
+      case 'servis-rutin':
+      case 'servis_rutin':
+        return Icons.oil_barrel_rounded;
+      case 'perbaikan':
+        return Icons.build_rounded;
+      case 'tune-up':
+      case 'tune_up':
+        return Icons.speed_rounded;
+      case 'body':
+        return Icons.color_lens_rounded;
+      default:
+        return Icons.build_rounded;
     }
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:spareart_app/core/services/sync_service.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/bluetooth_printer_service.dart';
@@ -93,6 +94,7 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
                 unitPrice: d.item.unitPrice,
                 subtotal: d.item.subtotal,
                 type: d.itemType,
+                workerName: d.item.workerName,
               ))
           .toList();
 
@@ -188,6 +190,7 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
                                               subtotal: d.item.subtotal,
                                               type: d.itemType,
                                               isApproved: d.item.isApproved,
+                                              workerName: d.item.workerName,
                                             ))
                                         .toList(),
                                 total: txn.total,
@@ -265,10 +268,22 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
       end: dateRange.end,
     )));
     final theme = Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = from == 'dashboard' ? '/dashboard' : '/settings';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Riwayat Transaksi'),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Riwayat Transaksi'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go(target),
+          ),
         actions: [
           IconButton(
             icon: const Icon(Icons.date_range_rounded),
@@ -423,7 +438,7 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
           )
         ],
       ),
-    );
+    ));
   }
 }
 

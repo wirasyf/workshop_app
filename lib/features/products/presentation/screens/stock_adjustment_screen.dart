@@ -109,7 +109,8 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
 
       if (mounted) {
         AppToast.show(context, 'Stok ${_isAdd ? "ditambah" : "dikurangi"} $qty', type: ToastType.success);
-        context.go('/products/${widget.productId}');
+        final from = GoRouterState.of(context).uri.queryParameters['from'];
+        context.go('/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}');
       }
     } catch (e) {
       if (mounted) {
@@ -128,12 +129,20 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productDetailProvider(widget.productId));
     final theme = Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sesuaikan Stok'),
-        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/products/${widget.productId}')),
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Sesuaikan Stok'),
+          leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go(target)),
+        ),
       body: productAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
@@ -208,7 +217,7 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
           );
         },
       ),
-    );
+    ));
   }
 
   Widget _toggleButton(String label, bool isAddOption, IconData icon) {

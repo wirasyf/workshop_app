@@ -134,6 +134,7 @@ class TransactionItems extends Table {
   RealColumn get discount => real().withDefault(const Constant(0.0))();
   RealColumn get subtotal => real()();
   BoolColumn get isApproved => boolean().withDefault(const Constant(true))();
+  TextColumn get workerName => text().nullable()();
 
   @override
   Set<Column> get primaryKey => {id};

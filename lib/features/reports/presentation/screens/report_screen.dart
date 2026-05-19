@@ -6,7 +6,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
-import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/excel_export_service.dart';
 import '../../../../shared/widgets/metric_card.dart';
@@ -59,7 +58,6 @@ final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
     'txnCount': await db.getTransactionCount(start, end),
     'topProducts': await db.getTopProducts(start, end, limit: 5),
     'dailySales': await db.getDailySales(chartDays > 30 ? 30 : chartDays),
-    'transactions': await db.getTransactionsByDate(start, end),
     'start': start,
     'end': end,
   };
@@ -78,10 +76,6 @@ class ReportScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Laporan Keuangan'),
-        leading: IconButton(
-          icon: const Icon(Icons.chevron_left_rounded),
-          onPressed: () => context.go('/settings'),
-        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.file_download_rounded),
@@ -135,7 +129,6 @@ class ReportScreen extends ConsumerWidget {
               error: (e, _) => Center(child: Text('$e')),
               data: (data) {
                 final daily = data['dailySales'] as List<Map<String, dynamic>>;
-                final txns = data['transactions'] as List<Transaction>;
                 final totalSales = (data['totalSales'] as num?)?.toDouble() ?? 0;
                 final totalCost = (data['totalCost'] as num?)?.toDouble() ?? 0;
                 final grossProfit = (data['grossProfit'] as num?)?.toDouble() ?? 0;
@@ -150,7 +143,7 @@ class ReportScreen extends ConsumerWidget {
                       // Metric Cards Row 1: Omzet & Transaksi
                       Row(children: [
                         Expanded(child: MetricCard(
-                          label: 'Omzet', value: CurrencyFormatter.formatCompact(totalSales),
+                          label: 'Omzet', value: CurrencyFormatter.format(totalSales),
                           icon: Icons.monetization_on_rounded, iconColor: AppColors.success,
                         )),
                         const SizedBox(width: 12),
@@ -164,12 +157,12 @@ class ReportScreen extends ConsumerWidget {
                       // Metric Cards Row 2: Modal & Laba
                       Row(children: [
                         Expanded(child: MetricCard(
-                          label: 'Modal (HPP)', value: CurrencyFormatter.formatCompact(totalCost),
+                          label: 'Modal (HPP)', value: CurrencyFormatter.format(totalCost),
                           icon: Icons.account_balance_wallet_rounded, iconColor: AppColors.warning,
                         )),
                         const SizedBox(width: 12),
                         Expanded(child: MetricCard(
-                          label: 'Laba Kotor', value: CurrencyFormatter.formatCompact(grossProfit),
+                          label: 'Laba Kotor', value: CurrencyFormatter.format(grossProfit),
                           icon: Icons.trending_up_rounded,
                           iconColor: grossProfit >= 0 ? AppColors.success : AppColors.error,
                         )),
@@ -179,12 +172,12 @@ class ReportScreen extends ConsumerWidget {
                       // Metric Cards Row 3: Jasa & Sparepart
                       Row(children: [
                         Expanded(child: MetricCard(
-                          label: 'Pendapatan Jasa', value: CurrencyFormatter.formatCompact(serviceRev),
+                          label: 'Pendapatan Jasa', value: CurrencyFormatter.format(serviceRev),
                           icon: Icons.build_rounded, iconColor: AppColors.info,
                         )),
                         const SizedBox(width: 12),
                         Expanded(child: MetricCard(
-                          label: 'Pendapatan Part', value: CurrencyFormatter.formatCompact(partsRev),
+                          label: 'Pendapatan Part', value: CurrencyFormatter.format(partsRev),
                           icon: Icons.settings_rounded, iconColor: AppColors.primary,
                         )),
                       ]),
@@ -196,54 +189,23 @@ class ReportScreen extends ConsumerWidget {
                       _buildChart(context, daily, period),
                       const SizedBox(height: 24),
 
-                      // Riwayat Transaksi
-                      Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
-                        Text('Riwayat Transaksi', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                        Text('${txns.length} transaksi', style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary)),
-                      ]),
-                      const SizedBox(height: 8),
-                      if (txns.isEmpty)
-                        const Padding(padding: EdgeInsets.all(16), child: Text('Belum ada transaksi'))
-                      else
-                        ...txns.take(10).map((txn) => Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: theme.cardTheme.color,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: AppColors.border),
-                          ),
-                          child: Row(children: [
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(color: AppColors.success.withOpacity(0.1), borderRadius: BorderRadius.circular(10)),
-                              child: const Icon(Icons.receipt_rounded, color: AppColors.success, size: 18),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                              Text(txn.invoiceNo, style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600)),
-                              const SizedBox(height: 2),
-                              Text(DateFormatter.formatWithTime(txn.createdAt),
-                                style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textSecondary, fontSize: 11)),
-                            ])),
-                            Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-                              Text(CurrencyFormatter.format(txn.total),
-                                style: theme.textTheme.titleSmall?.copyWith(color: AppColors.primary, fontWeight: FontWeight.w700)),
-                              const SizedBox(height: 2),
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(color: AppColors.successLight, borderRadius: BorderRadius.circular(20)),
-                                child: Text(txn.paymentMethod.toUpperCase(),
-                                  style: const TextStyle(fontSize: 9, fontWeight: FontWeight.w600, color: AppColors.success)),
-                              ),
-                            ]),
-                          ]),
-                        )),
-                      if (txns.length > 10)
-                        Center(child: TextButton(
+                      const Divider(height: 40),
+                      SizedBox(
+                        width: double.infinity,
+                        height: 50,
+                        child: OutlinedButton.icon(
                           onPressed: () => context.go('/history'),
-                          child: Text('Lihat ${txns.length - 10} transaksi lainnya', style: const TextStyle(fontSize: 12)),
-                        )),
+                          icon: const Icon(Icons.receipt_long_rounded),
+                          label: const Text('Buka Riwayat & Detail Transaksi'),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: AppColors.primary),
+                            foregroundColor: AppColors.primary,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                        ),
+                      ),
                       const SizedBox(height: 24),
                     ],
                   ),
@@ -281,7 +243,7 @@ class ReportScreen extends ConsumerWidget {
               tooltipBorder: BorderSide.none,
               getTooltipItem: (group, groupIndex, rod, rodIndex) {
                 return BarTooltipItem(
-                  CurrencyFormatter.formatCompact(rod.toY * 1000),
+                  CurrencyFormatter.format(rod.toY * 1000),
                   const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                 );
               },

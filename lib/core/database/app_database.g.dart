@@ -4170,6 +4170,17 @@ class $TransactionItemsTable extends TransactionItems
     ),
     defaultValue: const Constant(true),
   );
+  static const VerificationMeta _workerNameMeta = const VerificationMeta(
+    'workerName',
+  );
+  @override
+  late final GeneratedColumn<String> workerName = GeneratedColumn<String>(
+    'worker_name',
+    aliasedName,
+    true,
+    type: DriftSqlType.string,
+    requiredDuringInsert: false,
+  );
   @override
   List<GeneratedColumn> get $columns => [
     id,
@@ -4182,6 +4193,7 @@ class $TransactionItemsTable extends TransactionItems
     discount,
     subtotal,
     isApproved,
+    workerName,
   ];
   @override
   String get aliasedName => _alias ?? actualTableName;
@@ -4265,6 +4277,12 @@ class $TransactionItemsTable extends TransactionItems
         isApproved.isAcceptableOrUnknown(data['is_approved']!, _isApprovedMeta),
       );
     }
+    if (data.containsKey('worker_name')) {
+      context.handle(
+        _workerNameMeta,
+        workerName.isAcceptableOrUnknown(data['worker_name']!, _workerNameMeta),
+      );
+    }
     return context;
   }
 
@@ -4314,6 +4332,10 @@ class $TransactionItemsTable extends TransactionItems
         DriftSqlType.bool,
         data['${effectivePrefix}is_approved'],
       )!,
+      workerName: attachedDatabase.typeMapping.read(
+        DriftSqlType.string,
+        data['${effectivePrefix}worker_name'],
+      ),
     );
   }
 
@@ -4334,6 +4356,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
   final double discount;
   final double subtotal;
   final bool isApproved;
+  final String? workerName;
   const TransactionItem({
     required this.id,
     required this.transactionId,
@@ -4345,6 +4368,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     required this.discount,
     required this.subtotal,
     required this.isApproved,
+    this.workerName,
   });
   @override
   Map<String, Expression> toColumns(bool nullToAbsent) {
@@ -4363,6 +4387,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     map['discount'] = Variable<double>(discount);
     map['subtotal'] = Variable<double>(subtotal);
     map['is_approved'] = Variable<bool>(isApproved);
+    if (!nullToAbsent || workerName != null) {
+      map['worker_name'] = Variable<String>(workerName);
+    }
     return map;
   }
 
@@ -4382,6 +4409,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       discount: Value(discount),
       subtotal: Value(subtotal),
       isApproved: Value(isApproved),
+      workerName: workerName == null && nullToAbsent
+          ? const Value.absent()
+          : Value(workerName),
     );
   }
 
@@ -4401,6 +4431,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       discount: serializer.fromJson<double>(json['discount']),
       subtotal: serializer.fromJson<double>(json['subtotal']),
       isApproved: serializer.fromJson<bool>(json['isApproved']),
+      workerName: serializer.fromJson<String?>(json['workerName']),
     );
   }
   @override
@@ -4417,6 +4448,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       'discount': serializer.toJson<double>(discount),
       'subtotal': serializer.toJson<double>(subtotal),
       'isApproved': serializer.toJson<bool>(isApproved),
+      'workerName': serializer.toJson<String?>(workerName),
     };
   }
 
@@ -4431,6 +4463,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     double? discount,
     double? subtotal,
     bool? isApproved,
+    Value<String?> workerName = const Value.absent(),
   }) => TransactionItem(
     id: id ?? this.id,
     transactionId: transactionId ?? this.transactionId,
@@ -4442,6 +4475,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     discount: discount ?? this.discount,
     subtotal: subtotal ?? this.subtotal,
     isApproved: isApproved ?? this.isApproved,
+    workerName: workerName.present ? workerName.value : this.workerName,
   );
   TransactionItem copyWithCompanion(TransactionItemsCompanion data) {
     return TransactionItem(
@@ -4459,6 +4493,9 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
       isApproved: data.isApproved.present
           ? data.isApproved.value
           : this.isApproved,
+      workerName: data.workerName.present
+          ? data.workerName.value
+          : this.workerName,
     );
   }
 
@@ -4474,7 +4511,8 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
           ..write('unitPrice: $unitPrice, ')
           ..write('discount: $discount, ')
           ..write('subtotal: $subtotal, ')
-          ..write('isApproved: $isApproved')
+          ..write('isApproved: $isApproved, ')
+          ..write('workerName: $workerName')
           ..write(')'))
         .toString();
   }
@@ -4491,6 +4529,7 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
     discount,
     subtotal,
     isApproved,
+    workerName,
   );
   @override
   bool operator ==(Object other) =>
@@ -4505,7 +4544,8 @@ class TransactionItem extends DataClass implements Insertable<TransactionItem> {
           other.unitPrice == this.unitPrice &&
           other.discount == this.discount &&
           other.subtotal == this.subtotal &&
-          other.isApproved == this.isApproved);
+          other.isApproved == this.isApproved &&
+          other.workerName == this.workerName);
 }
 
 class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
@@ -4519,6 +4559,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
   final Value<double> discount;
   final Value<double> subtotal;
   final Value<bool> isApproved;
+  final Value<String?> workerName;
   final Value<int> rowid;
   const TransactionItemsCompanion({
     this.id = const Value.absent(),
@@ -4531,6 +4572,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     this.discount = const Value.absent(),
     this.subtotal = const Value.absent(),
     this.isApproved = const Value.absent(),
+    this.workerName = const Value.absent(),
     this.rowid = const Value.absent(),
   });
   TransactionItemsCompanion.insert({
@@ -4544,6 +4586,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     this.discount = const Value.absent(),
     required double subtotal,
     this.isApproved = const Value.absent(),
+    this.workerName = const Value.absent(),
     this.rowid = const Value.absent(),
   }) : id = Value(id),
        transactionId = Value(transactionId),
@@ -4561,6 +4604,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     Expression<double>? discount,
     Expression<double>? subtotal,
     Expression<bool>? isApproved,
+    Expression<String>? workerName,
     Expression<int>? rowid,
   }) {
     return RawValuesInsertable({
@@ -4574,6 +4618,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       if (discount != null) 'discount': discount,
       if (subtotal != null) 'subtotal': subtotal,
       if (isApproved != null) 'is_approved': isApproved,
+      if (workerName != null) 'worker_name': workerName,
       if (rowid != null) 'rowid': rowid,
     });
   }
@@ -4589,6 +4634,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     Value<double>? discount,
     Value<double>? subtotal,
     Value<bool>? isApproved,
+    Value<String?>? workerName,
     Value<int>? rowid,
   }) {
     return TransactionItemsCompanion(
@@ -4602,6 +4648,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
       discount: discount ?? this.discount,
       subtotal: subtotal ?? this.subtotal,
       isApproved: isApproved ?? this.isApproved,
+      workerName: workerName ?? this.workerName,
       rowid: rowid ?? this.rowid,
     );
   }
@@ -4639,6 +4686,9 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
     if (isApproved.present) {
       map['is_approved'] = Variable<bool>(isApproved.value);
     }
+    if (workerName.present) {
+      map['worker_name'] = Variable<String>(workerName.value);
+    }
     if (rowid.present) {
       map['rowid'] = Variable<int>(rowid.value);
     }
@@ -4658,6 +4708,7 @@ class TransactionItemsCompanion extends UpdateCompanion<TransactionItem> {
           ..write('discount: $discount, ')
           ..write('subtotal: $subtotal, ')
           ..write('isApproved: $isApproved, ')
+          ..write('workerName: $workerName, ')
           ..write('rowid: $rowid')
           ..write(')'))
         .toString();
@@ -10370,6 +10421,7 @@ typedef $$TransactionItemsTableCreateCompanionBuilder =
       Value<double> discount,
       required double subtotal,
       Value<bool> isApproved,
+      Value<String?> workerName,
       Value<int> rowid,
     });
 typedef $$TransactionItemsTableUpdateCompanionBuilder =
@@ -10384,6 +10436,7 @@ typedef $$TransactionItemsTableUpdateCompanionBuilder =
       Value<double> discount,
       Value<double> subtotal,
       Value<bool> isApproved,
+      Value<String?> workerName,
       Value<int> rowid,
     });
 
@@ -10501,6 +10554,11 @@ class $$TransactionItemsTableFilterComposer
     builder: (column) => ColumnFilters(column),
   );
 
+  ColumnFilters<String> get workerName => $composableBuilder(
+    column: $table.workerName,
+    builder: (column) => ColumnFilters(column),
+  );
+
   $$TransactionsTableFilterComposer get transactionId {
     final $$TransactionsTableFilterComposer composer = $composerBuilder(
       composer: this,
@@ -10615,6 +10673,11 @@ class $$TransactionItemsTableOrderingComposer
     builder: (column) => ColumnOrderings(column),
   );
 
+  ColumnOrderings<String> get workerName => $composableBuilder(
+    column: $table.workerName,
+    builder: (column) => ColumnOrderings(column),
+  );
+
   $$TransactionsTableOrderingComposer get transactionId {
     final $$TransactionsTableOrderingComposer composer = $composerBuilder(
       composer: this,
@@ -10714,6 +10777,11 @@ class $$TransactionItemsTableAnnotationComposer
 
   GeneratedColumn<bool> get isApproved => $composableBuilder(
     column: $table.isApproved,
+    builder: (column) => column,
+  );
+
+  GeneratedColumn<String> get workerName => $composableBuilder(
+    column: $table.workerName,
     builder: (column) => column,
   );
 
@@ -10831,6 +10899,7 @@ class $$TransactionItemsTableTableManager
                 Value<double> discount = const Value.absent(),
                 Value<double> subtotal = const Value.absent(),
                 Value<bool> isApproved = const Value.absent(),
+                Value<String?> workerName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionItemsCompanion(
                 id: id,
@@ -10843,6 +10912,7 @@ class $$TransactionItemsTableTableManager
                 discount: discount,
                 subtotal: subtotal,
                 isApproved: isApproved,
+                workerName: workerName,
                 rowid: rowid,
               ),
           createCompanionCallback:
@@ -10857,6 +10927,7 @@ class $$TransactionItemsTableTableManager
                 Value<double> discount = const Value.absent(),
                 required double subtotal,
                 Value<bool> isApproved = const Value.absent(),
+                Value<String?> workerName = const Value.absent(),
                 Value<int> rowid = const Value.absent(),
               }) => TransactionItemsCompanion.insert(
                 id: id,
@@ -10869,6 +10940,7 @@ class $$TransactionItemsTableTableManager
                 discount: discount,
                 subtotal: subtotal,
                 isApproved: isApproved,
+                workerName: workerName,
                 rowid: rowid,
               ),
           withReferenceMapper: (p0) => p0

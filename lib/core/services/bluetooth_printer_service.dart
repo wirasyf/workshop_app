@@ -263,7 +263,10 @@ class ThermalPrintService {
 
   static List<int> _printItem(Generator gen, PrintReceiptItem item) {
     List<int> bytes = [];
-    bytes += gen.text(item.name);
+    final nameStr = (item.workerName != null && item.workerName!.isNotEmpty && !item.name.contains('(${item.workerName})'))
+        ? '${item.name} [Mek: ${item.workerName}]'
+        : item.name;
+    bytes += gen.text(nameStr);
     bytes += gen.row([
       PosColumn(
         text: '${item.qty} x ${_formatRp(item.unitPrice)}',
@@ -311,6 +314,7 @@ class PrintReceiptItem {
   final double unitPrice;
   final double subtotal;
   final String type;
+  final String? workerName;
 
   PrintReceiptItem({
     required this.name,
@@ -318,5 +322,6 @@ class PrintReceiptItem {
     required this.unitPrice,
     required this.subtotal,
     this.type = 'product',
+    this.workerName,
   });
 }

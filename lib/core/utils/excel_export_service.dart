@@ -162,7 +162,7 @@ class ExcelExportService {
   void _buildItemDetailSheet(Excel excel, List<Map<String, dynamic>> items) {
     final sheet = excel['Detail Item'];
 
-    final headers = ['No', 'Invoice', 'Tipe', 'Nama Item', 'Qty', 'Harga Satuan', 'Modal Satuan', 'Subtotal', 'Total Modal', 'Profit Item'];
+    final headers = ['No', 'Invoice', 'Tipe', 'Nama Item', 'Mekanik/Pekerja', 'Qty', 'Harga Satuan', 'Modal Satuan', 'Subtotal', 'Total Modal', 'Profit Item'];
     for (int i = 0; i < headers.length; i++) {
       _headerCell(sheet, '${_colLetter(i)}1', headers[i]);
     }
@@ -177,17 +177,19 @@ class ExcelExportService {
       final totalCost = costPrice * qty;
       final profit = subtotal - totalCost;
       final tipe = item['itemType'] == 'service' ? 'Jasa' : 'Sparepart';
+      final worker = item['workerName']?.toString() ?? '-';
 
       sheet.cell(CellIndex.indexByString('A$r')).value = IntCellValue(i + 1);
       sheet.cell(CellIndex.indexByString('B$r')).value = TextCellValue(item['invoiceNo'] ?? '-');
       sheet.cell(CellIndex.indexByString('C$r')).value = TextCellValue(tipe);
       sheet.cell(CellIndex.indexByString('D$r')).value = TextCellValue(item['itemName'] ?? '-');
-      sheet.cell(CellIndex.indexByString('E$r')).value = IntCellValue(qty);
-      sheet.cell(CellIndex.indexByString('F$r')).value = DoubleCellValue(unitPrice);
-      sheet.cell(CellIndex.indexByString('G$r')).value = DoubleCellValue(costPrice);
-      sheet.cell(CellIndex.indexByString('H$r')).value = DoubleCellValue(subtotal);
-      sheet.cell(CellIndex.indexByString('I$r')).value = DoubleCellValue(totalCost);
-      sheet.cell(CellIndex.indexByString('J$r')).value = DoubleCellValue(profit);
+      sheet.cell(CellIndex.indexByString('E$r')).value = TextCellValue(worker);
+      sheet.cell(CellIndex.indexByString('F$r')).value = IntCellValue(qty);
+      sheet.cell(CellIndex.indexByString('G$r')).value = DoubleCellValue(unitPrice);
+      sheet.cell(CellIndex.indexByString('H$r')).value = DoubleCellValue(costPrice);
+      sheet.cell(CellIndex.indexByString('I$r')).value = DoubleCellValue(subtotal);
+      sheet.cell(CellIndex.indexByString('J$r')).value = DoubleCellValue(totalCost);
+      sheet.cell(CellIndex.indexByString('K$r')).value = DoubleCellValue(profit);
 
       if (i % 2 == 1) {
         for (int c = 0; c < headers.length; c++) {
@@ -198,7 +200,7 @@ class ExcelExportService {
       }
     }
 
-    final widths = [5.0, 25.0, 12.0, 25.0, 8.0, 15.0, 15.0, 15.0, 15.0, 15.0];
+    final widths = [5.0, 25.0, 12.0, 25.0, 20.0, 8.0, 15.0, 15.0, 15.0, 15.0, 15.0];
     for (int i = 0; i < widths.length; i++) {
       sheet.setColumnWidth(i, widths[i]);
     }

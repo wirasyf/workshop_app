@@ -111,6 +111,21 @@ class SyncService {
 
     try {
       await _db.batch((batch) async {
+        // 0. Download Users (Karyawan & Mekanik)
+        final userData = await client.from('users').select();
+        for (final row in userData) {
+          batch.insert(_db.users, UsersCompanion.insert(
+            id: row['id'],
+            name: row['name'],
+            username: row['username'],
+            email: row['email'],
+            passwordHash: row['password_hash'],
+            role: Value(row['role'] ?? 'owner'),
+            isActive: Value(row['is_active'] ?? true),
+            createdAt: Value(row['created_at'] != null ? DateTime.parse(row['created_at']) : DateTime.now()),
+          ), mode: InsertMode.insertOrReplace);
+        }
+
         // 1. Download Categories
         final catData = await client.from('categories').select();
         for (final row in catData) {
@@ -218,6 +233,7 @@ class SyncService {
             discount: Value((row['discount'] as num?)?.toDouble() ?? 0.0),
             subtotal: (row['subtotal'] as num).toDouble(),
             isApproved: Value(row['is_approved'] ?? true),
+            workerName: Value(row['worker_name']),
           ), mode: InsertMode.insertOrReplace);
         }
 
