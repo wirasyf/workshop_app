@@ -73,70 +73,83 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Ganti Password')),
-      body: Form(
-        key: _formKey,
-        child: ListView(
-          padding: const EdgeInsets.all(16),
-          children: [
-            TextFormField(
-              controller: _oldPassCtrl,
-              obscureText: _obscureOld,
-              decoration: InputDecoration(
-                labelText: 'Password Lama',
-                suffixIcon: IconButton(
-                  icon: Icon(_obscureOld ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                  onPressed: () => setState(() => _obscureOld = !_obscureOld),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go('/settings');
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Ganti Password'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go('/settings'),
+          ),
+        ),
+        body: Form(
+          key: _formKey,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              TextFormField(
+                controller: _oldPassCtrl,
+                obscureText: _obscureOld,
+                decoration: InputDecoration(
+                  labelText: 'Password Lama',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureOld ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                    onPressed: () => setState(() => _obscureOld = !_obscureOld),
+                  ),
+                ),
+                validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _newPassCtrl,
+                obscureText: _obscureNew,
+                decoration: InputDecoration(
+                  labelText: 'Password Baru',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureNew ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                    onPressed: () => setState(() => _obscureNew = !_obscureNew),
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Wajib diisi';
+                  if (v.length < 6) return 'Minimal 6 karakter';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _confirmPassCtrl,
+                obscureText: _obscureConfirm,
+                decoration: InputDecoration(
+                  labelText: 'Konfirmasi Password Baru',
+                  suffixIcon: IconButton(
+                    icon: Icon(_obscureConfirm ? Icons.visibility_off_rounded : Icons.visibility_rounded),
+                    onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  ),
+                ),
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Wajib diisi';
+                  if (v != _newPassCtrl.text) return 'Password tidak cocok';
+                  return null;
+                },
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: _isLoading ? null : _save,
+                  child: _isLoading 
+                      ? const CircularProgressIndicator(color: Colors.white)
+                      : const Text('Simpan Password Baru'),
                 ),
               ),
-              validator: (v) => v!.isEmpty ? 'Wajib diisi' : null,
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _newPassCtrl,
-              obscureText: _obscureNew,
-              decoration: InputDecoration(
-                labelText: 'Password Baru',
-                suffixIcon: IconButton(
-                  icon: Icon(_obscureNew ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                  onPressed: () => setState(() => _obscureNew = !_obscureNew),
-                ),
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Wajib diisi';
-                if (v.length < 6) return 'Minimal 6 karakter';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _confirmPassCtrl,
-              obscureText: _obscureConfirm,
-              decoration: InputDecoration(
-                labelText: 'Konfirmasi Password Baru',
-                suffixIcon: IconButton(
-                  icon: Icon(_obscureConfirm ? Icons.visibility_off_rounded : Icons.visibility_rounded),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
-                ),
-              ),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Wajib diisi';
-                if (v != _newPassCtrl.text) return 'Password tidak cocok';
-                return null;
-              },
-            ),
-            const SizedBox(height: 32),
-            SizedBox(
-              height: 52,
-              child: ElevatedButton(
-                onPressed: _isLoading ? null : _save,
-                child: _isLoading 
-                    ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Simpan Password Baru'),
-              ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

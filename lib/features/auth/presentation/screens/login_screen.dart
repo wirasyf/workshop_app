@@ -153,17 +153,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 20),
 
-                    // Signup link
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Belum punya akun?'),
-                        TextButton(
-                          onPressed: () => context.push('/signup'),
-                          child: const Text('Daftar Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
-                        ),
-                      ],
-                    ),
+                    // Signup link (hanya tampil jika bukan build kasir)
+                    if (!AppConstants.isCashierBuild)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          const Text('Belum punya akun?'),
+                          TextButton(
+                            onPressed: () => context.push('/signup'),
+                            child: const Text('Daftar Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
+                          ),
+                        ],
+                      ),
                   ],
                 ),
               ),

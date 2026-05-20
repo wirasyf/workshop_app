@@ -9,6 +9,7 @@ import '../../../../features/auth/presentation/providers/auth_provider.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../dashboard/presentation/screens/notification_screen.dart';
 import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
+import '../../../../core/services/notification_service.dart';
 import '../providers/product_provider.dart';
 import 'package:uuid/uuid.dart';
 /// Form penyesuaian stok manual
@@ -55,6 +56,52 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
         reason: Value(_reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim()),
       ));
       await db.updateStock(widget.productId, change);
+      
+      // Enqueue sync
+      final syncService = ref.read(syncServiceProvider);
+      final now = DateTime.now();
+      
+      await syncService.enqueue(
+        tableName: 'stock_adjustments',
+        recordId: id,
+        operation: 'create',
+        data: {
+          'id': id,
+          'product_id': widget.productId,
+          'user_id': user?.id ?? '1',
+          'type': _type,
+          'qty_change': change,
+          'reason': _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
+          'created_at': now.toIso8601String(),
+        },
+      );
+
+      final updatedProduct = await db.getProductById(widget.productId);
+      if (updatedProduct != null) {
+        await syncService.enqueue(
+          tableName: 'products',
+          recordId: widget.productId,
+          operation: 'update',
+          data: {
+            'stock_qty': updatedProduct.stockQty,
+            'updated_at': now.toIso8601String(),
+          },
+        );
+
+        // Cek jika penyesuaian membuat stok menipis/habis, picu notifikasi OS
+        if (updatedProduct.stockQty <= updatedProduct.stockMin) {
+          final isZero = updatedProduct.stockQty == 0;
+          ref.read(notificationServiceProvider).showStockWarning(
+            id: updatedProduct.id.hashCode,
+            title: isZero ? 'Stok Habis: ${updatedProduct.name}' : 'Stok Menipis: ${updatedProduct.name}',
+            body: isZero 
+                ? 'Stok produk ${updatedProduct.name} sudah habis. Segera lakukan restok.'
+                : 'Sisa stok ${updatedProduct.name} tinggal ${updatedProduct.stockQty} ${updatedProduct.unit}.',
+            isCritical: isZero,
+          );
+        }
+      }
+
       ref.invalidate(productsProvider);
       ref.invalidate(productDetailProvider(widget.productId));
       ref.invalidate(notificationNotifierProvider);
@@ -62,7 +109,8 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
 
       if (mounted) {
         AppToast.show(context, 'Stok ${_isAdd ? "ditambah" : "dikurangi"} $qty', type: ToastType.success);
-        context.go('/products/${widget.productId}');
+        final from = GoRouterState.of(context).uri.queryParameters['from'];
+        context.go('/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}');
       }
     } catch (e) {
       if (mounted) {
@@ -81,12 +129,20 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productDetailProvider(widget.productId));
     final theme = Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sesuaikan Stok'),
-        leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go('/products/${widget.productId}')),
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Sesuaikan Stok'),
+          leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go(target)),
+        ),
       body: productAsync.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('$e')),
@@ -161,7 +217,7 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
           );
         },
       ),
-    );
+    ));
   }
 
   Widget _toggleButton(String label, bool isAddOption, IconData icon) {

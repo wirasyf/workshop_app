@@ -1,3 +1,4 @@
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 
 /// Format angka ke format Rupiah Indonesia
@@ -40,5 +41,25 @@ class CurrencyFormatter {
   /// Format angka biasa dengan pemisah ribuan: 150.000
   static String formatNumber(num value) {
     return NumberFormat('#,###', 'id_ID').format(value);
+  }
+}
+
+/// Formatter otomatis untuk input form dengan pemisah ribuan saat mengetik
+class RupiahInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) {
+      return newValue;
+    }
+    final cleaned = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (cleaned.isEmpty) {
+      return const TextEditingValue(text: '');
+    }
+    final number = int.tryParse(cleaned) ?? 0;
+    final formatted = CurrencyFormatter.formatNumber(number);
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
   }
 }

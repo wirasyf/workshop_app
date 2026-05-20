@@ -6,6 +6,8 @@ import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/notification_screen.dart';
+import '../../features/dashboard/presentation/screens/service_approval_screen.dart';
+import '../../features/dashboard/presentation/screens/staff_list_screen.dart';
 import '../../features/pos/presentation/screens/pos_product_screen.dart';
 import '../../features/pos/presentation/screens/cart_screen.dart';
 import '../../features/pos/presentation/screens/payment_success_screen.dart';
@@ -20,7 +22,13 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/store_profile_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
-import '../../features/settings/presentation/screens/receipt_template_screen.dart';
+import '../../features/settings/presentation/screens/bluetooth_printer_screen.dart';
+import '../../features/services/presentation/screens/service_list_screen.dart';
+import '../../features/services/presentation/screens/service_form_screen.dart';
+import '../../features/services/presentation/screens/service_category_list_screen.dart';
+import '../../features/workshop/presentation/screens/workshop_screen.dart';
+import '../../features/workshop/presentation/screens/work_order_form_screen.dart';
+import '../../features/workshop/presentation/screens/work_order_detail_screen.dart';
 import '../../shared/screens/shell_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -44,6 +52,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       if (isLoggedIn && (isLogin || isSignup || isSplash)) {
         return '/dashboard';
       }
+
+      final user = authState.value;
+      if (user != null && user.role == 'cashier') {
+        final loc = state.matchedLocation;
+        if (loc.startsWith('/products') ||
+            loc.startsWith('/workshop') ||
+            loc.startsWith('/staff') ||
+            loc.startsWith('/service-approval')) {
+          return '/dashboard';
+        }
+      }
       
       return null;
     },
@@ -51,6 +70,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
+      GoRoute(path: '/payment-success', builder: (_, state) => PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?)),
 
       // Shell route dengan bottom navigation
       ShellRoute(
@@ -62,9 +82,20 @@ final routerProvider = Provider<GoRouter>((ref) {
             builder: (_, __) => const PosProductScreen(),
             routes: [
               GoRoute(path: 'cart', builder: (_, __) => const CartScreen()),
-              GoRoute(path: 'success', builder: (_, state) => PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?)),
             ],
           ),
+
+          // Bengkel / Workshop
+          GoRoute(
+            path: '/workshop',
+            builder: (_, __) => const WorkshopScreen(),
+            routes: [
+              GoRoute(path: 'new-order', builder: (_, __) => const WorkOrderFormScreen()),
+              GoRoute(path: ':id', builder: (_, state) =>
+                  WorkOrderDetailScreen(workOrderId: state.pathParameters['id']!)),
+            ],
+          ),
+
           GoRoute(
             path: '/products',
             builder: (_, __) => const ProductListScreen(),
@@ -79,9 +110,29 @@ final routerProvider = Provider<GoRouter>((ref) {
                   StockAdjustmentScreen(productId: state.pathParameters['id']!)),
             ],
           ),
-          GoRoute(path: '/history', builder: (_, __) => const TransactionHistoryScreen()),
+
+          // Manajemen Jasa
+          GoRoute(
+            path: '/services',
+            builder: (_, __) => const ServiceListScreen(),
+            routes: [
+              GoRoute(path: 'add', builder: (_, __) => const ServiceFormScreen()),
+              GoRoute(path: ':id/edit', builder: (_, state) =>
+                  ServiceFormScreen(serviceId: state.pathParameters['id']!)),
+              GoRoute(path: 'categories', builder: (_, __) => const ServiceCategoryListScreen()),
+            ],
+          ),
+
+          GoRoute(
+            path: '/history',
+            builder: (_, state) => TransactionHistoryScreen(
+              transactionId: state.uri.queryParameters['id'],
+            ),
+          ),
           GoRoute(path: '/reports', builder: (_, __) => const ReportScreen()),
           GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
+          GoRoute(path: '/service-approval', builder: (_, __) => const ServiceApprovalScreen()),
+          GoRoute(path: '/staff', builder: (_, __) => const StaffListScreen()),
           GoRoute(
             path: '/settings', 
             builder: (_, __) => const SettingsScreen(),
@@ -89,7 +140,7 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(path: 'store-profile', builder: (_, __) => const StoreProfileScreen()),
               GoRoute(path: 'edit-profile', builder: (_, __) => const EditProfileScreen()),
               GoRoute(path: 'change-password', builder: (_, __) => const ChangePasswordScreen()),
-              GoRoute(path: 'receipt-template', builder: (_, __) => const ReceiptTemplateScreen()),
+              GoRoute(path: 'bluetooth-printer', builder: (_, __) => const BluetoothPrinterScreen()),
             ],
           ),
         ],

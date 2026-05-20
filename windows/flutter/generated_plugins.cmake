@@ -6,6 +6,7 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   connectivity_plus
   file_selector_windows
+  print_bluetooth_thermal
   share_plus
   sqlite3_flutter_libs
   url_launcher_windows

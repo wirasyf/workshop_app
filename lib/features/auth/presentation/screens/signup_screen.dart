@@ -29,6 +29,7 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
       username: _usernameCtrl.text.trim(),
       email: _emailCtrl.text.trim(),
       password: _passwordCtrl.text,
+      role: 'owner',
     );
 
     if (success && mounted) {
