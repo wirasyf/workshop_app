@@ -18,14 +18,19 @@ class ProductListScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final products = ref.watch(productsProvider);
     final filter = ref.watch(stockFilterProvider);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Manajemen Stok'),
+        leading: IconButton(
+          icon: const Icon(Icons.chevron_left_rounded),
+          onPressed: () => context.go(from == 'dashboard' ? '/dashboard' : '/settings'),
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.category_rounded),
-            onPressed: () => context.go('/products/categories'),
+            onPressed: () => context.go('/products/categories${from == 'dashboard' ? '?from=dashboard' : ''}'),
             tooltip: 'Kelola Kategori',
           ),
         ],
@@ -111,7 +116,7 @@ class ProductListScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => context.go('/products/add'),
+        onPressed: () => context.go('/products/add${from == 'dashboard' ? '?from=dashboard' : ''}'),
         icon: const Icon(Icons.add_rounded),
         label: const Text('Produk Baru'),
       ),
@@ -126,8 +131,9 @@ class _ProductTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
     return GestureDetector(
-      onTap: () => context.go('/products/${product.id}'),
+      onTap: () => context.go('/products/${product.id}${from == 'dashboard' ? '?from=dashboard' : ''}'),
       child: Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(

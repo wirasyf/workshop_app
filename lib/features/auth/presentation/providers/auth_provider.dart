@@ -75,8 +75,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
               username: response['username'],
               email: response['email'],
               passwordHash: response['password_hash'],
+              role: Value(response['role'] ?? 'owner'),
               isActive: Value(response['is_active'] ?? true),
-              createdAt: Value(DateTime.parse(response['created_at'])),
+              createdAt: Value(DateTime.now()), // or use response['created_at'] if available
             );
             
             await _db.insertUser(companion);
@@ -121,6 +122,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     required String username,
     required String email,
     required String password,
+    String role = 'owner',
   }) async {
     state = const AsyncValue.loading();
     try {
@@ -148,6 +150,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         username: trimmedUsername,
         email: trimmedEmail,
         passwordHash: password,
+        role: Value(role),
         isActive: const Value(true),
         createdAt: Value(DateTime.now()),
       );
@@ -167,6 +170,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
             'username': trimmedUsername,
             'email': trimmedEmail,
             'password_hash': password,
+            'role': role,
             'created_at': DateTime.now().toIso8601String(),
           },
         );

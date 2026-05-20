@@ -7,16 +7,16 @@ import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../shared/utils/app_toast.dart';
 import 'package:uuid/uuid.dart';
-import '../providers/product_provider.dart';
+import '../providers/service_provider.dart';
 
-class CategoryListScreen extends ConsumerWidget {
-  const CategoryListScreen({super.key});
+class ServiceCategoryListScreen extends ConsumerWidget {
+  const ServiceCategoryListScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final categoriesAsync = ref.watch(categoriesProvider);
+    final categoriesAsync = ref.watch(serviceCategoriesProvider);
     final from = GoRouterState.of(context).uri.queryParameters['from'];
-    final target = from == 'dashboard' ? '/products?from=dashboard' : '/products';
+    final target = '/services${from == 'dashboard' ? '?from=dashboard' : ''}';
 
     return PopScope(
       canPop: false,
@@ -26,7 +26,7 @@ class CategoryListScreen extends ConsumerWidget {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('Kelola Kategori'),
+          title: const Text('Kelola Kategori Jasa'),
           leading: IconButton(
             icon: const Icon(Icons.chevron_left_rounded),
             onPressed: () => context.go(target),
@@ -43,7 +43,7 @@ class CategoryListScreen extends ConsumerWidget {
                 children: [
                   Icon(Icons.category_rounded, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
                   const SizedBox(height: 16),
-                  const Text('Belum ada kategori', style: TextStyle(color: AppColors.textSecondary)),
+                  const Text('Belum ada kategori jasa', style: TextStyle(color: AppColors.textSecondary)),
                 ],
               ),
             );
@@ -67,19 +67,19 @@ class CategoryListScreen extends ConsumerWidget {
     ));
   }
 
-  void _showCategoryDialog(BuildContext context, WidgetRef ref, {Category? category}) {
+  void _showCategoryDialog(BuildContext context, WidgetRef ref, {ServiceCategory? category}) {
     final nameCtrl = TextEditingController(text: category?.name);
     final isEditing = category != null;
 
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isEditing ? 'Edit Kategori' : 'Tambah Kategori'),
+        title: Text(isEditing ? 'Edit Kategori Jasa' : 'Tambah Kategori Jasa'),
         content: TextField(
           controller: nameCtrl,
           decoration: const InputDecoration(
             labelText: 'Nama Kategori',
-            hintText: 'Contoh: Aki, Ban, Oli...',
+            hintText: 'Contoh: Servis Rutin, Perbaikan, Tune Up...',
           ),
           autofocus: true,
           textCapitalization: TextCapitalization.words,
@@ -97,39 +97,39 @@ class CategoryListScreen extends ConsumerWidget {
               
               try {
                 if (isEditing) {
-                  await db.updateCategory(CategoriesCompanion(
+                  await db.updateServiceCategory(ServiceCategoriesCompanion(
                     id: Value(category.id),
                     name: Value(name),
                     slug: Value(slug),
                   ));
                   await sync.enqueue(
-                    tableName: 'categories',
+                    tableName: 'service_categories',
                     recordId: category.id,
                     operation: 'update',
                     data: {'id': category.id, 'name': name, 'slug': slug},
                   );
                 } else {
                   final id = const Uuid().v4();
-                  await db.insertCategory(CategoriesCompanion.insert(
+                  await db.insertServiceCategory(ServiceCategoriesCompanion.insert(
                     id: id,
                     name: name,
                     slug: slug,
                   ));
                   await sync.enqueue(
-                    tableName: 'categories',
+                    tableName: 'service_categories',
                     recordId: id,
                     operation: 'create',
                     data: {'id': id, 'name': name, 'slug': slug},
                   );
                 }
                 
-                ref.invalidate(categoriesProvider);
+                ref.invalidate(serviceCategoriesProvider);
                 if (context.mounted) {
                   Navigator.pop(context);
-                  AppToast.show(context, 'Kategori berhasil disimpan', type: ToastType.success);
+                  AppToast.show(context, 'Kategori jasa berhasil disimpan', type: ToastType.success);
                 }
               } catch (e) {
-                if (context.mounted) AppToast.show(context, 'Gagal menyimpan kategori', type: ToastType.error);
+                if (context.mounted) AppToast.show(context, 'Gagal menyimpan kategori jasa', type: ToastType.error);
               }
             },
             child: const Text('Simpan'),
@@ -141,7 +141,7 @@ class CategoryListScreen extends ConsumerWidget {
 }
 
 class _CategoryTile extends ConsumerWidget {
-  final Category category;
+  final ServiceCategory category;
   const _CategoryTile({required this.category});
 
   @override
@@ -159,7 +159,7 @@ class _CategoryTile extends ConsumerWidget {
           children: [
             IconButton(
               icon: const Icon(Icons.edit_rounded, size: 20, color: AppColors.primary),
-              onPressed: () => const CategoryListScreen()._showCategoryDialog(context, ref, category: category),
+              onPressed: () => const ServiceCategoryListScreen()._showCategoryDialog(context, ref, category: category),
             ),
             IconButton(
               icon: const Icon(Icons.delete_rounded, size: 20, color: AppColors.error),
@@ -175,7 +175,7 @@ class _CategoryTile extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Hapus Kategori'),
+        title: const Text('Hapus Kategori Jasa'),
         content: Text('Apakah Anda yakin ingin menghapus kategori "${category.name}"?'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
@@ -184,20 +184,20 @@ class _CategoryTile extends ConsumerWidget {
               final db = ref.read(databaseProvider);
               final sync = ref.read(syncServiceProvider);
               try {
-                await db.deleteCategory(category.id);
+                await db.deleteServiceCategory(category.id);
                 await sync.enqueue(
-                  tableName: 'categories',
+                  tableName: 'service_categories',
                   recordId: category.id,
                   operation: 'delete',
                   data: {'id': category.id},
                 );
-                ref.invalidate(categoriesProvider);
+                ref.invalidate(serviceCategoriesProvider);
                 if (context.mounted) {
                   Navigator.pop(context);
-                  AppToast.show(context, 'Kategori dihapus', type: ToastType.success);
+                  AppToast.show(context, 'Kategori jasa dihapus', type: ToastType.success);
                 }
               } catch (e) {
-                if (context.mounted) AppToast.show(context, 'Gagal menghapus kategori', type: ToastType.error);
+                if (context.mounted) AppToast.show(context, 'Gagal menghapus kategori jasa', type: ToastType.error);
               }
             },
             child: const Text('Hapus', style: TextStyle(color: AppColors.error)),

@@ -2,10 +2,10 @@ import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
+import 'package:go_router/go_router.dart';
 import 'package:spareart_app/core/database/app_database.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/sync_service.dart';
-import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 
 
@@ -31,6 +31,7 @@ class AppNotification {
     'stock_critical' => Icons.error_rounded,
     'stock_low' => Icons.warning_amber_rounded,
     'transaction' => Icons.receipt_long_rounded,
+    'service_approval' => Icons.assignment_turned_in_rounded,
     _ => Icons.info_rounded,
   };
 
@@ -58,14 +59,14 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
       // 1. Ambil dari DB
       final dbNotifs = await db.getAllNotifications();
       
-      // 2. Jika kosong atau perlu refresh (simulasi auto-generation)
-      if (dbNotifs.isEmpty) {
-        await _generateInitialNotifications(db);
-        final refreshed = await db.getAllNotifications();
-        state = AsyncValue.data(refreshed.map(_fromDb).toList());
-      } else {
-        state = AsyncValue.data(dbNotifs.map(_fromDb).toList());
-      }
+      // 2. Cek semua produk yang stoknya menipis/habis dan pastikan ada notifikasinya di DB
+      await _checkAndAddLowStockNotifications(db, dbNotifs);
+      
+      // 3. Cek persetujuan jasa yang pending
+      await _checkAndAddApprovalNotifications(db, dbNotifs);
+      
+      final refreshed = await db.getAllNotifications();
+      state = AsyncValue.data(refreshed.map(_fromDb).toList());
     } catch (e, st) {
       state = AsyncValue.error(e, st);
     }
@@ -80,34 +81,46 @@ class NotificationNotifier extends StateNotifier<AsyncValue<List<AppNotification
     isRead: n.isRead,
   );
 
-  Future<void> _generateInitialNotifications(AppDatabase db) async {
-    final now = DateTime.now();
-    final start = DateFormatter.startOfDay(now);
-    final end = DateFormatter.endOfDay(now);
-
-    // Stok rendah
+  Future<void> _checkAndAddLowStockNotifications(AppDatabase db, List<Notification> currentNotifs) async {
     final lowStock = await db.getLowStockProducts();
-    for (final p in lowStock) {
-      await db.insertNotification(NotificationsCompanion.insert(
-        title: p.stockQty == 0 ? 'Stok Habis!' : 'Stok Menipis',
-        message: p.stockQty == 0 
-          ? '${p.name} sudah habis. Segera restok.' 
-          : '${p.name} sisa ${p.stockQty} ${p.unit}.',
-        type: p.stockQty == 0 ? 'stock_critical' : 'stock_low',
-        createdAt: Value(now),
-      ));
-    }
+    final now = DateTime.now();
 
-    // Transaksi hari ini
-    final txnCount = await db.getTransactionCount(start, end);
-    if (txnCount > 0) {
-      final total = await db.getTotalSales(start, end);
-      await db.insertNotification(NotificationsCompanion.insert(
-        title: 'Transaksi Hari Ini',
-        message: '$txnCount transaksi berhasil. Total: ${CurrencyFormatter.format(total)}',
-        type: 'transaction',
-        createdAt: Value(now),
-      ));
+    for (final p in lowStock) {
+      final isZero = p.stockQty == 0;
+      final title = isZero ? 'Stok Habis: ${p.name}' : 'Stok Menipis: ${p.name}';
+      final body = isZero 
+          ? 'Stok produk ${p.name} sudah habis. Segera lakukan restok.' 
+          : 'Sisa stok ${p.name} tinggal ${p.stockQty} ${p.unit}.';
+          
+      final exists = currentNotifs.any((n) => n.title.contains(p.name) || n.message.contains(p.name));
+      if (!exists) {
+        await db.insertNotification(NotificationsCompanion.insert(
+          title: title,
+          message: body,
+          type: isZero ? 'stock_critical' : 'stock_low',
+          createdAt: Value(now),
+        ));
+      }
+    }
+  }
+
+  Future<void> _checkAndAddApprovalNotifications(AppDatabase db, List<Notification> currentNotifs) async {
+    final pendingApprovals = await db.getPendingServiceApprovals();
+    final now = DateTime.now();
+
+    if (pendingApprovals.isNotEmpty) {
+      final hasRecentGeneric = currentNotifs.any((n) => 
+        n.type == 'service_approval' && n.createdAt.day == now.day && n.createdAt.month == now.month
+      );
+
+      if (!hasRecentGeneric) {
+        await db.insertNotification(NotificationsCompanion.insert(
+          title: 'Persetujuan Jasa',
+          message: 'Ada ${pendingApprovals.length} jasa yang menunggu persetujuan Anda.',
+          type: 'service_approval',
+          createdAt: Value(now),
+        ));
+      }
     }
   }
 
@@ -163,19 +176,31 @@ class NotificationScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final notifs = ref.watch(notificationNotifierProvider);
     final theme = Theme.of(context);
+    final from = GoRouterState.of(context).uri.queryParameters['from'];
+    final target = from == 'dashboard' ? '/dashboard' : '/settings';
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifikasi'),
-        actions: [
-          if (notifs.value?.any((n) => !n.isRead) == true)
-            TextButton.icon(
-              onPressed: () => ref.read(notificationNotifierProvider.notifier).markAllAsRead(),
-              icon: const Icon(Icons.done_all_rounded, size: 18),
-              label: const Text('Baca Semua', style: TextStyle(fontSize: 12)),
-            ),
-        ],
-      ),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        context.go(target);
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Notifikasi'),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go(target),
+          ),
+          actions: [
+            if (notifs.value?.any((n) => !n.isRead) == true)
+              TextButton.icon(
+                onPressed: () => ref.read(notificationNotifierProvider.notifier).markAllAsRead(),
+                icon: const Icon(Icons.done_all_rounded, size: 18),
+                label: const Text('Baca Semua', style: TextStyle(fontSize: 12)),
+              ),
+          ],
+        ),
       body: notifs.when(
         loading: () => const Center(child: CircularProgressIndicator()),
         error: (e, _) => Center(child: Text('Error: $e')),
@@ -223,7 +248,11 @@ class NotificationScreen extends ConsumerWidget {
                     notification: n,
                     onTap: () {
                       if (n.id != null) ref.read(notificationNotifierProvider.notifier).markAsRead(n.id!);
-                      _showNotificationDetail(context, n);
+                      if (n.type == 'service_approval') {
+                        context.go('/service-approval?from=dashboard');
+                      } else {
+                        _showNotificationDetail(context, n);
+                      }
                     },
                   ),
                 );
@@ -232,7 +261,7 @@ class NotificationScreen extends ConsumerWidget {
           );
         },
       ),
-    );
+    ));
   }
 
   void _showNotificationDetail(BuildContext context, AppNotification n) {
@@ -302,6 +331,7 @@ class NotificationScreen extends ConsumerWidget {
     'stock_critical' => 'Darurat',
     'stock_low' => 'Peringatan',
     'transaction' => 'Transaksi',
+    'service_approval' => 'Persetujuan',
     _ => 'Info',
   };
 
@@ -309,6 +339,7 @@ class NotificationScreen extends ConsumerWidget {
     'stock_critical' => _NotifColors(AppColors.errorLight, AppColors.error, AppColors.error.withValues(alpha: 0.3)),
     'stock_low' => _NotifColors(AppColors.warningLight, AppColors.warning, AppColors.warning.withValues(alpha: 0.3)),
     'transaction' => _NotifColors(AppColors.successLight, AppColors.success, AppColors.success.withValues(alpha: 0.3)),
+    'service_approval' => _NotifColors(AppColors.warningLight, AppColors.warning, AppColors.warning.withValues(alpha: 0.3)),
     _ => _NotifColors(AppColors.infoLight, AppColors.info, AppColors.info.withValues(alpha: 0.3)),
   };
 }
@@ -395,6 +426,7 @@ class _NotificationTile extends StatelessWidget {
     'stock_critical' => _NotifColors(AppColors.errorLight, AppColors.error, AppColors.error.withValues(alpha: 0.3)),
     'stock_low' => _NotifColors(AppColors.warningLight, AppColors.warning, AppColors.warning.withValues(alpha: 0.3)),
     'transaction' => _NotifColors(AppColors.successLight, AppColors.success, AppColors.success.withValues(alpha: 0.3)),
+    'service_approval' => _NotifColors(AppColors.warningLight, AppColors.warning, AppColors.warning.withValues(alpha: 0.3)),
     _ => _NotifColors(AppColors.infoLight, AppColors.info, AppColors.info.withValues(alpha: 0.3)),
   };
 }

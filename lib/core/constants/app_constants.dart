@@ -9,6 +9,9 @@ class AppConstants {
   static const String appVersion = '1.0.0';
   static const String storeName = 'SpareArt Motor';
 
+  // Build Modes
+  static const bool isCashierBuild = String.fromEnvironment('APP_MODE') == 'cashier';
+
   // Supabase
   static String get supabaseUrl => dotenv.get('SUPABASE_URL', fallback: '');
   static String get supabaseAnonKey =>
