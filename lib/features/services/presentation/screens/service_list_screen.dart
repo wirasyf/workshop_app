@@ -106,7 +106,7 @@ class _ServiceCard extends ConsumerWidget {
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: isActive ? AppColors.border : AppColors.error.withOpacity(0.3),
+            color: isActive ? AppColors.border : AppColors.error.withValues(alpha: 0.3),
           ),
         ),
         child: Row(
@@ -114,7 +114,7 @@ class _ServiceCard extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: AppColors.info.withOpacity(0.1),
+                color: AppColors.info.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(
@@ -142,7 +142,7 @@ class _ServiceCard extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: const Text(
@@ -159,7 +159,7 @@ class _ServiceCard extends ConsumerWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                           decoration: BoxDecoration(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(

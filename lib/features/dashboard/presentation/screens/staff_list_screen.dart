@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
+import '../../../../core/services/password_service.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import 'package:drift/drift.dart' as drift;
@@ -135,6 +136,8 @@ class StaffListScreen extends ConsumerWidget {
                 operation: 'delete',
                 data: {'id': user.id},
               );
+              
+              syncService.syncPendingChanges().catchError((_) {});
 
               ref.invalidate(staffProvider);
               if (context.mounted) {
@@ -262,7 +265,8 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
     final shortUuid = id.substring(0, 8);
     final username = isMechanic ? 'mekanik_$shortUuid' : _usernameCtrl.text.trim();
     final email = isMechanic ? 'mekanik_$shortUuid@bengkel.com' : _emailCtrl.text.trim();
-    final password = isMechanic ? '123456' : _passwordCtrl.text;
+    final rawPassword = isMechanic ? '123456' : _passwordCtrl.text;
+    final passwordHash = PasswordService.hashPassword(rawPassword);
 
     try {
       await db.insertUser(UsersCompanion.insert(
@@ -270,7 +274,7 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         name: _nameCtrl.text.trim(),
         username: username,
         email: email,
-        passwordHash: password,
+        passwordHash: passwordHash,
         role: drift.Value(_selectedRole),
         isActive: const drift.Value(true),
       ));
@@ -284,12 +288,14 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
           'name': _nameCtrl.text.trim(),
           'username': username,
           'email': email,
-          'password_hash': password,
+          'password_hash': passwordHash,
           'role': _selectedRole,
           'is_active': true,
           'created_at': DateTime.now().toIso8601String(),
         },
       );
+      
+      syncService.syncPendingChanges().catchError((_) {});
 
       ref.invalidate(staffProvider);
       if (mounted) {

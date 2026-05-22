@@ -55,7 +55,7 @@ class PosProductScreen extends ConsumerWidget {
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.border.withOpacity(0.5),
+                color: AppColors.border.withValues(alpha: 0.5),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Row(
@@ -255,10 +255,10 @@ class _PosProductCard extends ConsumerWidget {
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: inCartQty > 0 ? AppColors.primary : (isOutOfStock ? AppColors.error.withOpacity(0.3) : AppColors.border),
+            color: inCartQty > 0 ? AppColors.primary : (isOutOfStock ? AppColors.error.withValues(alpha: 0.3) : AppColors.border),
             width: inCartQty > 0 ? 1.5 : 1,
           ),
-          boxShadow: inCartQty > 0 ? [BoxShadow(color: AppColors.primary.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))] : null,
+          boxShadow: inCartQty > 0 ? [BoxShadow(color: AppColors.primary.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4))] : null,
         ),
         child: Stack(
           children: [
@@ -269,7 +269,7 @@ class _PosProductCard extends ConsumerWidget {
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.06),
+                      color: AppColors.primary.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: product.imageUrl != null
@@ -369,7 +369,7 @@ class _PosServiceCard extends ConsumerWidget {
             color: totalInCartQty > 0 ? AppColors.info : AppColors.border,
             width: totalInCartQty > 0 ? 1.5 : 1,
           ),
-          boxShadow: totalInCartQty > 0 ? [BoxShadow(color: AppColors.info.withOpacity(0.1), blurRadius: 8, offset: const Offset(0, 4))] : null,
+          boxShadow: totalInCartQty > 0 ? [BoxShadow(color: AppColors.info.withValues(alpha: 0.1), blurRadius: 8, offset: const Offset(0, 4))] : null,
         ),
         child: Stack(
           children: [
@@ -380,7 +380,7 @@ class _PosServiceCard extends ConsumerWidget {
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: AppColors.info.withOpacity(0.06),
+                      color: AppColors.info.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(Icons.build_rounded, size: 36, color: AppColors.info),

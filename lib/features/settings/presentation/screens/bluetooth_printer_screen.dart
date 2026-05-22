@@ -97,7 +97,7 @@ class _BluetoothPrinterScreenState
     }
 
     final bytes = await ThermalPrintService.generateReceipt(
-      storeName: 'SpareArt Motor',
+      storeName: 'D&D Markas Ban',
       storeAddress: 'Jl. Contoh No. 123',
       storePhone: '08123456789',
       invoiceNo: 'TEST-PRINT',
@@ -168,18 +168,18 @@ class _BluetoothPrinterScreenState
               gradient: LinearGradient(
                 colors: printerState.isConnected
                     ? [
-                        AppColors.success.withOpacity(0.1),
-                        AppColors.success.withOpacity(0.05),
+                        AppColors.success.withValues(alpha: 0.1),
+                        AppColors.success.withValues(alpha: 0.05),
                       ]
                     : [
-                        AppColors.border.withOpacity(0.3),
-                        AppColors.border.withOpacity(0.1),
+                        AppColors.border.withValues(alpha: 0.3),
+                        AppColors.border.withValues(alpha: 0.1),
                       ],
               ),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: printerState.isConnected
-                    ? AppColors.success.withOpacity(0.3)
+                    ? AppColors.success.withValues(alpha: 0.3)
                     : AppColors.border,
               ),
             ),
@@ -189,8 +189,8 @@ class _BluetoothPrinterScreenState
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: printerState.isConnected
-                        ? AppColors.success.withOpacity(0.1)
-                        : AppColors.border.withOpacity(0.3),
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : AppColors.border.withValues(alpha: 0.3),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -273,9 +273,9 @@ class _BluetoothPrinterScreenState
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: AppColors.info.withOpacity(0.05),
+              color: AppColors.info.withValues(alpha: 0.05),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.info.withOpacity(0.2)),
+              border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
             ),
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -374,8 +374,8 @@ class _BluetoothPrinterScreenState
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isCurrentlyConnected
-                          ? AppColors.success.withOpacity(0.1)
-                          : AppColors.primary.withOpacity(0.1),
+                          ? AppColors.success.withValues(alpha: 0.1)
+                          : AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(

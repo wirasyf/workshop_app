@@ -101,6 +101,8 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
           );
         }
       }
+      
+      syncService.syncPendingChanges().catchError((_) {});
 
       ref.invalidate(productsProvider);
       ref.invalidate(productDetailProvider(widget.productId));

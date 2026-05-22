@@ -5,9 +5,9 @@ class AppConstants {
   AppConstants._();
 
   // App Info
-  static const String appName = 'SpareArt Motor';
+  static const String appName = 'D&D Markas Ban';
   static const String appVersion = '1.0.0';
-  static const String storeName = 'SpareArt Motor';
+  static const String storeName = 'D&D Markas Ban';
 
   // Build Modes
   static const bool isCashierBuild = String.fromEnvironment('APP_MODE') == 'cashier';

@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import '../../../../core/database/app_database.dart';
@@ -102,11 +103,69 @@ final changeAmountProvider = Provider<double>((ref) {
   return paid - total;
 });
 
-/// Provider riwayat transaksi
-final transactionHistoryProvider = FutureProvider.family<List<Transaction>, ({DateTime start, DateTime end})>((ref, range) {
-  final db = ref.watch(databaseProvider);
-  return db.getTransactionsByDate(range.start, range.end);
+final historyDateRangeProvider = StateProvider<DateTimeRange>((ref) {
+  final now = DateTime.now();
+  return DateTimeRange(
+    start: DateTime(now.year, now.month, now.day),
+    end: DateTime(now.year, now.month, now.day, 23, 59, 59, 999),
+  );
 });
+
+class TransactionHistoryNotifier extends AsyncNotifier<List<Transaction>> {
+  int _offset = 0;
+  final int _limit = 20;
+  bool _hasMore = true;
+
+  bool get hasMore => _hasMore;
+
+  @override
+  Future<List<Transaction>> build() async {
+    _offset = 0;
+    _hasMore = true;
+    
+    // Listen to date range changes
+    ref.watch(historyDateRangeProvider);
+    
+    return _fetchTransactions();
+  }
+
+  Future<List<Transaction>> _fetchTransactions() async {
+    final db = ref.read(databaseProvider);
+    final dateRange = ref.read(historyDateRangeProvider);
+    final user = ref.read(authStateProvider).value;
+    
+    final transactions = await db.getTransactionsByDate(
+      dateRange.start, 
+      dateRange.end,
+      userId: user?.role == 'cashier' ? user?.id : null,
+      limit: _limit,
+      offset: _offset,
+    );
+
+    _hasMore = transactions.length == _limit;
+    return transactions;
+  }
+
+  Future<void> loadMore() async {
+    if (!_hasMore || state.isLoading) return;
+
+    final currentTransactions = state.value ?? [];
+    _offset += _limit;
+
+    try {
+      final newTransactions = await _fetchTransactions();
+      state = AsyncValue.data([...currentTransactions, ...newTransactions]);
+    } catch (e, st) {
+      _offset -= _limit;
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+final transactionHistoryProvider = AsyncNotifierProvider<TransactionHistoryNotifier, List<Transaction>>(() {
+  return TransactionHistoryNotifier();
+});
+
 
 /// Provider detail item transaksi
 final transactionItemsProvider = FutureProvider.family<List<TransactionDetail>, String>((ref, txnId) async {
@@ -133,7 +192,7 @@ class CartNotifier extends StateNotifier<List<CartItem>> {
   void addItem(CartItem item) {
     final idx = state.indexWhere((i) => i.productId == item.productId && i.type == item.type && i.workerName == item.workerName);
     if (idx >= 0) {
-      state = [...state]..[idx] = state[idx].copyWith(qty: state[idx].qty + (item.qty > 1 ? item.qty - 1 : 1));
+      state = [...state]..[idx] = state[idx].copyWith(qty: state[idx].qty + item.qty);
     } else {
       state = [...state, item];
     }

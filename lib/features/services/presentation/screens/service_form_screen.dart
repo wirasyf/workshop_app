@@ -7,6 +7,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
 import '../../../../core/services/sync_service.dart';
+import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../providers/service_provider.dart';
 
@@ -45,7 +46,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
       setState(() {
         _nameCtrl.text = service.name;
         _descCtrl.text = service.description ?? '';
-        _priceCtrl.text = service.price.toStringAsFixed(0);
+        _priceCtrl.text = CurrencyFormatter.formatNumber(service.price);
         _timeCtrl.text = service.estimatedMinutes.toString();
         _category = service.category;
         _categoryId = service.categoryId;
@@ -69,7 +70,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
 
     final db = ref.read(databaseProvider);
     final syncService = ref.read(syncServiceProvider);
-    final price = double.tryParse(_priceCtrl.text.replaceAll('.', '')) ?? 0;
+    final price = CurrencyFormatter.parse(_priceCtrl.text);
     final estimatedMinutes = int.tryParse(_timeCtrl.text) ?? 30;
 
     try {
@@ -251,6 +252,7 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
             TextFormField(
               controller: _priceCtrl,
               keyboardType: TextInputType.number,
+              inputFormatters: [RupiahInputFormatter()],
               decoration: const InputDecoration(
                 labelText: 'Harga *',
                 prefixText: 'Rp ',

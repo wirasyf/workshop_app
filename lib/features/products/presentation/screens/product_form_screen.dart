@@ -6,7 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:spareart_app/features/pos/presentation/widgets/barcode_scanner_dialog.dart';
+import 'package:dnd_markasban_app/features/pos/presentation/widgets/barcode_scanner_dialog.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/database/app_database.dart';
@@ -227,6 +227,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
           'updated_at': DateTime.now().toIso8601String(),
         },
       );
+      
+      syncService.syncPendingChanges().catchError((_) {});
 
       ref.invalidate(productsProvider);
       if (_isEditing) {

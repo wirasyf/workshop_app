@@ -3,7 +3,7 @@ import 'package:flutter/material.dart' hide Notification;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
-import 'package:spareart_app/core/database/app_database.dart';
+import 'package:dnd_markasban_app/core/database/app_database.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/date_formatter.dart';

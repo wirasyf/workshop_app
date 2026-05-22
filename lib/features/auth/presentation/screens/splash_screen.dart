@@ -49,12 +49,21 @@ class _SplashScreenState extends ConsumerState<SplashScreen> with SingleTickerPr
               ScaleTransition(
                 scale: _scaleAnim,
                 child: Container(
-                  padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(28),
+                    boxShadow: [
+                      BoxShadow(color: Colors.black.withValues(alpha: 0.2), blurRadius: 20, offset: const Offset(0, 10)),
+                    ],
                   ),
-                  child: const Icon(Icons.build_circle_outlined, size: 72, color: Colors.white),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(28),
+                    child: Image.asset(
+                      'assets/images/logo.jpg',
+                      width: 120,
+                      height: 120,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 24),

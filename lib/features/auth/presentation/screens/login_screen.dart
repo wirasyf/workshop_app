@@ -82,18 +82,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                   children: [
                     // Logo & Branding
                     Container(
-                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primary, AppColors.primaryLight],
-                          begin: Alignment.topLeft, end: Alignment.bottomRight,
-                        ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8)),
                         ],
                       ),
-                      child: const Icon(Icons.build_circle_outlined, size: 56, color: Colors.white),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset(
+                          'assets/images/logo.jpg',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(AppConstants.appName, style: theme.textTheme.displaySmall),
@@ -153,18 +156,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 20),
 
-                    // Signup link (hanya tampil jika bukan build kasir)
-                    if (!AppConstants.isCashierBuild)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('Belum punya akun?'),
-                          TextButton(
-                            onPressed: () => context.push('/signup'),
-                            child: const Text('Daftar Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
+
                   ],
                 ),
               ),

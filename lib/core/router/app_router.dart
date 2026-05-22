@@ -59,7 +59,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         if (loc.startsWith('/products') ||
             loc.startsWith('/workshop') ||
             loc.startsWith('/staff') ||
-            loc.startsWith('/service-approval')) {
+            loc.startsWith('/service-approval') ||
+            loc.startsWith('/reports') ||
+            loc.startsWith('/services') ||
+            loc == '/settings/store-profile' ||
+            loc == '/settings/edit-profile') {
           return '/dashboard';
         }
       }
