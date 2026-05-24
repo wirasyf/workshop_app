@@ -43,24 +43,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final success = await ref.read(authStateProvider.notifier).login(
-      _emailCtrl.text.trim(),
-      _passwordCtrl.text,
-    );
+    try {
+      final success = await ref.read(authStateProvider.notifier).login(
+        _emailCtrl.text.trim(),
+        _passwordCtrl.text,
+      );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
 
-    if (success && mounted) {
-      AppToast.show(context, 'Login berhasil', type: ToastType.success);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        context.go('/dashboard');
-      });
-    } else if (mounted) {
-      final error = ref.read(authStateProvider).error?.toString() ?? 'Login gagal';
-      AppToast.show(context, error, type: ToastType.error);
+      if (success && mounted) {
+        AppToast.show(context, 'Login berhasil', type: ToastType.success);
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!mounted) return;
+          context.go('/dashboard');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppToast.show(context, e.toString(), type: ToastType.error);
+      }
     }
   }
 
@@ -82,18 +86,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                   children: [
                     // Logo & Branding
                     Container(
-                      padding: const EdgeInsets.all(20),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.primary, AppColors.primaryLight],
-                          begin: Alignment.topLeft, end: Alignment.bottomRight,
-                        ),
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
                           BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8)),
                         ],
                       ),
-                      child: const Icon(Icons.build_circle_outlined, size: 56, color: Colors.white),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(24),
+                        child: Image.asset(
+                          'assets/images/logo.jpg',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
+                        ),
+                      ),
                     ),
                     const SizedBox(height: 20),
                     Text(AppConstants.appName, style: theme.textTheme.displaySmall),
@@ -153,18 +160,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                     ),
                     const SizedBox(height: 20),
 
-                    // Signup link (hanya tampil jika bukan build kasir)
-                    if (!AppConstants.isCashierBuild)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          const Text('Belum punya akun?'),
-                          TextButton(
-                            onPressed: () => context.push('/signup'),
-                            child: const Text('Daftar Sekarang', style: TextStyle(fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
+
                   ],
                 ),
               ),

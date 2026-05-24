@@ -55,6 +55,21 @@ class _CartScreenState extends ConsumerState<CartScreen> {
 
     setState(() => _isProcessing = true);
     final db = ref.read(databaseProvider);
+    
+    // Validasi stok sebelum melanjutkan
+    for (final item in cart) {
+      if (item.type == CartItemType.product) {
+        final p = await db.getProductById(item.productId);
+        if (p == null || p.stockQty < item.qty) {
+          if (mounted) {
+            AppToast.show(context, 'Stok tidak mencukupi untuk ${item.name}. Sisa: ${p?.stockQty ?? 0}', type: ToastType.error);
+            setState(() => _isProcessing = false);
+          }
+          return;
+        }
+      }
+    }
+
     final user = ref.read(authStateProvider).value;
     final subtotal = ref.read(cartSubtotalProvider);
     final discount = ref.read(cartDiscountProvider);
@@ -147,15 +162,12 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           if (item.type == CartItemType.product) {
             await db.updateStock(item.productId, -item.qty);
             
-            final updatedProduct = await db.getProductById(item.productId);
-            if (updatedProduct != null) {
-              await syncService.enqueue(
-                tableName: 'products',
-                recordId: item.productId,
-                operation: 'update',
-                data: {'stock_qty': updatedProduct.stockQty},
-              );
-            }
+            await syncService.enqueue(
+              tableName: 'products',
+              recordId: item.productId,
+              operation: 'rpc_adjust_stock',
+              data: {'qty_change': -item.qty},
+            );
           }
         }
       });
@@ -172,6 +184,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       bool hasLowStock = false;
       List<String> lowStockNames = [];
       final notifService = ref.read(notificationServiceProvider);
+      final syncService = ref.read(syncServiceProvider);
 
       for (final item in cart) {
         if (item.type == CartItemType.product) {
@@ -196,6 +209,24 @@ class _CartScreenState extends ConsumerState<CartScreen> {
               type: isZero ? 'stock_critical' : 'stock_low',
               createdAt: Value(DateTime.now()),
             ));
+            
+            if (user?.role == 'cashier') {
+              final notifId = const Uuid().v4();
+              await syncService.enqueue(
+                tableName: 'notifications',
+                recordId: notifId,
+                operation: 'create',
+                data: {
+                  'id': notifId,
+                  'title': title,
+                  'message': body,
+                  'type': isZero ? 'stock_critical' : 'stock_low',
+                  'target_role': 'owner',
+                  'is_read': false,
+                  'created_at': DateTime.now().toIso8601String(),
+                },
+              );
+            }
           }
         }
       }
@@ -206,12 +237,64 @@ class _CartScreenState extends ConsumerState<CartScreen> {
         type: 'transaction',
         createdAt: Value(DateTime.now()),
       ));
+      
+      if (user?.role == 'cashier') {
+        final notifId = const Uuid().v4();
+        await syncService.enqueue(
+          tableName: 'notifications',
+          recordId: notifId,
+          operation: 'create',
+          data: {
+            'id': notifId,
+            'title': 'Transaksi Sukses (Kasir)',
+            'message': 'Kasir ${user?.name ?? ""} memproses Invoice $invoiceNo senilai ${CurrencyFormatter.format(total)}.',
+            'type': 'transaction',
+            'target_role': 'owner',
+            'is_read': false,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+        );
+      }
+
+      final hasService = cart.any((i) => i.type == CartItemType.service);
+      if (hasService && user?.role == 'cashier') {
+        final notifId = const Uuid().v4();
+        await syncService.enqueue(
+          tableName: 'notifications',
+          recordId: notifId,
+          operation: 'create',
+          data: {
+            'id': notifId,
+            'title': 'Menunggu Persetujuan Jasa',
+            'message': 'Invoice $invoiceNo memiliki item jasa yang membutuhkan persetujuan Owner.',
+            'type': 'approval_needed',
+            'target_role': 'owner',
+            'is_read': false,
+            'created_at': DateTime.now().toIso8601String(),
+          },
+        );
+      }
+
+      // Langsung sync agar notifikasi Realtime seketika terkirim ke Owner
+      // Gunakan timeout agar tidak blocking jika offline
+      try {
+        await syncService.syncPendingChanges().timeout(
+          const Duration(seconds: 10),
+          onTimeout: () {
+            debugPrint('⚠️ Sync timeout setelah 10 detik, lanjut offline');
+          },
+        );
+        debugPrint('✅ Sync selesai, notifikasi terkirim ke cloud');
+      } catch (e) {
+        debugPrint('⚠️ Immediate sync failed (offline): $e');
+      }
 
       // Invalidate providers to refresh data
       ref.invalidate(productsProvider);
       ref.invalidate(ownerDashboardProvider);
       ref.invalidate(reportDataProvider);
       ref.invalidate(notificationNotifierProvider);
+      ref.invalidate(transactionHistoryProvider);
 
       // Create processed items with approval status for the success screen
       final processedItems = cart.map((item) {
@@ -336,7 +419,20 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               padding: const EdgeInsets.symmetric(horizontal: 12),
                               child: Text('${item.qty}', style: theme.textTheme.titleSmall),
                             ),
-                            _qtyButton(Icons.add_rounded, () => ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1, item.type, item.workerName)),
+                            _qtyButton(Icons.add_rounded, () {
+                              if (item.type == CartItemType.product) {
+                                final products = ref.read(productsProvider).value ?? [];
+                                final product = products.firstWhere(
+                                  (p) => p.id == item.productId,
+                                  orElse: () => throw Exception('Produk tidak ditemukan'),
+                                );
+                                if (item.qty >= product.stockQty) {
+                                  AppToast.show(context, 'Stok maksimal tercapai (${product.stockQty})', type: ToastType.warning, duration: const Duration(seconds: 2));
+                                  return;
+                                }
+                              }
+                              ref.read(cartProvider.notifier).updateQty(item.productId, item.qty + 1, item.type, item.workerName);
+                            }),
                           ]),
                           const SizedBox(width: 12),
                           SizedBox(
@@ -423,7 +519,8 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                             loading: () => const LinearProgressIndicator(),
                             error: (e, _) => Text('Error: $e'),
                             data: (staff) {
-                              if (staff.isEmpty) {
+                              final mechanics = staff.where((u) => u.role == 'mechanic').toList();
+                              if (mechanics.isEmpty) {
                                 return const Text('Belum ada data mekanik. Tambahkan di menu Kelola Karyawan.', style: TextStyle(color: AppColors.error, fontSize: 12));
                               }
                               return DropdownButtonFormField<String>(
@@ -433,10 +530,10 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   hintText: 'Pilih Mekanik / Pekerja',
                                   contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                 ),
-                                items: staff.map((u) {
+                                items: mechanics.map((u) {
                                   return DropdownMenuItem(
                                     value: u.name,
-                                    child: Text('${u.name} (${u.role == 'mechanic' ? 'Mekanik' : 'Kasir'})', style: const TextStyle(fontSize: 14)),
+                                    child: Text(u.name, style: const TextStyle(fontSize: 14)),
                                   );
                                 }).toList(),
                                 onChanged: (val) {

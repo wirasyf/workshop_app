@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/services/password_service.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -40,15 +41,27 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       final user = ref.read(authStateProvider).value;
       if (user == null) throw Exception('User tidak ditemukan');
 
-      if (user.passwordHash != _oldPassCtrl.text) {
+      if (!PasswordService.verifyPassword(_oldPassCtrl.text, user.passwordHash)) {
         AppToast.show(context, 'Password lama tidak sesuai', type: ToastType.error);
         return;
       }
 
       final db = ref.read(databaseProvider);
+      final syncService = ref.read(syncServiceProvider);
+      final newHashed = PasswordService.hashPassword(_newPassCtrl.text);
+
       await (db.update(db.users)..where((u) => u.id.equals(user.id))).write(
-        UsersCompanion(passwordHash: Value(_newPassCtrl.text)),
+        UsersCompanion(passwordHash: Value(newHashed)),
       );
+
+      await syncService.enqueue(
+        tableName: 'users',
+        recordId: user.id,
+        operation: 'update',
+        data: {'password_hash': newHashed},
+      );
+
+      syncService.syncPendingChanges().catchError((_) {});
 
       // Refresh session
       final updatedUser = await db.getUserById(user.id);

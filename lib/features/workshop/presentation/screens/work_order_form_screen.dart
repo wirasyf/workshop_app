@@ -189,6 +189,13 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
             TextFormField(
               controller: _phoneCtrl, keyboardType: TextInputType.phone,
               decoration: const InputDecoration(labelText: 'No. HP', hintText: '08xxx', prefixIcon: Icon(Icons.phone_rounded)),
+              validator: (v) {
+                if (v != null && v.isNotEmpty) {
+                  if (!RegExp(r'^[0-9]+$').hasMatch(v)) return 'Format nomor HP salah';
+                  if (v.length < 9) return 'Nomor HP terlalu pendek';
+                }
+                return null;
+              },
             ),
             const SizedBox(height: 16),
             Row(children: [
@@ -198,7 +205,15 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
             ]),
             const SizedBox(height: 16),
             TextFormField(controller: _yearCtrl, keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Tahun', hintText: '2024', prefixIcon: Icon(Icons.calendar_today_rounded))),
+              decoration: const InputDecoration(labelText: 'Tahun', hintText: '2024', prefixIcon: Icon(Icons.calendar_today_rounded)),
+              validator: (v) {
+                if (v != null && v.isNotEmpty) {
+                  final year = int.tryParse(v);
+                  if (year == null || year < 1990 || year > DateTime.now().year) return 'Tahun tidak valid';
+                }
+                return null;
+              },
+            ),
             const SizedBox(height: 24),
             Text('Keluhan', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
             const SizedBox(height: 12),

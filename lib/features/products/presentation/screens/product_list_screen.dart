@@ -11,11 +11,34 @@ import '../providers/product_provider.dart';
 import '../widgets/stock_badge.dart';
 
 /// Daftar produk dengan search & filter
-class ProductListScreen extends ConsumerWidget {
+class ProductListScreen extends ConsumerStatefulWidget {
   const ProductListScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProductListScreen> createState() => _ProductListScreenState();
+}
+
+class _ProductListScreenState extends ConsumerState<ProductListScreen> {
+  final ScrollController _scrollController = ScrollController();
+
+  @override
+  void initState() {
+    super.initState();
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
+        ref.read(productsProvider.notifier).loadMore();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final products = ref.watch(productsProvider);
     final filter = ref.watch(stockFilterProvider);
     final from = GoRouterState.of(context).uri.queryParameters['from'];
@@ -104,10 +127,19 @@ class ProductListScreen extends ConsumerWidget {
                 return RefreshIndicator(
                   onRefresh: () async => ref.invalidate(productsProvider),
                   child: ListView.separated(
+                    controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: items.length,
+                    itemCount: items.length + (ref.read(productsProvider.notifier).hasMore ? 1 : 0),
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
-                    itemBuilder: (_, i) => _ProductTile(product: items[i]),
+                    itemBuilder: (_, i) {
+                      if (i == items.length) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      return _ProductTile(product: items[i]);
+                    },
                   ),
                 );
               },

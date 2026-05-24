@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:spareart_app/main.dart';
+import 'package:dnd_markasban_app/main.dart';
 
 final themeModeProvider = StateProvider<ThemeMode>((ref) {
   final settings = ref.watch(settingsServiceProvider);
@@ -16,6 +16,7 @@ class SettingsService {
   static const String keyReceiptFooter = 'receipt_footer';
   static const String keyUserId = 'user_id';
   static const String keyThemeMode = 'theme_mode';
+  static const String keyLastSyncTimestamp = 'last_sync_timestamp';
 
   late SharedPreferences _prefs;
 
@@ -23,12 +24,18 @@ class SettingsService {
     _prefs = await SharedPreferences.getInstance();
   }
 
-  String get storeName => _prefs.getString(keyStoreName) ?? 'SpareArt Motor';
+  String get storeName => _prefs.getString(keyStoreName) ?? 'D&D Markas Ban';
   String get storeAddress => _prefs.getString(keyStoreAddress) ?? 'Alamat Toko Belum Diatur';
   String get storePhone => _prefs.getString(keyStorePhone) ?? '-';
   String get receiptFooter => _prefs.getString(keyReceiptFooter) ?? 'Terima Kasih Atas Kunjungan Anda';
   String? get userId => _prefs.getString(keyUserId);
   String get themeMode => _prefs.getString(keyThemeMode) ?? 'light';
+  
+  DateTime? get lastSyncTimestamp {
+    final str = _prefs.getString(keyLastSyncTimestamp);
+    if (str == null) return null;
+    return DateTime.tryParse(str);
+  }
 
   Future<void> setStoreInfo(String name, String address, String phone) async {
     await _prefs.setString(keyStoreName, name);
@@ -50,6 +57,10 @@ class SettingsService {
 
   Future<void> setThemeMode(String mode) async {
     await _prefs.setString(keyThemeMode, mode);
+  }
+
+  Future<void> setLastSyncTimestamp(DateTime dt) async {
+    await _prefs.setString(keyLastSyncTimestamp, dt.toIso8601String());
   }
 
 }

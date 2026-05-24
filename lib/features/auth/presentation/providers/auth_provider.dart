@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../core/database/app_database.dart';
+import '../../../../core/services/password_service.dart';
 import '../../../../core/services/settings_service.dart';
 import '../../../../core/services/sync_service.dart';
 import '../../../../core/services/supabase_service.dart';
@@ -49,7 +50,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
 
   /// Login dengan username/email dan password (offline-first via lokal DB)
   Future<bool> login(String identifier, String password) async {
-    state = const AsyncValue.loading();
     try {
       final trimmedIdentifier = identifier.trim();
       
@@ -90,16 +90,33 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       }
       
       if (user == null) {
-        state = AsyncValue.error('User tidak ditemukan', StackTrace.current);
-        return false;
+        throw 'User tidak ditemukan';
       }
-      if (user.passwordHash != password) {
-        state = AsyncValue.error('Password salah', StackTrace.current);
-        return false;
+      if (!PasswordService.verifyPassword(password, user.passwordHash)) {
+        throw 'Password salah';
       }
       if (!user.isActive) {
-        state = AsyncValue.error('Akun tidak aktif', StackTrace.current);
-        return false;
+        throw 'Akun tidak aktif';
+      }
+
+      // Auto-migrate plain text password ke hashed format
+      if (!PasswordService.isHashed(user.passwordHash)) {
+        try {
+          final hashed = PasswordService.hashPassword(password);
+          await _db.updateUser(UsersCompanion(
+            id: Value(user.id),
+            passwordHash: Value(hashed),
+          ));
+          await _sync.enqueue(
+            tableName: 'users',
+            recordId: user.id,
+            operation: 'update',
+            data: {'password_hash': hashed},
+          );
+          debugPrint('Password auto-migrated to hashed format for user: ${user.username}');
+        } catch (e) {
+          debugPrint('Failed to auto-migrate password: $e');
+        }
       }
       
       // 3. Download data user (produk, kategori, dll) dari server
@@ -110,9 +127,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       
       state = AsyncValue.data(user);
       return true;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return false;
+    } catch (e) {
+      throw e.toString();
     }
   }
 
@@ -124,7 +140,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     required String password,
     String role = 'owner',
   }) async {
-    state = const AsyncValue.loading();
     try {
       final trimmedUsername = username.trim();
       final trimmedEmail = email.trim();
@@ -132,24 +147,23 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       // Cek apakah username sudah terdaftar
       final existingUser = await _db.getUserByUsername(trimmedUsername);
       if (existingUser != null) {
-        state = AsyncValue.error('Username sudah digunakan', StackTrace.current);
-        return false;
+        throw 'Username sudah digunakan';
       }
 
       // Cek apakah email sudah terdaftar
       final existingEmail = await _db.getUserByEmail(trimmedEmail);
       if (existingEmail != null) {
-        state = AsyncValue.error('Email sudah terdaftar', StackTrace.current);
-        return false;
+        throw 'Email sudah terdaftar';
       }
 
       final id = const Uuid().v4();
+      final hashedPassword = PasswordService.hashPassword(password);
       final companion = UsersCompanion.insert(
         id: id,
         name: name.trim(),
         username: trimmedUsername,
         email: trimmedEmail,
-        passwordHash: password,
+        passwordHash: hashedPassword,
         role: Value(role),
         isActive: const Value(true),
         createdAt: Value(DateTime.now()),
@@ -169,11 +183,16 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
             'name': name.trim(),
             'username': trimmedUsername,
             'email': trimmedEmail,
-            'password_hash': password,
+            'password_hash': hashedPassword,
             'role': role,
             'created_at': DateTime.now().toIso8601String(),
           },
         );
+        
+        // Coba langsung jalankan sinkronisasi secara background
+        _sync.syncPendingChanges().catchError((e) {
+          debugPrint('Immediate sync failed: $e');
+        });
         
         // Save session otomatis setelah signup
         await _settings.setUserId(id);
@@ -181,9 +200,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         return true;
       }
       return false;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return false;
+    } catch (e) {
+      throw e.toString();
     }
   }
 

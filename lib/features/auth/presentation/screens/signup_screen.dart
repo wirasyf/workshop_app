@@ -21,32 +21,44 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
   final _confirmPasswordCtrl = TextEditingController();
   bool _obscurePassword = true;
 
+  bool _isLoading = false;
+
   Future<void> _handleSignup() async {
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isLoading = true);
 
-    final success = await ref.read(authStateProvider.notifier).signup(
-      name: _nameCtrl.text.trim(),
-      username: _usernameCtrl.text.trim(),
-      email: _emailCtrl.text.trim(),
-      password: _passwordCtrl.text,
-      role: 'owner',
-    );
+    try {
+      final success = await ref
+          .read(authStateProvider.notifier)
+          .signup(
+            name: _nameCtrl.text.trim(),
+            username: _usernameCtrl.text.trim(),
+            email: _emailCtrl.text.trim(),
+            password: _passwordCtrl.text,
+            role: 'owner',
+          );
 
-    if (success && mounted) {
-      AppToast.show(context, 'Registrasi berhasil!', type: ToastType.success);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) context.go('/');
-      });
-    } else if (mounted) {
-      final error = ref.read(authStateProvider).error;
-      AppToast.show(context, error?.toString() ?? 'Gagal daftar', type: ToastType.error);
+      if (success && mounted) {
+        AppToast.show(context, 'Registrasi berhasil!', type: ToastType.success);
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) context.go('/');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(context, e.toString(), type: ToastType.error);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final authState = ref.watch(authStateProvider);
+    ref.watch(authStateProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -59,17 +71,25 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.person_add_outlined, size: 80, color: AppColors.primary),
+                  const Icon(
+                    Icons.person_add_outlined,
+                    size: 80,
+                    color: AppColors.primary,
+                  ),
                   const SizedBox(height: 24),
                   Text(
                     'Daftar Akun Baru',
-                    style: theme.textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
+                    style: theme.textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Kelola bengkel Anda lebih profesional',
-                    style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
                     textAlign: TextAlign.center,
                   ),
                   const SizedBox(height: 40),
@@ -81,7 +101,9 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       labelText: 'Nama Lengkap',
                       prefixIcon: Icon(Icons.person_outline),
                     ),
-                    validator: (v) => v == null || v.isEmpty ? 'Nama tidak boleh kosong' : null,
+                    validator: (v) => v == null || v.isEmpty
+                        ? 'Nama tidak boleh kosong'
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -93,7 +115,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       prefixIcon: Icon(Icons.alternate_email),
                     ),
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Username tidak boleh kosong';
+                      if (v == null || v.isEmpty)
+                        return 'Username tidak boleh kosong';
                       if (v.length < 3) return 'Username minimal 3 karakter';
                       return null;
                     },
@@ -109,7 +132,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                     keyboardType: TextInputType.emailAddress,
                     validator: (v) {
-                      if (v == null || v.isEmpty) return 'Email tidak boleh kosong';
+                      if (v == null || v.isEmpty)
+                        return 'Email tidak boleh kosong';
                       if (!v.contains('@')) return 'Format email salah';
                       return null;
                     },
@@ -123,12 +147,20 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       labelText: 'Password',
                       prefixIcon: const Icon(Icons.lock_outline),
                       suffixIcon: IconButton(
-                        icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                        onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                        icon: Icon(
+                          _obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility,
+                        ),
+                        onPressed: () => setState(
+                          () => _obscurePassword = !_obscurePassword,
+                        ),
                       ),
                     ),
                     obscureText: _obscurePassword,
-                    validator: (v) => v != null && v.length < 6 ? 'Password minimal 6 karakter' : null,
+                    validator: (v) => v != null && v.length < 6
+                        ? 'Password minimal 6 karakter'
+                        : null,
                   ),
                   const SizedBox(height: 16),
 
@@ -141,7 +173,8 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                     ),
                     obscureText: _obscurePassword,
                     validator: (v) {
-                      if (v != _passwordCtrl.text) return 'Password tidak cocok';
+                      if (v != _passwordCtrl.text)
+                        return 'Password tidak cocok';
                       return null;
                     },
                   ),
@@ -151,9 +184,16 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                   SizedBox(
                     height: 52,
                     child: ElevatedButton(
-                      onPressed: authState.isLoading ? null : _handleSignup,
-                      child: authState.isLoading
-                          ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                      onPressed: _isLoading ? null : _handleSignup,
+                      child: _isLoading
+                          ? const SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
                           : const Text('Daftar Sekarang'),
                     ),
                   ),
@@ -166,7 +206,10 @@ class _SignupScreenState extends ConsumerState<SignupScreen> {
                       const Text('Sudah punya akun?'),
                       TextButton(
                         onPressed: () => context.pop(),
-                        child: const Text('Login', style: TextStyle(fontWeight: FontWeight.bold)),
+                        child: const Text(
+                          'Login',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
                       ),
                     ],
                   ),

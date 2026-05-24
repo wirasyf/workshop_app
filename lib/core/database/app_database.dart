@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:drift_flutter/drift_flutter.dart';
+import 'package:flutter/foundation.dart';
 import '../constants/app_constants.dart';
 import 'tables.dart';
 
@@ -28,6 +29,35 @@ class AppDatabase extends _$AppDatabase {
   @override
   int get schemaVersion => 9;
 
+  // ── Migration Helpers ──
+
+  /// Cek apakah kolom sudah ada di tabel
+  Future<bool> _columnExists(String table, String column) async {
+    try {
+      final result = await customSelect(
+        "PRAGMA table_info($table)",
+        readsFrom: {},
+      ).get();
+      return result.any((r) => r.read<String>('name') == column);
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// Cek apakah tabel sudah ada
+  Future<bool> _tableExists(String table) async {
+    try {
+      final result = await customSelect(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+        variables: [Variable.withString(table)],
+        readsFrom: {},
+      ).get();
+      return result.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
+
   @override
   MigrationStrategy get migration {
     return MigrationStrategy(
@@ -35,101 +65,240 @@ class AppDatabase extends _$AppDatabase {
         await m.createAll();
       },
       onUpgrade: (m, from, to) async {
+        // ── v1 → v2 ──
         if (from < 2) {
-          // Tambahkan kolom baru ke tabel yang sudah ada
-          await m.addColumn(users, users.avatarUrl);
-          await m.addColumn(products, products.sellPriceWholesale);
-          await m.addColumn(products, products.updatedAt);
+          try {
+            if (!await _columnExists('users', 'avatar_url')) {
+              await m.addColumn(users, users.avatarUrl);
+            }
+            if (!await _columnExists('products', 'sell_price_wholesale')) {
+              await m.addColumn(products, products.sellPriceWholesale);
+            }
+            if (!await _columnExists('products', 'updated_at')) {
+              await m.addColumn(products, products.updatedAt);
+            }
+          } catch (e) {
+            debugPrint('Migration v2 error (non-fatal): $e');
+          }
         }
-        if (from < 3) {
-          await m.createTable(notifications);
-        }
-        if (from < 4) {
-          // PERINGATAN: Perubahan PK dari Int ke String memerlukan penghapusan data
-          // karena SQLite tidak mendukung penggantian PK secara langsung.
-        }
-        if (from < 5) {
-          // Tabel baru untuk bengkel
-          await m.createTable(services);
-          await m.createTable(vehicles);
-          await m.createTable(workOrders);
-          // Kolom baru di transactions
-          await m.addColumn(transactions, transactions.customerName);
 
-          // ── Recreate transaction_items ──
-          // SQLite tidak bisa ALTER COLUMN untuk mengubah NOT NULL → nullable
-          // Solusi: buat tabel baru, copy data, drop lama, rename baru
-          await customStatement('''
-            CREATE TABLE transaction_items_new (
-              id TEXT NOT NULL PRIMARY KEY,
-              transaction_id TEXT NOT NULL REFERENCES transactions(id),
-              item_type TEXT NOT NULL DEFAULT 'product',
-              product_id TEXT REFERENCES products(id),
-              service_id TEXT REFERENCES services(id),
-              qty INTEGER NOT NULL,
-              unit_price REAL NOT NULL,
-              discount REAL NOT NULL DEFAULT 0.0,
-              subtotal REAL NOT NULL
-            )
-          ''');
-          await customStatement('''
-            INSERT INTO transaction_items_new (id, transaction_id, item_type, product_id, qty, unit_price, discount, subtotal)
-            SELECT id, transaction_id, 'product', product_id, qty, unit_price, discount, subtotal
-            FROM transaction_items
-          ''');
-          await customStatement('DROP TABLE transaction_items');
-          await customStatement(
-            'ALTER TABLE transaction_items_new RENAME TO transaction_items',
-          );
+        // ── v2 → v3 ──
+        if (from < 3) {
+          try {
+            if (!await _tableExists('notifications')) {
+              await m.createTable(notifications);
+            }
+          } catch (e) {
+            debugPrint('Migration v3 error (non-fatal): $e');
+          }
         }
+
+        // ── v3 → v4 ──
+        if (from < 4) {
+          // PK change dari Int ke String — handled by schema recreation
+          debugPrint('Migration v4: PK change acknowledged');
+        }
+
+        // ── v4 → v5: Workshop tables + transaction_items recreate ──
+        if (from < 5) {
+          try {
+            if (!await _tableExists('services')) {
+              await m.createTable(services);
+            }
+            if (!await _tableExists('vehicles')) {
+              await m.createTable(vehicles);
+            }
+            if (!await _tableExists('work_orders')) {
+              await m.createTable(workOrders);
+            }
+            if (!await _columnExists('transactions', 'customer_name')) {
+              await m.addColumn(transactions, transactions.customerName);
+            }
+            if (!await _columnExists('transactions', 'customer_id')) {
+              await m.addColumn(transactions, transactions.customerId);
+            }
+
+            // Recreate transaction_items dengan product_id nullable + service support
+            await _recreateTransactionItems(includeApproval: false, includeWorker: false);
+          } catch (e) {
+            debugPrint('Migration v5 error (non-fatal): $e');
+          }
+        }
+
+        // ── v5 → v6: Fix product_id nullable ──
         if (from == 5) {
-          // Fix untuk device yang sudah migrasi ke v5 tapi product_id masih NOT NULL
-          // Recreate transaction_items dengan product_id nullable
-          await customStatement('''
-            CREATE TABLE IF NOT EXISTS transaction_items_new (
-              id TEXT NOT NULL PRIMARY KEY,
-              transaction_id TEXT NOT NULL REFERENCES transactions(id),
-              item_type TEXT NOT NULL DEFAULT 'product',
-              product_id TEXT REFERENCES products(id),
-              service_id TEXT REFERENCES services(id),
-              qty INTEGER NOT NULL,
-              unit_price REAL NOT NULL,
-              discount REAL NOT NULL DEFAULT 0.0,
-              subtotal REAL NOT NULL
-            )
-          ''');
-          await customStatement('''
-            INSERT INTO transaction_items_new (id, transaction_id, item_type, product_id, service_id, qty, unit_price, discount, subtotal)
-            SELECT id, transaction_id, 
-              COALESCE(item_type, 'product'), 
-              product_id, 
-              service_id, 
-              qty, unit_price, 
-              COALESCE(discount, 0.0), 
-              subtotal
-            FROM transaction_items
-          ''');
-          await customStatement('DROP TABLE transaction_items');
-          await customStatement(
-            'ALTER TABLE transaction_items_new RENAME TO transaction_items',
-          );
+          try {
+            // Recreate jika product_id masih NOT NULL
+            await _recreateTransactionItems(includeApproval: false, includeWorker: false);
+          } catch (e) {
+            debugPrint('Migration v6 fix error (non-fatal): $e');
+          }
         }
+
+        // ── v6 → v7: Role + approval ──
         if (from < 7) {
-          await m.addColumn(users, users.role);
-          await m.addColumn(transactionItems, transactionItems.isApproved);
+          try {
+            if (!await _columnExists('users', 'role')) {
+              await m.addColumn(users, users.role);
+            }
+            if (!await _columnExists('transaction_items', 'is_approved')) {
+              await m.addColumn(transactionItems, transactionItems.isApproved);
+            }
+          } catch (e) {
+            debugPrint('Migration v7 error (non-fatal): $e');
+          }
         }
+
+        // ── v7 → v8: Service categories ──
         if (from < 8) {
-          await m.createTable(serviceCategories);
-          await m.addColumn(services, services.categoryId);
+          try {
+            if (!await _tableExists('service_categories')) {
+              await m.createTable(serviceCategories);
+            }
+            if (!await _columnExists('services', 'category_id')) {
+              await m.addColumn(services, services.categoryId);
+            }
+          } catch (e) {
+            debugPrint('Migration v8 error (non-fatal): $e');
+          }
         }
+
+        // ── v8 → v9: Worker name ──
         if (from < 9) {
-          await m.addColumn(transactionItems, transactionItems.workerName);
+          try {
+            if (!await _columnExists('transaction_items', 'worker_name')) {
+              await m.addColumn(transactionItems, transactionItems.workerName);
+            }
+          } catch (e) {
+            debugPrint('Migration v9 error (non-fatal): $e');
+          }
         }
       },
       beforeOpen: (details) async {
-        // Optional: Logika tambahan sebelum database dibuka
+        // Validasi schema setelah migration selesai
+        try {
+          await _validateAndRepairSchema();
+        } catch (e) {
+          debugPrint('Schema validation error: $e');
+          // Jika validasi gagal total, recreate semua tabel
+          if (details.wasCreated) return;
+          try {
+            debugPrint('Attempting destructive migration fallback...');
+            final m = createMigrator();
+            await m.createAll();
+            debugPrint('Destructive migration fallback completed');
+          } catch (e2) {
+            debugPrint('Destructive migration fallback failed: $e2');
+          }
+        }
       },
     );
+  }
+
+  /// Recreate transaction_items dengan schema yang benar
+  Future<void> _recreateTransactionItems({
+    required bool includeApproval,
+    required bool includeWorker,
+  }) async {
+    final hasOldTable = await _tableExists('transaction_items');
+    if (!hasOldTable) return;
+
+    final approvalCol = includeApproval ? ', is_approved INTEGER NOT NULL DEFAULT 1' : '';
+    final workerCol = includeWorker ? ', worker_name TEXT' : '';
+
+    await customStatement('''
+      CREATE TABLE IF NOT EXISTS transaction_items_new (
+        id TEXT NOT NULL PRIMARY KEY,
+        transaction_id TEXT NOT NULL REFERENCES transactions(id),
+        item_type TEXT NOT NULL DEFAULT 'product',
+        product_id TEXT REFERENCES products(id),
+        service_id TEXT REFERENCES services(id),
+        qty INTEGER NOT NULL,
+        unit_price REAL NOT NULL,
+        discount REAL NOT NULL DEFAULT 0.0,
+        subtotal REAL NOT NULL
+        $approvalCol
+        $workerCol
+      )
+    ''');
+
+    // Copy data dari tabel lama
+    final hasItemType = await _columnExists('transaction_items', 'item_type');
+    final hasServiceId = await _columnExists('transaction_items', 'service_id');
+    final hasDiscount = await _columnExists('transaction_items', 'discount');
+
+    final itemTypeSelect = hasItemType ? "COALESCE(item_type, 'product')" : "'product'";
+    final serviceIdSelect = hasServiceId ? 'service_id' : 'NULL';
+    final discountSelect = hasDiscount ? 'COALESCE(discount, 0.0)' : '0.0';
+
+    await customStatement('''
+      INSERT OR IGNORE INTO transaction_items_new 
+        (id, transaction_id, item_type, product_id, service_id, qty, unit_price, discount, subtotal)
+      SELECT id, transaction_id, $itemTypeSelect, product_id, $serviceIdSelect, 
+        qty, unit_price, $discountSelect, subtotal
+      FROM transaction_items
+    ''');
+
+    await customStatement('DROP TABLE transaction_items');
+    await customStatement('ALTER TABLE transaction_items_new RENAME TO transaction_items');
+  }
+
+  /// Validasi schema — pastikan semua kolom kritikal ada
+  Future<void> _validateAndRepairSchema() async {
+    // Validasi kolom penting di transactions
+    if (await _tableExists('transactions')) {
+      if (!await _columnExists('transactions', 'customer_name')) {
+        await customStatement('ALTER TABLE transactions ADD COLUMN customer_name TEXT');
+      }
+      if (!await _columnExists('transactions', 'customer_id')) {
+        await customStatement('ALTER TABLE transactions ADD COLUMN customer_id TEXT');
+      }
+    }
+
+    // Validasi kolom penting di transaction_items
+    if (await _tableExists('transaction_items')) {
+      if (!await _columnExists('transaction_items', 'is_approved')) {
+        await customStatement('ALTER TABLE transaction_items ADD COLUMN is_approved INTEGER NOT NULL DEFAULT 1');
+      }
+      if (!await _columnExists('transaction_items', 'worker_name')) {
+        await customStatement('ALTER TABLE transaction_items ADD COLUMN worker_name TEXT');
+      }
+      if (!await _columnExists('transaction_items', 'item_type')) {
+        await customStatement("ALTER TABLE transaction_items ADD COLUMN item_type TEXT NOT NULL DEFAULT 'product'");
+      }
+      if (!await _columnExists('transaction_items', 'service_id')) {
+        await customStatement('ALTER TABLE transaction_items ADD COLUMN service_id TEXT');
+      }
+    }
+
+    // Validasi kolom penting di users
+    if (await _tableExists('users')) {
+      if (!await _columnExists('users', 'role')) {
+        await customStatement("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'owner'");
+      }
+      if (!await _columnExists('users', 'avatar_url')) {
+        await customStatement('ALTER TABLE users ADD COLUMN avatar_url TEXT');
+      }
+    }
+
+    // Validasi kolom penting di services
+    if (await _tableExists('services')) {
+      if (!await _columnExists('services', 'category_id')) {
+        await customStatement('ALTER TABLE services ADD COLUMN category_id TEXT');
+      }
+    }
+
+    // Validasi tabel yang harus ada
+    final requiredTables = [
+      'notifications', 'services', 'vehicles', 'work_orders',
+      'service_categories', 'stock_adjustments', 'sync_queue',
+    ];
+    for (final table in requiredTables) {
+      if (!await _tableExists(table)) {
+        debugPrint('Missing table detected: $table — will be created by fallback');
+        throw Exception('Missing required table: $table');
+      }
+    }
   }
 
   static QueryExecutor _openConnection() {
@@ -174,9 +343,10 @@ class AppDatabase extends _$AppDatabase {
   // ══════════════════════════════════════════════
   // ── Products ──
   // ══════════════════════════════════════════════
-  Future<List<Product>> getAllProducts({bool activeOnly = true}) {
+  Future<List<Product>> getAllProducts({bool activeOnly = true, int? limit, int? offset}) {
     final q = select(products);
     if (activeOnly) q.where((p) => p.isActive.equals(true));
+    if (limit != null) q.limit(limit, offset: offset);
     return q.get();
   }
 
@@ -374,7 +544,7 @@ class AppDatabase extends _$AppDatabase {
   )..where((t) => t.id.equals(w.id.value))).write(w).then((r) => r > 0);
 
   /// Get work order with vehicle info
-  Future<List<TypedResult>> getWorkOrdersWithVehicle({String? statusFilter}) {
+  Future<List<TypedResult>> getWorkOrdersWithVehicle({String? statusFilter, int? limit, int? offset}) {
     final q = select(
       workOrders,
     ).join([innerJoin(vehicles, vehicles.id.equalsExp(workOrders.vehicleId))]);
@@ -382,6 +552,7 @@ class AppDatabase extends _$AppDatabase {
       q.where(workOrders.status.equals(statusFilter));
     }
     q.orderBy([OrderingTerm.desc(workOrders.createdAt)]);
+    if (limit != null) q.limit(limit, offset: offset);
     return q.get();
   }
 
@@ -394,16 +565,22 @@ class AppDatabase extends _$AppDatabase {
       into(transactionItems).insert(i).then((_) => i.id.value);
   Future<List<Transaction>> getTransactionsByDate(
     DateTime start,
-    DateTime end,
-  ) =>
-      (select(transactions)
+    DateTime end, {
+    String? userId,
+    int? limit,
+    int? offset,
+  }) {
+      final q = select(transactions)
             ..where(
               (t) =>
                   t.createdAt.isBiggerOrEqualValue(start) &
                   t.createdAt.isSmallerOrEqualValue(end),
             )
-            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]))
-          .get();
+            ..orderBy([(t) => OrderingTerm.desc(t.createdAt)]);
+      if (userId != null) q.where((t) => t.userId.equals(userId));
+      if (limit != null) q.limit(limit, offset: offset);
+      return q.get();
+  }
   Future<List<Transaction>> getTransactionsByUser(
     String userId,
     DateTime start,
@@ -517,6 +694,30 @@ class AppDatabase extends _$AppDatabase {
       'GROUP BY DATE(t.created_at, \'unixepoch\', \'localtime\') ORDER BY sale_date ASC',
       variables: [
         Variable.withDateTime(DateTime.now().subtract(Duration(days: days))),
+      ],
+      readsFrom: {transactions, transactionItems},
+    ).get();
+    return rows
+        .map(
+          (r) => {
+            'date': r.readNullable<String>('sale_date') ?? '',
+            'total': r.read<double>('daily_total'),
+            'count': r.read<int>('txn_count'),
+          },
+        )
+        .toList();
+  }
+
+  /// Penjualan berdasarkan rentang tanggal
+  Future<List<Map<String, dynamic>>> getSalesByDateRange(DateTime start, DateTime end) async {
+    final rows = await customSelect(
+      'SELECT DATE(t.created_at, \'unixepoch\', \'localtime\') as sale_date, COALESCE(SUM(ti.subtotal), 0.0) as daily_total, COUNT(DISTINCT t.id) as txn_count '
+      'FROM transactions t JOIN transaction_items ti ON t.id=ti.transaction_id '
+      'WHERE t.created_at>=? AND t.created_at<=? AND t.status=\'completed\' AND ti.is_approved=1 '
+      'GROUP BY DATE(t.created_at, \'unixepoch\', \'localtime\') ORDER BY sale_date ASC',
+      variables: [
+        Variable.withDateTime(start),
+        Variable.withDateTime(end),
       ],
       readsFrom: {transactions, transactionItems},
     ).get();

@@ -18,8 +18,10 @@ class NotificationService {
     if (_isInitialized) return;
     try {
       // Icon launcher standar untuk notifikasi Android
+      // PENTING: Menggunakan @mipmap/logo karena itulah icon yang ada di project.
+      // @mipmap/ic_launcher TIDAK ADA dan akan menyebabkan crash diam-diam.
       const AndroidInitializationSettings androidSettings =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
+          AndroidInitializationSettings('@mipmap/logo');
 
       // Pengaturan untuk iOS
       const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
@@ -44,13 +46,15 @@ class NotificationService {
       if (defaultTargetPlatform == TargetPlatform.android) {
         final androidImplementation = _plugin
             .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-        await androidImplementation?.requestNotificationsPermission();
+        final granted = await androidImplementation?.requestNotificationsPermission();
+        debugPrint('Notification permission granted: $granted');
       }
 
       _isInitialized = true;
-      debugPrint('Notification service initialized successfully');
-    } catch (e) {
-      debugPrint('Error initializing notification service: $e');
+      debugPrint('✅ Notification service initialized successfully');
+    } catch (e, st) {
+      debugPrint('❌ Error initializing notification service: $e');
+      debugPrint('Stack trace: $st');
     }
   }
 
@@ -61,18 +65,79 @@ class NotificationService {
     required String body,
     required bool isCritical,
   }) async {
+    await _showNotification(
+      id: id,
+      title: title,
+      body: body,
+      channelId: 'stock_warnings_channel',
+      channelName: 'Peringatan Stok',
+      channelDescription: 'Notifikasi saat stok barang menipis atau habis di toko',
+      color: isCritical ? const Color(0xFFD32F2F) : const Color(0xFFF57C00),
+    );
+  }
+
+  /// Menampilkan notifikasi transaksi baru dari kasir
+  Future<void> showTransactionNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await _showNotification(
+      id: id,
+      title: title,
+      body: body,
+      channelId: 'transactions_channel',
+      channelName: 'Transaksi',
+      channelDescription: 'Notifikasi saat ada transaksi baru dari kasir',
+      color: const Color(0xFF4CAF50),
+    );
+  }
+
+  /// Menampilkan notifikasi persetujuan jasa
+  Future<void> showApprovalNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await _showNotification(
+      id: id,
+      title: title,
+      body: body,
+      channelId: 'approval_channel',
+      channelName: 'Persetujuan Jasa',
+      channelDescription: 'Notifikasi saat ada jasa yang membutuhkan persetujuan',
+      color: const Color(0xFF2196F3),
+    );
+  }
+
+  /// Method internal untuk menampilkan notifikasi
+  Future<void> _showNotification({
+    required int id,
+    required String title,
+    required String body,
+    required String channelId,
+    required String channelName,
+    required String channelDescription,
+    required Color color,
+  }) async {
     if (!_isInitialized) {
+      debugPrint('⚠️ NotificationService belum diinisialisasi, mencoba init()...');
       await init();
     }
 
+    if (!_isInitialized) {
+      debugPrint('❌ NotificationService gagal diinisialisasi, notifikasi tidak bisa ditampilkan');
+      return;
+    }
+
     final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'stock_warnings_channel',
-      'Peringatan Stok',
-      channelDescription: 'Notifikasi saat stok barang menipis atau habis di toko',
+      channelId,
+      channelName,
+      channelDescription: channelDescription,
       importance: Importance.max,
       priority: Priority.high,
-      color: isCritical ? const Color(0xFFD32F2F) : const Color(0xFFF57C00),
-      icon: '@mipmap/ic_launcher',
+      color: color,
+      icon: '@mipmap/logo',
       enableVibration: true,
       playSound: true,
     );
@@ -95,9 +160,10 @@ class NotificationService {
         body: body,
         notificationDetails: details,
       );
-      debugPrint('Stock warning notification shown: $title');
-    } catch (e) {
-      debugPrint('Error showing local notification: $e');
+      debugPrint('✅ Notification shown: [$channelId] $title');
+    } catch (e, st) {
+      debugPrint('❌ Error showing local notification: $e');
+      debugPrint('Stack trace: $st');
     }
   }
 }

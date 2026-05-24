@@ -21,34 +21,80 @@ final categoriesProvider = FutureProvider<List<Category>>((ref) {
   return db.getAllCategories();
 });
 
-/// Provider daftar produk (dengan filter)
-final productsProvider = FutureProvider<List<Product>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  final search = ref.watch(productSearchProvider);
-  final filter = ref.watch(stockFilterProvider);
-  final categoryId = ref.watch(selectedCategoryProvider);
+class ProductsPaginationNotifier extends AsyncNotifier<List<Product>> {
+  int _offset = 0;
+  final int _limit = 20;
+  bool _hasMore = true;
 
-  List<Product> products;
+  bool get hasMore => _hasMore;
 
-  if (search.isNotEmpty) {
-    products = await db.searchProducts(search);
-  } else if (categoryId != null) {
-    products = await db.getProductsByCategory(categoryId);
-  } else {
-    products = await db.getAllProducts();
+  @override
+  Future<List<Product>> build() async {
+    _offset = 0;
+    _hasMore = true;
+    
+    // Listen to filter changes so it triggers a rebuild
+    ref.watch(productSearchProvider);
+    ref.watch(stockFilterProvider);
+    ref.watch(selectedCategoryProvider);
+    
+    return _fetchProducts();
   }
 
-  // Apply stock filter
-  switch (filter) {
-    case StockFilter.low:
-      products = products.where((p) => p.stockQty > 0 && p.stockQty <= p.stockMin).toList();
-    case StockFilter.empty:
-      products = products.where((p) => p.stockQty == 0).toList();
-    case StockFilter.all:
-      break;
+  Future<List<Product>> _fetchProducts() async {
+    final db = ref.read(databaseProvider);
+    final search = ref.read(productSearchProvider);
+    final filter = ref.read(stockFilterProvider);
+    final categoryId = ref.read(selectedCategoryProvider);
+
+    List<Product> products;
+
+    if (search.isNotEmpty) {
+      products = await db.searchProducts(search);
+    } else if (categoryId != null) {
+      products = await db.getProductsByCategory(categoryId);
+    } else {
+      products = await db.getAllProducts(limit: _limit, offset: _offset);
+    }
+
+    // Apply stock filter
+    switch (filter) {
+      case StockFilter.low:
+        products = products.where((p) => p.stockQty > 0 && p.stockQty <= p.stockMin).toList();
+      case StockFilter.empty:
+        products = products.where((p) => p.stockQty == 0).toList();
+      case StockFilter.all:
+        break;
+    }
+
+    if (search.isEmpty && categoryId == null && filter == StockFilter.all) {
+      _hasMore = products.length == _limit;
+    } else {
+      _hasMore = false;
+    }
+
+    return products;
   }
 
-  return products;
+  Future<void> loadMore() async {
+    if (!_hasMore || state.isLoading) return;
+
+    final currentProducts = state.value ?? [];
+    _offset += _limit;
+
+    try {
+      final newProducts = await _fetchProducts();
+      state = AsyncValue.data([...currentProducts, ...newProducts]);
+    } catch (e, st) {
+      _offset -= _limit;
+      state = AsyncValue.error(e, st);
+    }
+  }
+}
+
+/// Provider daftar produk (dengan filter dan pagination)
+final productsProvider = AsyncNotifierProvider<ProductsPaginationNotifier, List<Product>>(() {
+  return ProductsPaginationNotifier();
 });
 
 /// Provider detail produk

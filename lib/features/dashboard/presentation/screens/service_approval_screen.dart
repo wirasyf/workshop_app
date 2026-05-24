@@ -237,7 +237,10 @@ class _PendingTab extends ConsumerWidget {
                                   tableName: 'transaction_items',
                                   recordId: item.id,
                                   operation: 'update',
-                                  data: {'is_approved': true},
+                                  data: {
+                                    'is_approved': true,
+                                    'updated_at': DateTime.now().toIso8601String()
+                                  },
                                 );
                                 ref.invalidate(pendingApprovalsProvider);
                                 ref.invalidate(approvedApprovalsProvider);

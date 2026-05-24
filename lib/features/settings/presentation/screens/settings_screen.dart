@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:spareart_app/main.dart';
+import 'package:dnd_markasban_app/main.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/connectivity_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
@@ -57,10 +57,11 @@ class SettingsScreen extends ConsumerWidget {
                 Text('Akun Terverifikasi', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600, color: AppColors.success)),
               ]),
               const Spacer(),
-              IconButton(
-                icon: const Icon(Icons.edit_rounded, color: AppColors.primary),
-                onPressed: () => context.go('/settings/edit-profile'),
-              ),
+              if (user?.role != 'cashier')
+                IconButton(
+                  icon: const Icon(Icons.edit_rounded, color: AppColors.primary),
+                  onPressed: () => context.go('/settings/edit-profile'),
+                ),
             ]),
           ),
           const SizedBox(height: 20),
@@ -99,6 +100,8 @@ class SettingsScreen extends ConsumerWidget {
           }),
           
           const Divider(height: 32),
+          _settingsTile(Icons.lock_reset_rounded, 'Ubah Kata Sandi', subtitle: 'Perbarui kata sandi akun Anda', onTap: () => context.go('/settings/change-password')),
+          const Divider(height: 32),
           if (user?.role == 'owner')
             _settingsTile(Icons.store_rounded, 'Profil & Struk Toko', subtitle: 'Identitas toko & footer struk', onTap: () => context.go('/settings/store-profile')),
           _settingsTile(Icons.print_rounded, 'Printer Bluetooth', subtitle: 'Hubungkan printer thermal', onTap: () => context.go('/settings/bluetooth-printer')),
@@ -106,13 +109,13 @@ class SettingsScreen extends ConsumerWidget {
 
           // Menu yang dipindah dari bottom nav
           _settingsTile(Icons.history_rounded, 'Riwayat Transaksi', subtitle: 'Semua transaksi selesai', onTap: () => context.go('/history')),
-          _settingsTile(Icons.inventory_2_rounded, 'Manajemen Stok & Produk', subtitle: 'Katalog sparepart & stok', onTap: () => context.go('/products')),
-          _settingsTile(Icons.build_rounded, 'Manajemen Jasa', subtitle: 'Katalog jasa bengkel', onTap: () => context.go('/services')),
+          if (user?.role != 'cashier')
+            _settingsTile(Icons.inventory_2_rounded, 'Manajemen Stok & Produk', subtitle: 'Katalog sparepart & stok', onTap: () => context.go('/products')),
+          if (user?.role != 'cashier')
+            _settingsTile(Icons.build_rounded, 'Manajemen Jasa', subtitle: 'Katalog jasa bengkel', onTap: () => context.go('/services')),
           if (user?.role == 'owner')
             _settingsTile(Icons.people_alt_rounded, 'Kelola Karyawan', subtitle: 'Manajemen akun kasir', onTap: () => context.go('/staff')),
           const Divider(height: 32),
-          _settingsTile(Icons.info_rounded, 'Tentang Aplikasi', subtitle: 'SpareArt Motor v1.0.0'),
-          const SizedBox(height: 16),
 
           // Logout
           SizedBox(
