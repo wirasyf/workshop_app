@@ -275,6 +275,11 @@ class _ServiceFormScreenState extends ConsumerState<ServiceFormScreen> {
                 suffixText: 'menit',
                 prefixIcon: Icon(Icons.timer_rounded),
               ),
+              validator: (v) {
+                if (v == null || v.isEmpty) return 'Wajib diisi';
+                if ((int.tryParse(v) ?? 0) <= 0) return 'Harus angka > 0';
+                return null;
+              },
             ),
             const SizedBox(height: 16),
 

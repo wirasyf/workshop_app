@@ -399,7 +399,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     keyboard: TextInputType.number,
                     prefix: 'Rp ',
                     formatters: [RupiahInputFormatter()],
-                    validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Wajib';
+                      if (CurrencyFormatter.parse(v) <= 0) return 'Harus > 0';
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -410,7 +414,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     keyboard: TextInputType.number,
                     prefix: 'Rp ',
                     formatters: [RupiahInputFormatter()],
-                    validator: (v) => v!.isEmpty ? 'Wajib' : null,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Wajib';
+                      if (CurrencyFormatter.parse(v) <= 0) return 'Harus > 0';
+                      return null;
+                    },
                   ),
                 ),
               ],
@@ -432,6 +440,11 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     _stockQtyCtrl,
                     'Stok Awal',
                     keyboard: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Wajib';
+                      if ((int.tryParse(v) ?? -1) < 0) return 'Harus >= 0';
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -440,10 +453,15 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                     _stockMinCtrl,
                     'Stok Minimum',
                     keyboard: TextInputType.number,
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Wajib';
+                      if ((int.tryParse(v) ?? -1) < 0) return 'Harus >= 0';
+                      return null;
+                    },
                   ),
                 ),
                 const SizedBox(width: 12),
-                Expanded(child: _field(_unitCtrl, 'Satuan')),
+                Expanded(child: _field(_unitCtrl, 'Satuan', validator: (v) => v!.isEmpty ? 'Wajib' : null)),
               ],
             ),
 

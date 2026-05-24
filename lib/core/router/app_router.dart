@@ -1,5 +1,7 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import '../database/app_database.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
 import '../../features/auth/presentation/screens/signup_screen.dart';
@@ -32,11 +34,17 @@ import '../../features/workshop/presentation/screens/work_order_detail_screen.da
 import '../../shared/screens/shell_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  final notifier = ValueNotifier<AsyncValue<User?>>(const AsyncValue.loading());
+
+  ref.listen(authStateProvider, (prev, next) {
+    notifier.value = next;
+  });
 
   return GoRouter(
     initialLocation: '/splash',
+    refreshListenable: notifier,
     redirect: (context, state) {
+      final authState = ref.read(authStateProvider);
       if (authState.isLoading) return null; // Tunggu loading selesai di Splash
 
       final isLoggedIn = authState.value != null;
@@ -67,20 +75,27 @@ final routerProvider = Provider<GoRouter>((ref) {
           return '/dashboard';
         }
       }
-      
+
       return null;
     },
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
       GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
-      GoRoute(path: '/payment-success', builder: (_, state) => PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?)),
+      GoRoute(
+        path: '/payment-success',
+        builder: (_, state) =>
+            PaymentSuccessScreen(data: state.extra as Map<String, dynamic>?),
+      ),
 
       // Shell route dengan bottom navigation
       ShellRoute(
         builder: (_, state, child) => ShellScreen(child: child),
         routes: [
-          GoRoute(path: '/dashboard', builder: (_, __) => const OwnerDashboardScreen()),
+          GoRoute(
+            path: '/dashboard',
+            builder: (_, __) => const OwnerDashboardScreen(),
+          ),
           GoRoute(
             path: '/pos',
             builder: (_, __) => const PosProductScreen(),
@@ -94,9 +109,16 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/workshop',
             builder: (_, __) => const WorkshopScreen(),
             routes: [
-              GoRoute(path: 'new-order', builder: (_, __) => const WorkOrderFormScreen()),
-              GoRoute(path: ':id', builder: (_, state) =>
-                  WorkOrderDetailScreen(workOrderId: state.pathParameters['id']!)),
+              GoRoute(
+                path: 'new-order',
+                builder: (_, __) => const WorkOrderFormScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (_, state) => WorkOrderDetailScreen(
+                  workOrderId: state.pathParameters['id']!,
+                ),
+              ),
             ],
           ),
 
@@ -104,14 +126,30 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/products',
             builder: (_, __) => const ProductListScreen(),
             routes: [
-              GoRoute(path: 'categories', builder: (_, __) => const CategoryListScreen()),
-              GoRoute(path: 'add', builder: (_, __) => const ProductFormScreen()),
-              GoRoute(path: ':id', builder: (_, state) =>
-                  ProductDetailScreen(productId: state.pathParameters['id']!)),
-              GoRoute(path: ':id/edit', builder: (_, state) =>
-                  ProductFormScreen(productId: state.pathParameters['id']!)),
-              GoRoute(path: ':id/adjust', builder: (_, state) =>
-                  StockAdjustmentScreen(productId: state.pathParameters['id']!)),
+              GoRoute(
+                path: 'categories',
+                builder: (_, __) => const CategoryListScreen(),
+              ),
+              GoRoute(
+                path: 'add',
+                builder: (_, __) => const ProductFormScreen(),
+              ),
+              GoRoute(
+                path: ':id',
+                builder: (_, state) =>
+                    ProductDetailScreen(productId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: ':id/edit',
+                builder: (_, state) =>
+                    ProductFormScreen(productId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: ':id/adjust',
+                builder: (_, state) => StockAdjustmentScreen(
+                  productId: state.pathParameters['id']!,
+                ),
+              ),
             ],
           ),
 
@@ -120,10 +158,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             path: '/services',
             builder: (_, __) => const ServiceListScreen(),
             routes: [
-              GoRoute(path: 'add', builder: (_, __) => const ServiceFormScreen()),
-              GoRoute(path: ':id/edit', builder: (_, state) =>
-                  ServiceFormScreen(serviceId: state.pathParameters['id']!)),
-              GoRoute(path: 'categories', builder: (_, __) => const ServiceCategoryListScreen()),
+              GoRoute(
+                path: 'add',
+                builder: (_, __) => const ServiceFormScreen(),
+              ),
+              GoRoute(
+                path: ':id/edit',
+                builder: (_, state) =>
+                    ServiceFormScreen(serviceId: state.pathParameters['id']!),
+              ),
+              GoRoute(
+                path: 'categories',
+                builder: (_, __) => const ServiceCategoryListScreen(),
+              ),
             ],
           ),
 
@@ -134,17 +181,35 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ),
           GoRoute(path: '/reports', builder: (_, __) => const ReportScreen()),
-          GoRoute(path: '/notifications', builder: (_, __) => const NotificationScreen()),
-          GoRoute(path: '/service-approval', builder: (_, __) => const ServiceApprovalScreen()),
+          GoRoute(
+            path: '/notifications',
+            builder: (_, __) => const NotificationScreen(),
+          ),
+          GoRoute(
+            path: '/service-approval',
+            builder: (_, __) => const ServiceApprovalScreen(),
+          ),
           GoRoute(path: '/staff', builder: (_, __) => const StaffListScreen()),
           GoRoute(
-            path: '/settings', 
+            path: '/settings',
             builder: (_, __) => const SettingsScreen(),
             routes: [
-              GoRoute(path: 'store-profile', builder: (_, __) => const StoreProfileScreen()),
-              GoRoute(path: 'edit-profile', builder: (_, __) => const EditProfileScreen()),
-              GoRoute(path: 'change-password', builder: (_, __) => const ChangePasswordScreen()),
-              GoRoute(path: 'bluetooth-printer', builder: (_, __) => const BluetoothPrinterScreen()),
+              GoRoute(
+                path: 'store-profile',
+                builder: (_, __) => const StoreProfileScreen(),
+              ),
+              GoRoute(
+                path: 'edit-profile',
+                builder: (_, __) => const EditProfileScreen(),
+              ),
+              GoRoute(
+                path: 'change-password',
+                builder: (_, __) => const ChangePasswordScreen(),
+              ),
+              GoRoute(
+                path: 'bluetooth-printer',
+                builder: (_, __) => const BluetoothPrinterScreen(),
+              ),
             ],
           ),
         ],

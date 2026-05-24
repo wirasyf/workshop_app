@@ -46,6 +46,14 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
     final change = _isAdd ? qty : -qty;
 
     try {
+      final product = await db.getProductById(widget.productId);
+      if (product == null) {
+        throw 'Produk tidak ditemukan';
+      }
+      if (!_isAdd && qty > product.stockQty) {
+        throw 'Jumlah pengurangan melebihi stok saat ini (${product.stockQty})';
+      }
+
       final id = const Uuid().v4();
       await db.insertStockAdjustment(StockAdjustmentsCompanion.insert(
         id: id,

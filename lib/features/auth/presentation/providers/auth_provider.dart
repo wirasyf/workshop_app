@@ -50,7 +50,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
 
   /// Login dengan username/email dan password (offline-first via lokal DB)
   Future<bool> login(String identifier, String password) async {
-    state = const AsyncValue.loading();
     try {
       final trimmedIdentifier = identifier.trim();
       
@@ -91,16 +90,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       }
       
       if (user == null) {
-        state = AsyncValue.error('User tidak ditemukan', StackTrace.current);
-        return false;
+        throw 'User tidak ditemukan';
       }
       if (!PasswordService.verifyPassword(password, user.passwordHash)) {
-        state = AsyncValue.error('Password salah', StackTrace.current);
-        return false;
+        throw 'Password salah';
       }
       if (!user.isActive) {
-        state = AsyncValue.error('Akun tidak aktif', StackTrace.current);
-        return false;
+        throw 'Akun tidak aktif';
       }
 
       // Auto-migrate plain text password ke hashed format
@@ -131,9 +127,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       
       state = AsyncValue.data(user);
       return true;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return false;
+    } catch (e) {
+      throw e.toString();
     }
   }
 
@@ -145,7 +140,6 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     required String password,
     String role = 'owner',
   }) async {
-    state = const AsyncValue.loading();
     try {
       final trimmedUsername = username.trim();
       final trimmedEmail = email.trim();
@@ -153,15 +147,13 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
       // Cek apakah username sudah terdaftar
       final existingUser = await _db.getUserByUsername(trimmedUsername);
       if (existingUser != null) {
-        state = AsyncValue.error('Username sudah digunakan', StackTrace.current);
-        return false;
+        throw 'Username sudah digunakan';
       }
 
       // Cek apakah email sudah terdaftar
       final existingEmail = await _db.getUserByEmail(trimmedEmail);
       if (existingEmail != null) {
-        state = AsyncValue.error('Email sudah terdaftar', StackTrace.current);
-        return false;
+        throw 'Email sudah terdaftar';
       }
 
       final id = const Uuid().v4();
@@ -208,9 +200,8 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
         return true;
       }
       return false;
-    } catch (e, st) {
-      state = AsyncValue.error(e, st);
-      return false;
+    } catch (e) {
+      throw e.toString();
     }
   }
 

@@ -43,24 +43,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final success = await ref.read(authStateProvider.notifier).login(
-      _emailCtrl.text.trim(),
-      _passwordCtrl.text,
-    );
+    try {
+      final success = await ref.read(authStateProvider.notifier).login(
+        _emailCtrl.text.trim(),
+        _passwordCtrl.text,
+      );
 
-    if (mounted) {
-      setState(() => _isLoading = false);
-    }
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
 
-    if (success && mounted) {
-      AppToast.show(context, 'Login berhasil', type: ToastType.success);
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (!mounted) return;
-        context.go('/dashboard');
-      });
-    } else if (mounted) {
-      final error = ref.read(authStateProvider).error?.toString() ?? 'Login gagal';
-      AppToast.show(context, error, type: ToastType.error);
+      if (success && mounted) {
+        AppToast.show(context, 'Login berhasil', type: ToastType.success);
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (!mounted) return;
+          context.go('/dashboard');
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+        AppToast.show(context, e.toString(), type: ToastType.error);
+      }
     }
   }
 
