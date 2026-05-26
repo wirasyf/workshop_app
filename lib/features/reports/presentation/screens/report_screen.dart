@@ -36,12 +36,22 @@ final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   switch (period) {
     case ReportPeriod.daily:
       start = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
-      end = DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 23, 59, 59, 999);
+      end = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        23,
+        59,
+        59,
+        999,
+      );
       break;
     case ReportPeriod.weekly:
       start = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
       start = DateTime(start.year, start.month, start.day);
-      end = start.add(const Duration(days: 6, hours: 23, minutes: 59, seconds: 59));
+      end = start.add(
+        const Duration(days: 6, hours: 23, minutes: 59, seconds: 59),
+      );
       break;
     case ReportPeriod.monthly:
       start = DateTime(selectedDate.year, selectedDate.month, 1);
@@ -53,9 +63,23 @@ final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
       end = DateTime(selectedDate.year, 12, 31, 23, 59, 59, 999);
       break;
     case ReportPeriod.custom:
-      start = ref.watch(customStartDateProvider) ?? DateTime(DateTime.now().year, DateTime.now().month, DateTime.now().day);
+      start =
+          ref.watch(customStartDateProvider) ??
+          DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          );
       final customEnd = ref.watch(customEndDateProvider) ?? DateTime.now();
-      end = DateTime(customEnd.year, customEnd.month, customEnd.day, 23, 59, 59, 999);
+      end = DateTime(
+        customEnd.year,
+        customEnd.month,
+        customEnd.day,
+        23,
+        59,
+        59,
+        999,
+      );
       break;
   }
 
@@ -93,53 +117,126 @@ class ReportScreen extends ConsumerWidget {
     try {
       final transactions = data['transactions'] as List<TransactionModel>;
       final period = ref.read(reportPeriodProvider);
-      
+
       String periodType = '';
       switch (period) {
-        case ReportPeriod.daily: periodType = 'Harian'; break;
-        case ReportPeriod.weekly: periodType = 'Mingguan'; break;
-        case ReportPeriod.monthly: periodType = 'Bulanan'; break;
-        case ReportPeriod.yearly: periodType = 'Tahunan'; break;
-        case ReportPeriod.custom: periodType = 'Kustom'; break;
+        case ReportPeriod.daily:
+          periodType = 'Harian';
+          break;
+        case ReportPeriod.weekly:
+          periodType = 'Mingguan';
+          break;
+        case ReportPeriod.monthly:
+          periodType = 'Bulanan';
+          break;
+        case ReportPeriod.yearly:
+          periodType = 'Tahunan';
+          break;
+        case ReportPeriod.custom:
+          periodType = 'Kustom';
+          break;
       }
 
       final label = _getFilterLabel(ref, period);
       final safePeriodLabel = label.replaceAll('/', '-').replaceAll(' ', '_');
 
       var excel = Excel.createExcel();
+
+      if (excel.tables.keys.isNotEmpty &&
+          excel.tables.keys.first != 'Laporan') {
+        excel.rename(excel.tables.keys.first, 'Laporan');
+      }
+
       Sheet sheetObject = excel['Laporan'];
       excel.setDefaultSheet('Laporan');
 
       // Add Headers
       sheetObject.appendRow([
-        TextCellValue('Invoice No'),
-        TextCellValue('Tanggal'),
-        TextCellValue('Pelanggan'),
-        TextCellValue('Total Pendapatan'),
-        TextCellValue('Total HPP'),
+        TextCellValue('Tanggal dan Waktu'),
+        TextCellValue('No Invoice'),
+        TextCellValue('Keterangan Produk dan Jumlah'),
+        TextCellValue('Harga Beli Produk'),
+        TextCellValue('Harga Jual Produk'),
+        TextCellValue('Keterangan Jasa'),
+        TextCellValue('Keterangan Mekanik'),
+        TextCellValue('Harga Jasa'),
+        TextCellValue('Harga Jual Total'),
         TextCellValue('Laba Bersih'),
-        TextCellValue('Metode Bayar'),
         TextCellValue('Status'),
       ]);
 
+      // Apply style to header row
+      final headerStyle = CellStyle(
+        backgroundColorHex: ExcelColor.fromHexString('#1976D2'),
+        fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+        bold: true,
+      );
+      for (int i = 0; i < 11; i++) {
+        var cell = sheetObject.cell(
+          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
+        cell.cellStyle = headerStyle;
+      }
+
+      final repo = ref.read(transactionRepositoryProvider);
+
       // Add Data
       for (var tx in transactions) {
+        final items = await repo.getTransactionItems(tx.id);
+
+        List<String> productDetails = [];
+        List<String> serviceDetails = [];
+        Set<String> mechanics = {};
+
+        double totalProductSales = 0.0;
+        double totalServiceSales = 0.0;
+
+        for (var item in items) {
+          if (item.itemType == 'product') {
+            productDetails.add('${item.productName ?? 'Produk'} x${item.qty}');
+            totalProductSales += item.subtotal;
+          } else if (item.itemType == 'service') {
+            serviceDetails.add('${item.productName ?? 'Jasa'} x${item.qty}');
+            totalServiceSales += item.subtotal;
+            if (item.workerName != null && item.workerName!.isNotEmpty) {
+              mechanics.add(item.workerName!);
+            }
+          }
+        }
+
+        String statusIndo = tx.status;
+        if (tx.status == 'completed') {
+          statusIndo = 'Selesai';
+        } else if (tx.status == 'pending') {
+          statusIndo = 'Tertunda';
+        } else if (tx.status == 'cancelled') {
+          statusIndo = 'Dibatalkan';
+        }
+
         sheetObject.appendRow([
+          TextCellValue(DateFormatter.formatWithTime(tx.createdAt)),
           TextCellValue(tx.invoiceNo),
-          TextCellValue(DateFormatter.formatLong(tx.createdAt)),
-          TextCellValue(tx.customerName ?? '-'),
-          DoubleCellValue(tx.total),
-          DoubleCellValue(tx.totalCost),
-          DoubleCellValue(tx.total - tx.totalCost),
-          TextCellValue(tx.paymentMethod),
-          TextCellValue(tx.status),
+          TextCellValue(
+            productDetails.isNotEmpty ? productDetails.join(', ') : '-',
+          ),
+          TextCellValue(CurrencyFormatter.format(tx.totalCost)),
+          TextCellValue(CurrencyFormatter.format(totalProductSales)),
+          TextCellValue(
+            serviceDetails.isNotEmpty ? serviceDetails.join(', ') : '-',
+          ),
+          TextCellValue(mechanics.isNotEmpty ? mechanics.join(', ') : '-'),
+          TextCellValue(CurrencyFormatter.format(totalServiceSales)),
+          TextCellValue(CurrencyFormatter.format(tx.total)),
+          TextCellValue(CurrencyFormatter.format(tx.total - tx.totalCost)),
+          TextCellValue(statusIndo),
         ]);
       }
 
       var fileBytes = excel.save();
       if (fileBytes != null) {
         final directory = await getApplicationDocumentsDirectory();
-        final path = '${directory.path}/Laporan_${periodType}_$safePeriodLabel.xlsx';
+        final path =
+            '${directory.path}/Laporan_${periodType}_$safePeriodLabel.xlsx';
         final file = File(path);
         await file.writeAsBytes(fileBytes);
 
@@ -156,12 +253,20 @@ class ReportScreen extends ConsumerWidget {
       }
     } catch (e) {
       if (context.mounted) {
-        AppToast.show(context, 'Gagal mengekspor laporan: $e', type: ToastType.error);
+        AppToast.show(
+          context,
+          'Gagal mengekspor laporan: $e',
+          type: ToastType.error,
+        );
       }
     }
   }
 
-  Future<void> _showMonthYearPicker(BuildContext context, WidgetRef ref, bool isYearOnly) async {
+  Future<void> _showMonthYearPicker(
+    BuildContext context,
+    WidgetRef ref,
+    bool isYearOnly,
+  ) async {
     final current = ref.read(selectedDateProvider);
     int selectedYear = current.year;
     int selectedMonth = current.month;
@@ -183,7 +288,13 @@ class ReportScreen extends ConsumerWidget {
                         icon: const Icon(Icons.chevron_left),
                         onPressed: () => setState(() => selectedYear--),
                       ),
-                      Text('$selectedYear', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                      Text(
+                        '$selectedYear',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                       IconButton(
                         icon: const Icon(Icons.chevron_right),
                         onPressed: () => setState(() => selectedYear++),
@@ -202,15 +313,27 @@ class ReportScreen extends ConsumerWidget {
                         return InkWell(
                           onTap: () => setState(() => selectedMonth = month),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
                             decoration: BoxDecoration(
-                              color: isSelected ? AppColors.primary : Colors.transparent,
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.transparent,
                               borderRadius: BorderRadius.circular(8),
                               border: Border.all(color: AppColors.primary),
                             ),
                             child: Text(
-                              DateFormat('MMM', 'id_ID').format(DateTime(2020, month)),
-                              style: TextStyle(color: isSelected ? Colors.white : AppColors.primary),
+                              DateFormat(
+                                'MMM',
+                                'id_ID',
+                              ).format(DateTime(2020, month)),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.primary,
+                              ),
                             ),
                           ),
                         );
@@ -220,19 +343,26 @@ class ReportScreen extends ConsumerWidget {
                 ],
               ),
               actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Batal'),
+                ),
                 ElevatedButton(
                   onPressed: () {
-                    ref.read(selectedDateProvider.notifier).state = DateTime(selectedYear, isYearOnly ? 1 : selectedMonth, 1);
+                    ref.read(selectedDateProvider.notifier).state = DateTime(
+                      selectedYear,
+                      isYearOnly ? 1 : selectedMonth,
+                      1,
+                    );
                     Navigator.pop(ctx);
                   },
                   child: const Text('Pilih'),
                 ),
               ],
             );
-          }
+          },
         );
-      }
+      },
     );
   }
 
@@ -245,7 +375,7 @@ class ReportScreen extends ConsumerWidget {
       }
       return 'Pilih Tanggal';
     }
-    
+
     final selected = ref.watch(selectedDateProvider);
     switch (period) {
       case ReportPeriod.daily:
@@ -278,7 +408,11 @@ class ReportScreen extends ConsumerWidget {
               icon: const Icon(Icons.download_rounded),
               tooltip: 'Unduh Excel',
               onPressed: () {
-                AppToast.show(context, 'Menyiapkan file Excel...', type: ToastType.loading);
+                AppToast.show(
+                  context,
+                  'Menyiapkan file Excel...',
+                  type: ToastType.loading,
+                );
                 _exportToExcel(context, ref, data);
               },
             ),
@@ -333,13 +467,17 @@ class ReportScreen extends ConsumerWidget {
                   flex: 3,
                   child: OutlinedButton.icon(
                     style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
                     onPressed: () async {
-                      if (period == ReportPeriod.daily || period == ReportPeriod.weekly) {
+                      if (period == ReportPeriod.daily ||
+                          period == ReportPeriod.weekly) {
                         final picked = await showDatePicker(
                           context: context,
                           initialDate: ref.read(selectedDateProvider),
@@ -347,22 +485,35 @@ class ReportScreen extends ConsumerWidget {
                           lastDate: DateTime(2100),
                         );
                         if (picked != null) {
-                          ref.read(selectedDateProvider.notifier).state = picked;
+                          ref.read(selectedDateProvider.notifier).state =
+                              picked;
                         }
-                      } else if (period == ReportPeriod.monthly || period == ReportPeriod.yearly) {
-                        await _showMonthYearPicker(context, ref, period == ReportPeriod.yearly);
+                      } else if (period == ReportPeriod.monthly ||
+                          period == ReportPeriod.yearly) {
+                        await _showMonthYearPicker(
+                          context,
+                          ref,
+                          period == ReportPeriod.yearly,
+                        );
                       } else if (period == ReportPeriod.custom) {
-                        final currentStart = ref.read(customStartDateProvider) ?? DateTime.now();
-                        final currentEnd = ref.read(customEndDateProvider) ?? DateTime.now();
+                        final currentStart =
+                            ref.read(customStartDateProvider) ?? DateTime.now();
+                        final currentEnd =
+                            ref.read(customEndDateProvider) ?? DateTime.now();
                         final picked = await showDateRangePicker(
                           context: context,
-                          initialDateRange: DateTimeRange(start: currentStart, end: currentEnd),
+                          initialDateRange: DateTimeRange(
+                            start: currentStart,
+                            end: currentEnd,
+                          ),
                           firstDate: DateTime(2020),
                           lastDate: DateTime(2100),
                         );
                         if (picked != null) {
-                          ref.read(customStartDateProvider.notifier).state = picked.start;
-                          ref.read(customEndDateProvider.notifier).state = picked.end;
+                          ref.read(customStartDateProvider.notifier).state =
+                              picked.start;
+                          ref.read(customEndDateProvider.notifier).state =
+                              picked.end;
                         }
                       }
                     },
@@ -397,7 +548,9 @@ class ReportScreen extends ConsumerWidget {
                                 Expanded(
                                   child: MetricCard(
                                     label: 'Total Pendapatan',
-                                    value: CurrencyFormatter.format(data['totalSales']),
+                                    value: CurrencyFormatter.format(
+                                      data['totalSales'],
+                                    ),
                                     icon: Icons.monetization_on_rounded,
                                     iconColor: AppColors.success,
                                   ),
@@ -419,7 +572,9 @@ class ReportScreen extends ConsumerWidget {
                                 Expanded(
                                   child: MetricCard(
                                     label: 'Total HPP',
-                                    value: CurrencyFormatter.format(data['totalHpp']),
+                                    value: CurrencyFormatter.format(
+                                      data['totalHpp'],
+                                    ),
                                     icon: Icons.inventory_2_rounded,
                                     iconColor: AppColors.warning,
                                   ),
@@ -428,7 +583,9 @@ class ReportScreen extends ConsumerWidget {
                                 Expanded(
                                   child: MetricCard(
                                     label: 'Laba Bersih',
-                                    value: CurrencyFormatter.format(data['labaBersih']),
+                                    value: CurrencyFormatter.format(
+                                      data['labaBersih'],
+                                    ),
                                     icon: Icons.trending_up_rounded,
                                     iconColor: AppColors.primary,
                                   ),
@@ -444,7 +601,8 @@ class ReportScreen extends ConsumerWidget {
                       sliver: SliverToBoxAdapter(
                         child: Text(
                           'Daftar Transaksi',
-                          style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ),
                     ),
@@ -459,70 +617,94 @@ class ReportScreen extends ConsumerWidget {
                         : SliverPadding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             sliver: SliverList(
-                              delegate: SliverChildBuilderDelegate(
-                                (context, index) {
-                                  final txn = transactions[index];
-                                  return Column(
-                                    children: [
-                                      InkWell(
-                                        onTap: () => ReceiptModal.show(context, ref, txn),
-                                        borderRadius: BorderRadius.circular(14),
-                                        child: Container(
-                                          padding: const EdgeInsets.all(14),
-                                          decoration: BoxDecoration(
-                                            color: theme.cardTheme.color,
-                                            borderRadius: BorderRadius.circular(14),
-                                            border: Border.all(color: AppColors.border),
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final txn = transactions[index];
+                                return Column(
+                                  children: [
+                                    InkWell(
+                                      onTap: () =>
+                                          ReceiptModal.show(context, ref, txn),
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: theme.cardTheme.color,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
                                           ),
-                                          child: Row(
-                                            children: [
-                                              Container(
-                                                padding: const EdgeInsets.all(10),
-                                                decoration: BoxDecoration(
-                                                  color: AppColors.success.withValues(alpha: 0.1),
-                                                  borderRadius: BorderRadius.circular(10),
-                                                ),
-                                                child: const Icon(Icons.receipt_rounded, color: AppColors.success, size: 22),
+                                          border: Border.all(
+                                            color: AppColors.border,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.success
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
                                               ),
-                                              const SizedBox(width: 12),
-                                              Expanded(
-                                                child: Column(
-                                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                                  children: [
-                                                    Text(txn.invoiceNo, style: theme.textTheme.titleSmall),
-                                                    const SizedBox(height: 2),
-                                                    Text(DateFormatter.formatWithTime(txn.createdAt), style: theme.textTheme.labelSmall),
-                                                  ],
-                                                ),
+                                              child: const Icon(
+                                                Icons.receipt_rounded,
+                                                color: AppColors.success,
+                                                size: 22,
                                               ),
-                                              Column(
-                                                crossAxisAlignment: CrossAxisAlignment.end,
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
                                                 children: [
-                                                  Text(CurrencyFormatter.format(txn.total), style: theme.textTheme.titleSmall?.copyWith(color: AppColors.primary)),
+                                                  Text(
+                                                    txn.invoiceNo,
+                                                    style: theme
+                                                        .textTheme
+                                                        .titleSmall,
+                                                  ),
                                                   const SizedBox(height: 2),
-                                                  Container(
-                                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                                    decoration: BoxDecoration(
-                                                      color: AppColors.successLight,
-                                                      borderRadius: BorderRadius.circular(20),
+                                                  Text(
+                                                    DateFormatter.formatWithTime(
+                                                      txn.createdAt,
                                                     ),
-                                                    child: Text(
-                                                      txn.paymentMethod.toUpperCase(),
-                                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.success),
-                                                    ),
+                                                    style: theme
+                                                        .textTheme
+                                                        .labelSmall,
                                                   ),
                                                 ],
                                               ),
-                                            ],
-                                          ),
+                                            ),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  CurrencyFormatter.format(
+                                                    txn.total,
+                                                  ),
+                                                  style: theme
+                                                      .textTheme
+                                                      .titleSmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      const SizedBox(height: 10),
-                                    ],
-                                  );
-                                },
-                                childCount: transactions.length,
-                              ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                );
+                              }, childCount: transactions.length),
                             ),
                           ),
                   ],

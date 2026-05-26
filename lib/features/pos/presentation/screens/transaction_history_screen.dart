@@ -17,7 +17,8 @@ class TransactionHistoryScreen extends ConsumerStatefulWidget {
       _TransactionHistoryScreenState();
 }
 
-class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScreen> {
+class _TransactionHistoryScreenState
+    extends ConsumerState<TransactionHistoryScreen> {
   bool _hasCheckedInitialId = false;
 
   @override
@@ -103,36 +104,43 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
                               Container(
                                 padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: AppColors.success.withValues(alpha: 0.1),
+                                  color: AppColors.success.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(10),
                                 ),
-                                child: const Icon(Icons.receipt_rounded, color: AppColors.success, size: 22),
+                                child: const Icon(
+                                  Icons.receipt_rounded,
+                                  color: AppColors.success,
+                                  size: 22,
+                                ),
                               ),
                               const SizedBox(width: 12),
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(txn.invoiceNo, style: theme.textTheme.titleSmall),
+                                    Text(
+                                      txn.invoiceNo,
+                                      style: theme.textTheme.titleSmall,
+                                    ),
                                     const SizedBox(height: 2),
-                                    Text(DateFormatter.formatWithTime(txn.createdAt), style: theme.textTheme.labelSmall),
+                                    Text(
+                                      DateFormatter.formatWithTime(
+                                        txn.createdAt,
+                                      ),
+                                      style: theme.textTheme.labelSmall,
+                                    ),
                                   ],
                                 ),
                               ),
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.end,
                                 children: [
-                                  Text(CurrencyFormatter.format(txn.total), style: theme.textTheme.titleSmall?.copyWith(color: AppColors.primary)),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.successLight,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      txn.paymentMethod.toUpperCase(),
-                                      style: const TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.success),
+                                  Text(
+                                    CurrencyFormatter.format(txn.total),
+                                    style: theme.textTheme.titleSmall?.copyWith(
+                                      color: AppColors.primary,
                                     ),
                                   ),
                                 ],
@@ -152,20 +160,46 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
     );
   }
 
-  Widget _buildFilterPanel(BuildContext context, WidgetRef ref, DateTimeRange dateRange, ThemeData theme) {
+  Widget _buildFilterPanel(
+    BuildContext context,
+    WidgetRef ref,
+    DateTimeRange dateRange,
+    ThemeData theme,
+  ) {
     final now = DateTime.now();
-    final isToday = dateRange.start.day == now.day && dateRange.start.month == now.month && dateRange.end.day == now.day && dateRange.end.month == now.month;
+    final isToday =
+        dateRange.start.day == now.day &&
+        dateRange.start.month == now.month &&
+        dateRange.end.day == now.day &&
+        dateRange.end.month == now.month;
     final yesterday = now.subtract(const Duration(days: 1));
-    final isYesterday = dateRange.start.day == yesterday.day && dateRange.start.month == yesterday.month && dateRange.end.day == yesterday.day && dateRange.end.month == yesterday.month;
+    final isYesterday =
+        dateRange.start.day == yesterday.day &&
+        dateRange.start.month == yesterday.month &&
+        dateRange.end.day == yesterday.day &&
+        dateRange.end.month == yesterday.month;
     final weekStart = now.subtract(Duration(days: now.weekday - 1));
-    final isThisWeek = dateRange.start.day == weekStart.day && dateRange.start.month == weekStart.month && dateRange.end.day == now.day && dateRange.end.month == now.month;
-    final isThisMonth = dateRange.start.day == 1 && dateRange.start.month == now.month && dateRange.end.day == now.day && dateRange.end.month == now.month;
+    final isThisWeek =
+        dateRange.start.day == weekStart.day &&
+        dateRange.start.month == weekStart.month &&
+        dateRange.end.day == now.day &&
+        dateRange.end.month == now.month;
+    final isThisMonth =
+        dateRange.start.day == 1 &&
+        dateRange.start.month == now.month &&
+        dateRange.end.day == now.day &&
+        dateRange.end.month == now.month;
 
     String activeLabel = 'Rentang Kustom';
-    if (isToday) activeLabel = 'Hari Ini';
-    else if (isYesterday) activeLabel = 'Kemarin';
-    else if (isThisWeek) activeLabel = 'Minggu Ini';
-    else if (isThisMonth) activeLabel = 'Bulan Ini';
+    if (isToday) {
+      activeLabel = 'Hari Ini';
+    } else if (isYesterday) {
+      activeLabel = 'Kemarin';
+    } else if (isThisWeek) {
+      activeLabel = 'Minggu Ini';
+    } else if (isThisMonth) {
+      activeLabel = 'Bulan Ini';
+    }
 
     void updateRange(DateTime start, DateTime end) {
       ref.read(historyDateRangeProvider.notifier).state = DateTimeRange(
@@ -178,27 +212,94 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
     void showFilterOptions() {
       showModalBottomSheet(
         context: context,
-        shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
         builder: (ctx) => SafeArea(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Container(width: 40, height: 4, margin: const EdgeInsets.symmetric(vertical: 12), decoration: BoxDecoration(color: Colors.grey[300], borderRadius: BorderRadius.circular(2))),
-              const Padding(padding: EdgeInsets.only(bottom: 8), child: Text('Pilih Rentang Waktu', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16))),
-              ListTile(leading: const Icon(Icons.today_rounded), title: const Text('Hari Ini'), trailing: isToday ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null, onTap: () => updateRange(now, now)),
-              ListTile(leading: const Icon(Icons.turn_left_rounded), title: const Text('Kemarin'), trailing: isYesterday ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null, onTap: () => updateRange(yesterday, yesterday)),
-              ListTile(leading: const Icon(Icons.view_week_rounded), title: const Text('Minggu Ini'), trailing: isThisWeek ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null, onTap: () => updateRange(weekStart, now)),
-              ListTile(leading: const Icon(Icons.calendar_month_rounded), title: const Text('Bulan Ini'), trailing: isThisMonth ? const Icon(Icons.check_circle_rounded, color: AppColors.primary) : null, onTap: () => updateRange(DateTime(now.year, now.month, 1), now)),
-              ListTile(leading: const Icon(Icons.date_range_rounded), title: const Text('Pilih Tanggal Kustom...'), onTap: () async {
-                Navigator.pop(ctx);
-                final newRange = await showDateRangePicker(context: context, initialDateRange: dateRange, firstDate: DateTime(2020), lastDate: now);
-                if (newRange != null) {
-                  ref.read(historyDateRangeProvider.notifier).state = DateTimeRange(
-                    start: DateFormatter.startOfDay(newRange.start),
-                    end: DateFormatter.endOfDay(newRange.end),
+              Container(
+                width: 40,
+                height: 4,
+                margin: const EdgeInsets.symmetric(vertical: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const Padding(
+                padding: EdgeInsets.only(bottom: 8),
+                child: Text(
+                  'Pilih Rentang Waktu',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.today_rounded),
+                title: const Text('Hari Ini'),
+                trailing: isToday
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.primary,
+                      )
+                    : null,
+                onTap: () => updateRange(now, now),
+              ),
+              ListTile(
+                leading: const Icon(Icons.turn_left_rounded),
+                title: const Text('Kemarin'),
+                trailing: isYesterday
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.primary,
+                      )
+                    : null,
+                onTap: () => updateRange(yesterday, yesterday),
+              ),
+              ListTile(
+                leading: const Icon(Icons.view_week_rounded),
+                title: const Text('Minggu Ini'),
+                trailing: isThisWeek
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.primary,
+                      )
+                    : null,
+                onTap: () => updateRange(weekStart, now),
+              ),
+              ListTile(
+                leading: const Icon(Icons.calendar_month_rounded),
+                title: const Text('Bulan Ini'),
+                trailing: isThisMonth
+                    ? const Icon(
+                        Icons.check_circle_rounded,
+                        color: AppColors.primary,
+                      )
+                    : null,
+                onTap: () => updateRange(DateTime(now.year, now.month, 1), now),
+              ),
+              ListTile(
+                leading: const Icon(Icons.date_range_rounded),
+                title: const Text('Pilih Tanggal Kustom...'),
+                onTap: () async {
+                  Navigator.pop(ctx);
+                  final newRange = await showDateRangePicker(
+                    context: context,
+                    initialDateRange: dateRange,
+                    firstDate: DateTime(2020),
+                    lastDate: now,
                   );
-                }
-              }),
+                  if (newRange != null) {
+                    ref
+                        .read(historyDateRangeProvider.notifier)
+                        .state = DateTimeRange(
+                      start: DateFormatter.startOfDay(newRange.start),
+                      end: DateFormatter.endOfDay(newRange.end),
+                    );
+                  }
+                },
+              ),
             ],
           ),
         ),
@@ -207,17 +308,31 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(color: theme.scaffoldBackgroundColor, border: Border(bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5)))),
+      decoration: BoxDecoration(
+        color: theme.scaffoldBackgroundColor,
+        border: Border(
+          bottom: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
+        ),
+      ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
           Row(
             children: [
-              const Icon(Icons.filter_alt_rounded, size: 16, color: AppColors.textSecondary),
+              const Icon(
+                Icons.filter_alt_rounded,
+                size: 16,
+                color: AppColors.textSecondary,
+              ),
               const SizedBox(width: 8),
               Text(
-                activeLabel == 'Rentang Kustom' ? '${DateFormatter.formatShort(dateRange.start)} - ${DateFormatter.formatShort(dateRange.end)}' : activeLabel,
-                style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimary),
+                activeLabel == 'Rentang Kustom'
+                    ? '${DateFormatter.formatShort(dateRange.start)} - ${DateFormatter.formatShort(dateRange.end)}'
+                    : activeLabel,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
               ),
             ],
           ),
@@ -226,12 +341,26 @@ class _TransactionHistoryScreenState extends ConsumerState<TransactionHistoryScr
             borderRadius: BorderRadius.circular(20),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(20)),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
               child: const Row(
                 children: [
-                  Text('Ubah', style: TextStyle(color: AppColors.primary, fontSize: 12, fontWeight: FontWeight.bold)),
+                  Text(
+                    'Ubah',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                   SizedBox(width: 4),
-                  Icon(Icons.keyboard_arrow_down_rounded, size: 16, color: AppColors.primary),
+                  Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 16,
+                    color: AppColors.primary,
+                  ),
                 ],
               ),
             ),

@@ -60,16 +60,32 @@ class NotificationScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (context, index) {
                 final n = items[index];
-                return _NotificationTile(
-                  notification: n,
-                  onTap: () {
-                    ref.read(firebaseMessagingServiceProvider).markAsRead(n.id);
-                    if (n.type == 'service_approval') {
-                      context.go('/service-approval?from=dashboard');
-                    } else {
-                      _showNotificationDetail(context, n);
-                    }
+                return Dismissible(
+                  key: Key(n.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    padding: const EdgeInsets.only(right: 20),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    alignment: Alignment.centerRight,
+                    child: const Icon(Icons.delete_outline_rounded, color: Colors.white),
+                  ),
+                  onDismissed: (direction) {
+                    ref.read(firebaseMessagingServiceProvider).deleteNotification(n.id);
                   },
+                  child: _NotificationTile(
+                    notification: n,
+                    onTap: () {
+                      ref.read(firebaseMessagingServiceProvider).markAsRead(n.id);
+                      if (n.type == 'service_approval') {
+                        context.go('/service-approval?from=dashboard');
+                      } else {
+                        _showNotificationDetail(context, n);
+                      }
+                    },
+                  ),
                 );
               },
             );

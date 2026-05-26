@@ -5,30 +5,31 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 /// Provider untuk layanan notifikasi lokal (OS-Level)
 final notificationServiceProvider = Provider<NotificationService>((ref) {
-  throw UnimplementedError('notificationServiceProvider harus di-override di ProviderScope');
+  throw UnimplementedError(
+    'notificationServiceProvider harus di-override di ProviderScope',
+  );
 });
 
 /// Layanan untuk mengelola notifikasi pop-up/banner di OS (Android & iOS)
 class NotificationService {
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
   bool _isInitialized = false;
 
   /// Inisialisasi plugin notifikasi
   Future<void> init() async {
     if (_isInitialized) return;
     try {
-      // Icon launcher standar untuk notifikasi Android
-      // PENTING: Menggunakan @mipmap/logo karena itulah icon yang ada di project.
-      // @mipmap/ic_launcher TIDAK ADA dan akan menyebabkan crash diam-diam.
       const AndroidInitializationSettings androidSettings =
           AndroidInitializationSettings('@mipmap/logo');
 
       // Pengaturan untuk iOS
-      const DarwinInitializationSettings iosSettings = DarwinInitializationSettings(
-        requestAlertPermission: true,
-        requestBadgePermission: true,
-        requestSoundPermission: true,
-      );
+      const DarwinInitializationSettings iosSettings =
+          DarwinInitializationSettings(
+            requestAlertPermission: true,
+            requestBadgePermission: true,
+            requestSoundPermission: true,
+          );
 
       const InitializationSettings initSettings = InitializationSettings(
         android: androidSettings,
@@ -45,19 +46,23 @@ class NotificationService {
       // Meminta izin notifikasi untuk Android 13+
       if (defaultTargetPlatform == TargetPlatform.android) {
         final androidImplementation = _plugin
-            .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-        final granted = await androidImplementation?.requestNotificationsPermission();
+            .resolvePlatformSpecificImplementation<
+              AndroidFlutterLocalNotificationsPlugin
+            >();
+        final granted = await androidImplementation
+            ?.requestNotificationsPermission();
         debugPrint('Notification permission granted: $granted');
 
         // Buat channel khusus untuk FCM Push Notification (High Priority)
-        const AndroidNotificationChannel fcmChannel = AndroidNotificationChannel(
-          'high_importance_channel',
-          'Notifikasi Penting',
-          description: 'Channel untuk notifikasi push dari kasir ke owner',
-          importance: Importance.max,
-          playSound: true,
-          enableVibration: true,
-        );
+        const AndroidNotificationChannel fcmChannel =
+            AndroidNotificationChannel(
+              'high_importance_channel',
+              'Notifikasi Penting',
+              description: 'Channel untuk notifikasi push dari kasir ke owner',
+              importance: Importance.max,
+              playSound: true,
+              enableVibration: true,
+            );
         await androidImplementation?.createNotificationChannel(fcmChannel);
         debugPrint('✅ FCM notification channel created');
       }
@@ -83,7 +88,8 @@ class NotificationService {
       body: body,
       channelId: 'stock_warnings_channel',
       channelName: 'Peringatan Stok',
-      channelDescription: 'Notifikasi saat stok barang menipis atau habis di toko',
+      channelDescription:
+          'Notifikasi saat stok barang menipis atau habis di toko',
       color: isCritical ? const Color(0xFFD32F2F) : const Color(0xFFF57C00),
     );
   }
@@ -117,7 +123,8 @@ class NotificationService {
       body: body,
       channelId: 'approval_channel',
       channelName: 'Persetujuan Jasa',
-      channelDescription: 'Notifikasi saat ada jasa yang membutuhkan persetujuan',
+      channelDescription:
+          'Notifikasi saat ada jasa yang membutuhkan persetujuan',
       color: const Color(0xFF2196F3),
     );
   }
@@ -150,26 +157,31 @@ class NotificationService {
     required Color color,
   }) async {
     if (!_isInitialized) {
-      debugPrint('⚠️ NotificationService belum diinisialisasi, mencoba init()...');
+      debugPrint(
+        '⚠️ NotificationService belum diinisialisasi, mencoba init()...',
+      );
       await init();
     }
 
     if (!_isInitialized) {
-      debugPrint('❌ NotificationService gagal diinisialisasi, notifikasi tidak bisa ditampilkan');
+      debugPrint(
+        '❌ NotificationService gagal diinisialisasi, notifikasi tidak bisa ditampilkan',
+      );
       return;
     }
 
-    final AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      channelId,
-      channelName,
-      channelDescription: channelDescription,
-      importance: Importance.max,
-      priority: Priority.high,
-      color: color,
-      icon: '@mipmap/logo',
-      enableVibration: true,
-      playSound: true,
-    );
+    final AndroidNotificationDetails androidDetails =
+        AndroidNotificationDetails(
+          channelId,
+          channelName,
+          channelDescription: channelDescription,
+          importance: Importance.max,
+          priority: Priority.high,
+          color: color,
+          icon: '@mipmap/logo',
+          enableVibration: true,
+          playSound: true,
+        );
 
     const DarwinNotificationDetails iosDetails = DarwinNotificationDetails(
       presentAlert: true,

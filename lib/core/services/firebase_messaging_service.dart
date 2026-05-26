@@ -166,4 +166,8 @@ class FirebaseMessagingService {
   Future<void> markAsRead(String id) async {
     await _firestore.collection('notifications').doc(id).update({'isRead': true});
   }
+
+  Future<void> deleteNotification(String id) async {
+    await _firestore.collection('notifications').doc(id).delete();
+  }
 }
