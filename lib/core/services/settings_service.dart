@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/legacy.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:dnd_markasban_app/main.dart';
 
@@ -15,8 +15,9 @@ class SettingsService {
   static const String keyStorePhone = 'store_phone';
   static const String keyReceiptFooter = 'receipt_footer';
   static const String keyUserId = 'user_id';
+  static const String keyUserName = 'user_name';
+  static const String keyUserRole = 'user_role';
   static const String keyThemeMode = 'theme_mode';
-  static const String keyLastSyncTimestamp = 'last_sync_timestamp';
 
   late SharedPreferences _prefs;
 
@@ -29,13 +30,9 @@ class SettingsService {
   String get storePhone => _prefs.getString(keyStorePhone) ?? '-';
   String get receiptFooter => _prefs.getString(keyReceiptFooter) ?? 'Terima Kasih Atas Kunjungan Anda';
   String? get userId => _prefs.getString(keyUserId);
+  String? get userName => _prefs.getString(keyUserName);
+  String? get userRole => _prefs.getString(keyUserRole);
   String get themeMode => _prefs.getString(keyThemeMode) ?? 'light';
-  
-  DateTime? get lastSyncTimestamp {
-    final str = _prefs.getString(keyLastSyncTimestamp);
-    if (str == null) return null;
-    return DateTime.tryParse(str);
-  }
 
   Future<void> setStoreInfo(String name, String address, String phone) async {
     await _prefs.setString(keyStoreName, name);
@@ -55,12 +52,30 @@ class SettingsService {
     }
   }
 
-  Future<void> setThemeMode(String mode) async {
-    await _prefs.setString(keyThemeMode, mode);
+  Future<void> setUserName(String? name) async {
+    if (name == null) {
+      await _prefs.remove(keyUserName);
+    } else {
+      await _prefs.setString(keyUserName, name);
+    }
   }
 
-  Future<void> setLastSyncTimestamp(DateTime dt) async {
-    await _prefs.setString(keyLastSyncTimestamp, dt.toIso8601String());
+  Future<void> setUserRole(String? role) async {
+    if (role == null) {
+      await _prefs.remove(keyUserRole);
+    } else {
+      await _prefs.setString(keyUserRole, role);
+    }
+  }
+
+  Future<void> clearUserSession() async {
+    await _prefs.remove(keyUserId);
+    await _prefs.remove(keyUserName);
+    await _prefs.remove(keyUserRole);
+  }
+
+  Future<void> setThemeMode(String mode) async {
+    await _prefs.setString(keyThemeMode, mode);
   }
 
 }

@@ -8,6 +8,7 @@ class ReceiptWidget extends StatelessWidget {
   final String storeAddress;
   final String storePhone;
   final String invoiceNo;
+  final String? cashierName;
   final DateTime date;
   final List<ReceiptItem> items;
   final double total;
@@ -22,6 +23,7 @@ class ReceiptWidget extends StatelessWidget {
     required this.storeAddress,
     required this.storePhone,
     required this.invoiceNo,
+    this.cashierName,
     required this.date,
     required this.items,
     required this.total,
@@ -105,6 +107,13 @@ class ReceiptWidget extends StatelessWidget {
               Text(DateFormatter.formatWithTime(date), style: const TextStyle(fontSize: 11, color: Colors.black54)),
             ],
           ),
+          if (cashierName != null && cashierName!.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text('Dibuat oleh: $cashierName', style: const TextStyle(fontSize: 11, color: Colors.black54)),
+            ),
+          ],
           const SizedBox(height: 8),
           const _DashedDivider(),
           const SizedBox(height: 16),

@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../database/app_database.dart';
+import '../models/user_model.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/auth/presentation/screens/login_screen.dart';
-import '../../features/auth/presentation/screens/signup_screen.dart';
 import '../../features/auth/presentation/screens/splash_screen.dart';
 import '../../features/dashboard/presentation/screens/owner_dashboard_screen.dart';
 import '../../features/dashboard/presentation/screens/notification_screen.dart';
@@ -34,7 +33,7 @@ import '../../features/workshop/presentation/screens/work_order_detail_screen.da
 import '../../shared/screens/shell_screen.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final notifier = ValueNotifier<AsyncValue<User?>>(const AsyncValue.loading());
+  final notifier = ValueNotifier<AsyncValue<UserModel?>>(const AsyncValue.loading());
 
   ref.listen(authStateProvider, (prev, next) {
     notifier.value = next;
@@ -50,14 +49,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isLoggedIn = authState.value != null;
       final isSplash = state.matchedLocation == '/splash';
       final isLogin = state.matchedLocation == '/login';
-      final isSignup = state.matchedLocation == '/signup';
-
       if (!isLoggedIn) {
-        // Jika tidak login dan bukan di halaman login/signup, lempar ke login
-        return (isLogin || isSignup) ? null : '/login';
+        // Jika tidak login dan bukan di halaman login, lempar ke login
+        return isLogin ? null : '/login';
       }
 
-      if (isLoggedIn && (isLogin || isSignup || isSplash)) {
+      if (isLoggedIn && (isLogin || isSplash)) {
         return '/dashboard';
       }
 
@@ -81,7 +78,6 @@ final routerProvider = Provider<GoRouter>((ref) {
     routes: [
       GoRoute(path: '/splash', builder: (_, __) => const SplashScreen()),
       GoRoute(path: '/login', builder: (_, __) => const LoginScreen()),
-      GoRoute(path: '/signup', builder: (_, __) => const SignupScreen()),
       GoRoute(
         path: '/payment-success',
         builder: (_, state) =>

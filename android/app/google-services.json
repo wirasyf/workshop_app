@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "398673468176",
+    "project_id": "sparepart-app-8df68",
+    "storage_bucket": "sparepart-app-8df68.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:398673468176:android:e24a7d2cac31af00a26395",
+        "android_client_info": {
+          "package_name": "com.example.spareart_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDs-msso0NOG19QdVe3jQ5hhsIu2d2vqGU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

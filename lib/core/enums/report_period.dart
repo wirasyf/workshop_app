@@ -1,1 +1,1 @@
-enum ReportPeriod { daily, weekly, monthly, yearly }
+enum ReportPeriod { daily, weekly, monthly, yearly, custom }

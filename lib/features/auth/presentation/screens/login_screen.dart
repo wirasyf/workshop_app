@@ -5,6 +5,8 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../providers/auth_provider.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Layar login — email + password
 class LoginScreen extends ConsumerStatefulWidget {
@@ -44,8 +46,32 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     setState(() => _isLoading = true);
 
     try {
+      String loginEmail = _emailCtrl.text.trim();
+      
+      // Jika input tidak memiliki '@', asumsikan sebagai username
+      if (!loginEmail.contains('@')) {
+        try {
+          final querySnapshot = await FirebaseFirestore.instance
+              .collection('users')
+              .where('username', isEqualTo: loginEmail)
+              .limit(1)
+              .get();
+              
+          if (querySnapshot.docs.isNotEmpty) {
+            loginEmail = querySnapshot.docs.first.data()['email'] as String;
+          } else {
+            throw Exception('Username tidak ditemukan');
+          }
+        } catch (e) {
+          if (e is FirebaseException && e.code == 'permission-denied') {
+            throw Exception('Akses ditolak oleh database. Silakan login menggunakan Alamat Email kasir yang didaftarkan.');
+          }
+          rethrow;
+        }
+      }
+
       final success = await ref.read(authStateProvider.notifier).login(
-        _emailCtrl.text.trim(),
+        loginEmail,
         _passwordCtrl.text,
       );
 
@@ -63,8 +89,49 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        AppToast.show(context, e.toString(), type: ToastType.error);
+        String errorMsg = e.toString();
+        if (errorMsg.startsWith('Exception: ')) {
+          errorMsg = errorMsg.substring(11);
+        }
+        AppToast.show(context, errorMsg, type: ToastType.error);
       }
+    }
+  }
+
+  Future<void> _createInitialOwner() async {
+    setState(() => _isLoading = true);
+    try {
+      final email = 'owner@bengkel.com';
+      final password = 'password123';
+      
+      // 1. Create auth user
+      final authResult = await FirebaseAuth.instance.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      
+      final uid = authResult.user!.uid;
+      
+      // 2. Insert to Firestore
+      await FirebaseFirestore.instance.collection('users').doc(uid).set({
+        'id': uid,
+        'name': 'Owner Bengkel',
+        'username': 'owner',
+        'email': email,
+        'role': 'owner',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      
+      if (mounted) {
+        AppToast.show(context, 'Akun Owner berhasil dibuat!\nSilakan login dengan owner@bengkel.com / password123', type: ToastType.success);
+      }
+    } catch (e) {
+      if (mounted) {
+        AppToast.show(context, 'Gagal membuat akun owner: $e', type: ToastType.error);
+      }
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -94,11 +161,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(24),
-                        child: Image.asset(
-                          'assets/images/logo.jpg',
-                          width: 100,
-                          height: 100,
-                          fit: BoxFit.cover,
+                        child: GestureDetector(
+                          onLongPress: _createInitialOwner,
+                          child: Image.asset(
+                            'assets/images/logo.jpg',
+                            width: 100,
+                            height: 100,
+                            fit: BoxFit.cover,
+                          ),
                         ),
                       ),
                     ),

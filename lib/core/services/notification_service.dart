@@ -48,6 +48,18 @@ class NotificationService {
             .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
         final granted = await androidImplementation?.requestNotificationsPermission();
         debugPrint('Notification permission granted: $granted');
+
+        // Buat channel khusus untuk FCM Push Notification (High Priority)
+        const AndroidNotificationChannel fcmChannel = AndroidNotificationChannel(
+          'high_importance_channel',
+          'Notifikasi Penting',
+          description: 'Channel untuk notifikasi push dari kasir ke owner',
+          importance: Importance.max,
+          playSound: true,
+          enableVibration: true,
+        );
+        await androidImplementation?.createNotificationChannel(fcmChannel);
+        debugPrint('✅ FCM notification channel created');
       }
 
       _isInitialized = true;
@@ -106,6 +118,23 @@ class NotificationService {
       channelId: 'approval_channel',
       channelName: 'Persetujuan Jasa',
       channelDescription: 'Notifikasi saat ada jasa yang membutuhkan persetujuan',
+      color: const Color(0xFF2196F3),
+    );
+  }
+
+  /// Menampilkan notifikasi umum dari Firebase Cloud Messaging
+  Future<void> showFCMNotification({
+    required int id,
+    required String title,
+    required String body,
+  }) async {
+    await _showNotification(
+      id: id,
+      title: title,
+      body: body,
+      channelId: 'fcm_channel',
+      channelName: 'Notifikasi Sistem',
+      channelDescription: 'Notifikasi sistem dari aplikasi',
       color: const Color(0xFF2196F3),
     );
   }

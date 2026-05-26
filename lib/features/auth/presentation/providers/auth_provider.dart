@@ -1,138 +1,51 @@
-import 'package:drift/drift.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import 'package:flutter/foundation.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/password_service.dart';
-import '../../../../core/services/settings_service.dart';
-import '../../../../core/services/sync_service.dart';
-import '../../../../core/services/supabase_service.dart';
-import 'package:uuid/uuid.dart';
-import '../../../../main.dart';
+import '../../../../core/models/user_model.dart';
+import '../../../../core/services/firebase_auth_service.dart';
+import 'package:dnd_markasban_app/main.dart';
 
-/// Provider untuk auth state — menyimpan user yang sedang login
-final authStateProvider = StateNotifierProvider<AuthNotifier, AsyncValue<User?>>((ref) {
-  final db = ref.watch(databaseProvider);
+final firebaseAuthServiceProvider = Provider<FirebaseAuthService>((ref) {
   final settings = ref.watch(settingsServiceProvider);
-  final sync = ref.watch(syncServiceProvider);
-  return AuthNotifier(db, settings, sync);
+  return FirebaseAuthService(settings);
 });
 
-/// Provider untuk cek apakah sedang login
+final authStateProvider =
+    StateNotifierProvider<AuthNotifier, AsyncValue<UserModel?>>((ref) {
+      final authService = ref.watch(firebaseAuthServiceProvider);
+      return AuthNotifier(authService);
+    });
+
 final isLoggedInProvider = Provider<bool>((ref) {
   return ref.watch(authStateProvider).value != null;
 });
 
+class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
+  final FirebaseAuthService _authService;
 
-/// Notifier untuk mengelola state autentikasi
-class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
-  final AppDatabase _db;
-  final SettingsService _settings;
-  final SyncService _sync;
-
-  AuthNotifier(this._db, this._settings, this._sync) : super(const AsyncValue.loading()) {
+  AuthNotifier(this._authService) : super(const AsyncValue.loading()) {
     _loadSession();
   }
 
   Future<void> _loadSession() async {
-    final savedId = _settings.userId;
-    if (savedId != null) {
-      try {
-        final user = await _db.getUserById(savedId);
-        if (user != null && user.isActive) {
-          state = AsyncValue.data(user);
-          return;
-        }
-      } catch (_) {}
+    try {
+      final user = await _authService.getCurrentUserData();
+      state = AsyncValue.data(user);
+    } catch (e) {
+      state = const AsyncValue.data(null);
     }
-    state = const AsyncValue.data(null);
   }
 
-  /// Login dengan username/email dan password (offline-first via lokal DB)
-  Future<bool> login(String identifier, String password) async {
+  Future<bool> login(String email, String password) async {
     try {
-      final trimmedIdentifier = identifier.trim();
-      
-      // 1. Cek di database lokal dulu
-      User? user = await _db.getUserByUsername(trimmedIdentifier);
-      user ??= await _db.getUserByEmail(trimmedIdentifier);
-      
-      // 2. Jika tidak ada lokal, coba cari di Supabase
-      if (user == null) {
-        try {
-          final client = SupabaseService.client;
-          final response = await client
-              .from('users')
-              .select()
-              .or('username.eq.$trimmedIdentifier,email.eq.$trimmedIdentifier')
-              .maybeSingle();
-
-          if (response != null) {
-            // User ditemukan di Supabase, simpan ke lokal
-            final companion = UsersCompanion.insert(
-              id: response['id'], // Gunakan ID dari server
-              name: response['name'],
-              username: response['username'],
-              email: response['email'],
-              passwordHash: response['password_hash'],
-              role: Value(response['role'] ?? 'owner'),
-              isActive: Value(response['is_active'] ?? true),
-              createdAt: Value(DateTime.now()), // or use response['created_at'] if available
-            );
-            
-            await _db.insertUser(companion);
-            user = await _db.getUserById(response['id']);
-          }
-        } catch (e) {
-          // Gagal cek Supabase (mungkin offline), lanjut ke error user null
-          debugPrint('Supabase login check failed: $e');
-        }
-      }
-      
-      if (user == null) {
-        throw 'User tidak ditemukan';
-      }
-      if (!PasswordService.verifyPassword(password, user.passwordHash)) {
-        throw 'Password salah';
-      }
-      if (!user.isActive) {
-        throw 'Akun tidak aktif';
-      }
-
-      // Auto-migrate plain text password ke hashed format
-      if (!PasswordService.isHashed(user.passwordHash)) {
-        try {
-          final hashed = PasswordService.hashPassword(password);
-          await _db.updateUser(UsersCompanion(
-            id: Value(user.id),
-            passwordHash: Value(hashed),
-          ));
-          await _sync.enqueue(
-            tableName: 'users',
-            recordId: user.id,
-            operation: 'update',
-            data: {'password_hash': hashed},
-          );
-          debugPrint('Password auto-migrated to hashed format for user: ${user.username}');
-        } catch (e) {
-          debugPrint('Failed to auto-migrate password: $e');
-        }
-      }
-      
-      // 3. Download data user (produk, kategori, dll) dari server
-      await _sync.downloadUserData();
-      
-      // Save session
-      await _settings.setUserId(user.id);
-      
+      state = const AsyncValue.loading();
+      final user = await _authService.signIn(email, password);
       state = AsyncValue.data(user);
       return true;
     } catch (e) {
+      state = const AsyncValue.data(null);
       throw e.toString();
     }
   }
 
-  /// Signup user baru
   Future<bool> signup({
     required String name,
     required String username,
@@ -141,78 +54,28 @@ class AuthNotifier extends StateNotifier<AsyncValue<User?>> {
     String role = 'owner',
   }) async {
     try {
-      final trimmedUsername = username.trim();
-      final trimmedEmail = email.trim();
-
-      // Cek apakah username sudah terdaftar
-      final existingUser = await _db.getUserByUsername(trimmedUsername);
-      if (existingUser != null) {
-        throw 'Username sudah digunakan';
-      }
-
-      // Cek apakah email sudah terdaftar
-      final existingEmail = await _db.getUserByEmail(trimmedEmail);
-      if (existingEmail != null) {
-        throw 'Email sudah terdaftar';
-      }
-
-      final id = const Uuid().v4();
-      final hashedPassword = PasswordService.hashPassword(password);
-      final companion = UsersCompanion.insert(
-        id: id,
-        name: name.trim(),
-        username: trimmedUsername,
-        email: trimmedEmail,
-        passwordHash: hashedPassword,
-        role: Value(role),
-        isActive: const Value(true),
-        createdAt: Value(DateTime.now()),
+      state = const AsyncValue.loading();
+      final user = await _authService.signUp(
+        name: name,
+        username: username,
+        email: email,
+        password: password,
+        role: role,
       );
-
-      await _db.insertUser(companion);
-      final user = await _db.getUserById(id);
-
-      if (user != null) {
-        // Enqueue sync ke Supabase
-        await _sync.enqueue(
-          tableName: 'users',
-          recordId: id,
-          operation: 'create',
-          data: {
-            'id': id,
-            'name': name.trim(),
-            'username': trimmedUsername,
-            'email': trimmedEmail,
-            'password_hash': hashedPassword,
-            'role': role,
-            'created_at': DateTime.now().toIso8601String(),
-          },
-        );
-        
-        // Coba langsung jalankan sinkronisasi secara background
-        _sync.syncPendingChanges().catchError((e) {
-          debugPrint('Immediate sync failed: $e');
-        });
-        
-        // Save session otomatis setelah signup
-        await _settings.setUserId(id);
-        state = AsyncValue.data(user);
-        return true;
-      }
-      return false;
+      state = AsyncValue.data(user);
+      return true;
     } catch (e) {
+      state = const AsyncValue.data(null);
       throw e.toString();
     }
   }
 
-  /// Logout
   Future<void> logout() async {
-    await _settings.setUserId(null);
+    await _authService.signOut();
     state = const AsyncValue.data(null);
   }
 
-  /// Set user langsung
-  void setUser(User user) {
+  void setUser(UserModel user) {
     state = AsyncValue.data(user);
   }
 }

@@ -7,9 +7,7 @@ import 'package:dnd_markasban_app/main.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/connectivity_service.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
-import '../../../../core/services/sync_service.dart';
 import '../../../../core/services/settings_service.dart';
-import '../../../../shared/utils/app_toast.dart';
 
 /// Layar pengaturan
 class SettingsScreen extends ConsumerWidget {
@@ -75,10 +73,6 @@ class SettingsScreen extends ConsumerWidget {
               error: (_, __) => const Icon(Icons.error_rounded, size: 12, color: AppColors.error),
             ),
           ),
-          _settingsTile(Icons.sync_rounded, 'Sinkronisasi Data', subtitle: 'Sinkronisasi otomatis saat online', onTap: () {
-            ref.read(syncServiceProvider).syncPendingChanges();
-            AppToast.show(context, 'Sinkronisasi dimulai', type: ToastType.info);
-          }),
           
           Consumer(builder: (context, ref, _) {
             final themeMode = ref.watch(themeModeProvider);
@@ -122,8 +116,28 @@ class SettingsScreen extends ConsumerWidget {
             width: double.infinity, height: 48,
             child: OutlinedButton.icon(
               onPressed: () async {
-                await ref.read(authStateProvider.notifier).logout();
-                if (context.mounted) context.go('/login');
+                final confirm = await showDialog<bool>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Keluar Akun'),
+                    content: const Text('Apakah Anda yakin ingin keluar?'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Batal'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context, true),
+                        child: const Text('Ya, Keluar', style: TextStyle(color: AppColors.error)),
+                      ),
+                    ],
+                  ),
+                );
+
+                if (confirm == true) {
+                  await ref.read(authStateProvider.notifier).logout();
+                  if (context.mounted) context.go('/login');
+                }
               },
               icon: const Icon(Icons.logout_rounded, color: AppColors.error),
               label: const Text('Keluar', style: TextStyle(color: AppColors.error)),

@@ -1,5 +1,3 @@
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-
 /// Konstanta global aplikasi SpareArt
 class AppConstants {
   AppConstants._();
@@ -10,16 +8,11 @@ class AppConstants {
   static const String storeName = 'D&D Markas Ban';
 
   // Build Modes
-  static const bool isCashierBuild = String.fromEnvironment('APP_MODE') == 'cashier';
-
-  // Supabase
-  static String get supabaseUrl => dotenv.get('SUPABASE_URL', fallback: '');
-  static String get supabaseAnonKey =>
-      dotenv.get('SUPABASE_ANON_KEY', fallback: '');
+  static const bool isCashierBuild =
+      String.fromEnvironment('APP_MODE') == 'cashier';
 
   // Database
   static const String dbName = 'spareart_db';
-
 
   // Stock thresholds
   static const int stockCriticalThreshold = 0;

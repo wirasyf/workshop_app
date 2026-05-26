@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/constants/app_colors.dart';
 
-enum ToastType { success, error, info, warning }
+enum ToastType { success, error, info, warning, loading }
 
 class AppToast {
   static void show(
@@ -94,8 +94,12 @@ class _ToastWidgetState extends State<_ToastWidget> with SingleTickerProviderSta
         color = Colors.orange;
         break;
       case ToastType.info:
-      icon = Icons.info_rounded;
+        icon = Icons.info_rounded;
         color = AppColors.primary;
+        break;
+      case ToastType.loading:
+        icon = Icons.downloading_rounded;
+        color = AppColors.info;
         break;
     }
 

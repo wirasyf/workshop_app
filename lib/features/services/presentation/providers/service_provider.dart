@@ -1,38 +1,34 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
+import '../../../../core/models/service_model.dart';
+import '../../../../core/models/category_model.dart';
+import '../../data/service_repository.dart';
 
-/// Provider daftar semua jasa aktif
-final servicesProvider = FutureProvider<List<Service>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getAllServices();
+final servicesProvider = StreamProvider<List<ServiceModel>>((ref) {
+  final repo = ref.watch(serviceRepositoryProvider);
+  return repo.getServices();
 });
 
-/// Provider daftar semua jasa (termasuk nonaktif) untuk manajemen
-final allServicesProvider = FutureProvider<List<Service>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getAllServices(activeOnly: false);
+final allServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
+  final repo = ref.watch(serviceRepositoryProvider);
+  return repo.getServices(activeOnly: false);
 });
 
-/// Provider pencarian jasa
 final serviceSearchProvider = StateProvider<String>((ref) => '');
 
-/// Provider filter kategori jasa
 final serviceSelectedCategoryProvider = StateProvider<String?>((ref) => null);
 
-/// Provider filtered services (berdasarkan search + category)
-final filteredServicesProvider = FutureProvider<List<Service>>((ref) {
+final filteredServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
   final search = ref.watch(serviceSearchProvider);
   final categoryId = ref.watch(serviceSelectedCategoryProvider);
 
-  return ref.watch(servicesProvider.future).then((allServices) {
+  return ref.watch(servicesProvider.stream).map((allServices) {
     var filtered = allServices;
     
     if (search.isNotEmpty) {
+      final query = search.toLowerCase();
       filtered = filtered.where((s) =>
-          s.name.toLowerCase().contains(search.toLowerCase()) ||
-          (s.description?.toLowerCase().contains(search.toLowerCase()) ?? false)
+          s.name.toLowerCase().contains(query) ||
+          (s.description?.toLowerCase().contains(query) ?? false)
       ).toList();
     }
     
@@ -44,8 +40,7 @@ final filteredServicesProvider = FutureProvider<List<Service>>((ref) {
   });
 });
 
-/// Provider kategori jasa dari database
-final serviceCategoriesProvider = FutureProvider<List<ServiceCategory>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getAllServiceCategories();
+final serviceCategoriesProvider = StreamProvider<List<ServiceCategoryModel>>((ref) {
+  final repo = ref.watch(serviceRepositoryProvider);
+  return repo.getServiceCategories();
 });

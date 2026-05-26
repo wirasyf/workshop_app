@@ -1,12 +1,10 @@
-import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/workshop_provider.dart';
@@ -44,91 +42,75 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
   Future<void> _searchByPlate() async {
     final plate = _plateCtrl.text.trim().toUpperCase();
     if (plate.isEmpty) return;
-    final db = ref.read(databaseProvider);
-    final vehicle = await db.getVehicleByPlateNumber(plate);
-    if (vehicle != null && mounted) {
-      setState(() {
-        _existingVehicleId = vehicle.id;
-        _nameCtrl.text = vehicle.customerName;
-        _phoneCtrl.text = vehicle.phoneNumber ?? '';
-        _brandCtrl.text = vehicle.vehicleBrand ?? '';
-        _typeCtrl.text = vehicle.vehicleType ?? '';
-        _yearCtrl.text = vehicle.vehicleYear?.toString() ?? '';
-      });
-      AppToast.show(context, 'Data pelanggan ditemukan!', type: ToastType.success);
+    try {
+      final snap = await FirebaseFirestore.instance.collection('vehicles').where('plateNumber', isEqualTo: plate).limit(1).get();
+      if (snap.docs.isNotEmpty && mounted) {
+        final vehicle = snap.docs.first.data();
+        setState(() {
+          _existingVehicleId = snap.docs.first.id;
+          _nameCtrl.text = vehicle['customerName'] ?? '';
+          _phoneCtrl.text = vehicle['phoneNumber'] ?? '';
+          _brandCtrl.text = vehicle['vehicleBrand'] ?? '';
+          _typeCtrl.text = vehicle['vehicleType'] ?? '';
+          _yearCtrl.text = vehicle['vehicleYear']?.toString() ?? '';
+        });
+        AppToast.show(context, 'Data pelanggan ditemukan!', type: ToastType.success);
+      }
+    } catch (e) {
+      debugPrint('Error searching vehicle: $e');
     }
+  }
+
+  Future<String> _getNextOrderNo() async {
+    final countSnap = await FirebaseFirestore.instance.collection('work_orders').count().get();
+    return 'WO-${(countSnap.count ?? 0) + 1001}';
   }
 
   Future<void> _createWorkOrder() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
-    final db = ref.read(databaseProvider);
-    final syncService = ref.read(syncServiceProvider);
     final user = ref.read(authStateProvider).value;
     final uuid = const Uuid();
+    
     try {
       String vehicleId;
       if (_existingVehicleId != null) {
         vehicleId = _existingVehicleId!;
-        await db.updateVehicle(VehiclesCompanion(
-          id: Value(vehicleId),
-          customerName: Value(_nameCtrl.text.trim()),
-          phoneNumber: Value(_phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim()),
-          plateNumber: Value(_plateCtrl.text.trim().toUpperCase()),
-          vehicleBrand: Value(_brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim()),
-          vehicleType: Value(_typeCtrl.text.trim().isEmpty ? null : _typeCtrl.text.trim()),
-          vehicleYear: Value(int.tryParse(_yearCtrl.text)),
-        ));
-        await syncService.enqueue(tableName: 'vehicles', recordId: vehicleId, operation: 'update', data: {
-          'customer_name': _nameCtrl.text.trim(),
-          'phone_number': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-          'plate_number': _plateCtrl.text.trim().toUpperCase(),
-          'vehicle_brand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
-          'vehicle_type': _typeCtrl.text.trim().isEmpty ? null : _typeCtrl.text.trim(),
-          'vehicle_year': int.tryParse(_yearCtrl.text),
+        await FirebaseFirestore.instance.collection('vehicles').doc(vehicleId).update({
+          'customerName': _nameCtrl.text.trim(),
+          'phoneNumber': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+          'plateNumber': _plateCtrl.text.trim().toUpperCase(),
+          'vehicleBrand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+          'vehicleType': _typeCtrl.text.trim().isEmpty ? null : _typeCtrl.text.trim(),
+          'vehicleYear': int.tryParse(_yearCtrl.text),
         });
       } else {
         vehicleId = uuid.v4();
-        final vehicleData = {
+        await FirebaseFirestore.instance.collection('vehicles').doc(vehicleId).set({
           'id': vehicleId,
-          'customer_name': _nameCtrl.text.trim(),
-          'phone_number': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
-          'plate_number': _plateCtrl.text.trim().toUpperCase(),
-          'vehicle_brand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
-          'vehicle_type': _typeCtrl.text.trim().isEmpty ? null : _typeCtrl.text.trim(),
-          'vehicle_year': int.tryParse(_yearCtrl.text),
-          'created_at': DateTime.now().toIso8601String(),
-        };
-        await db.insertVehicle(VehiclesCompanion.insert(
-          id: vehicleId,
-          customerName: _nameCtrl.text.trim(),
-          phoneNumber: Value(vehicleData['phone_number'] as String?),
-          plateNumber: vehicleData['plate_number'] as String,
-          vehicleBrand: Value(vehicleData['vehicle_brand'] as String?),
-          vehicleType: Value(vehicleData['vehicle_type'] as String?),
-          vehicleYear: Value(vehicleData['vehicle_year'] as int?),
-        ));
-        await syncService.enqueue(tableName: 'vehicles', recordId: vehicleId, operation: 'create', data: vehicleData);
+          'customerName': _nameCtrl.text.trim(),
+          'phoneNumber': _phoneCtrl.text.trim().isEmpty ? null : _phoneCtrl.text.trim(),
+          'plateNumber': _plateCtrl.text.trim().toUpperCase(),
+          'vehicleBrand': _brandCtrl.text.trim().isEmpty ? null : _brandCtrl.text.trim(),
+          'vehicleType': _typeCtrl.text.trim().isEmpty ? null : _typeCtrl.text.trim(),
+          'vehicleYear': int.tryParse(_yearCtrl.text),
+          'createdAt': FieldValue.serverTimestamp(),
+        });
       }
-      final orderNo = await db.getNextOrderNo();
+      
+      final orderNo = await _getNextOrderNo();
       final woId = uuid.v4();
-      final woData = {
+      
+      await FirebaseFirestore.instance.collection('work_orders').doc(woId).set({
         'id': woId,
-        'order_no': orderNo,
-        'vehicle_id': vehicleId,
-        'user_id': user?.id ?? '1',
+        'orderNo': orderNo,
+        'vehicleId': vehicleId,
+        'userId': user?.id ?? '1',
         'status': 'waiting',
         'complaint': _complaintCtrl.text.trim().isEmpty ? null : _complaintCtrl.text.trim(),
-        'created_at': DateTime.now().toIso8601String(),
-      };
-      await db.insertWorkOrder(WorkOrdersCompanion.insert(
-        id: woId,
-        orderNo: orderNo,
-        vehicleId: vehicleId,
-        userId: user?.id ?? '1',
-        complaint: Value(woData['complaint']),
-      ));
-      await syncService.enqueue(tableName: 'work_orders', recordId: woId, operation: 'create', data: woData);
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      
       HapticFeedback.heavyImpact();
       ref.invalidate(activeWorkOrdersProvider);
       ref.invalidate(workOrdersProvider);
@@ -177,7 +159,7 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
               onFieldSubmitted: (_) => _searchByPlate(),
             ),
             if (_existingVehicleId != null)
-              Padding(padding: const EdgeInsets.only(top: 4),
+              const Padding(padding: EdgeInsets.only(top: 4),
                 child: Text('✓ Pelanggan terdaftar', style: TextStyle(fontSize: 11, color: AppColors.success, fontWeight: FontWeight.w600))),
             const SizedBox(height: 16),
             TextFormField(

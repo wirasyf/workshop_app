@@ -61,6 +61,7 @@ class ReceiptModal {
         storeAddress: settings.storeAddress,
         storePhone: settings.storePhone,
         invoiceNo: txn.invoiceNo,
+        cashierName: txn.cashierName,
         date: txn.createdAt,
         items: printItems,
         total: txn.total,
@@ -136,6 +137,7 @@ class ReceiptModal {
                                 storeAddress: settings.storeAddress,
                                 storePhone: settings.storePhone,
                                 invoiceNo: txn.invoiceNo,
+                                cashierName: txn.cashierName,
                                 date: txn.createdAt,
                                 items: details
                                     .map(

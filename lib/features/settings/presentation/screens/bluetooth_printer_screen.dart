@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/services/bluetooth_printer_service.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../../shared/utils/app_toast.dart';
 
 /// Layar koneksi printer bluetooth
@@ -30,22 +31,31 @@ class _BluetoothPrinterScreenState
   Future<void> _scanDevices() async {
     setState(() => _isScanning = true);
 
-    final btEnabled =
-        await ref.read(printerStateProvider.notifier).isBluetoothEnabled();
-    if (!btEnabled) {
-      if (mounted) {
-        AppToast.show(
-          context,
-          'Bluetooth tidak aktif. Aktifkan Bluetooth terlebih dahulu.',
-          type: ToastType.error,
-        );
-      }
-      setState(() => _isScanning = false);
-      return;
-    }
-
     try {
-      final devices = await PrintBluetoothThermal.pairedBluetooths;
+      // Cek status bluetooth maksimal 3 detik
+      final btEnabled = await Future.any([
+        ref.read(printerStateProvider.notifier).isBluetoothEnabled(),
+        Future.delayed(const Duration(seconds: 3), () => false),
+      ]);
+
+      if (!btEnabled) {
+        if (mounted) {
+          AppToast.show(
+            context,
+            'Bluetooth tidak aktif atau tidak merespon. Pastikan Bluetooth menyala.',
+            type: ToastType.error,
+          );
+          setState(() => _isScanning = false);
+        }
+        return;
+      }
+
+      // Timeout 5 detik agar tidak loading selamanya
+      final devices = await Future.any([
+        PrintBluetoothThermal.pairedBluetooths,
+        Future.delayed(const Duration(seconds: 5), () => <BluetoothInfo>[]),
+      ]);
+
       if (mounted) {
         setState(() {
           _devices = devices;
@@ -54,8 +64,10 @@ class _BluetoothPrinterScreenState
       }
     } catch (e) {
       if (mounted) {
-        AppToast.show(context, 'Error scan: $e', type: ToastType.error);
-        setState(() => _isScanning = false);
+        setState(() {
+          _isScanning = false;
+          _devices = [];
+        });
       }
     }
   }
@@ -83,8 +95,9 @@ class _BluetoothPrinterScreenState
   }
 
   Future<void> _testPrint() async {
-    final isConnected =
-        await ref.read(printerStateProvider.notifier).checkConnection();
+    final isConnected = await ref
+        .read(printerStateProvider.notifier)
+        .checkConnection();
     if (!isConnected) {
       if (mounted) {
         AppToast.show(
@@ -158,284 +171,267 @@ class _BluetoothPrinterScreenState
             ),
           ],
         ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // Status koneksi
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: printerState.isConnected
-                    ? [
-                        AppColors.success.withValues(alpha: 0.1),
-                        AppColors.success.withValues(alpha: 0.05),
-                      ]
-                    : [
-                        AppColors.border.withValues(alpha: 0.3),
-                        AppColors.border.withValues(alpha: 0.1),
-                      ],
-              ),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: printerState.isConnected
-                    ? AppColors.success.withValues(alpha: 0.3)
-                    : AppColors.border,
-              ),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: printerState.isConnected
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : AppColors.border.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    printerState.isConnected
-                        ? Icons.print_rounded
-                        : Icons.print_disabled_rounded,
-                    color: printerState.isConnected
-                        ? AppColors.success
-                        : AppColors.textHint,
-                    size: 28,
-                  ),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // Status koneksi
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: printerState.isConnected
+                      ? [
+                          AppColors.success.withValues(alpha: 0.1),
+                          AppColors.success.withValues(alpha: 0.05),
+                        ]
+                      : [
+                          AppColors.border.withValues(alpha: 0.3),
+                          AppColors.border.withValues(alpha: 0.1),
+                        ],
                 ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        printerState.isConnected
-                            ? 'Terhubung'
-                            : 'Tidak Terhubung',
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: printerState.isConnected
-                              ? AppColors.success
-                              : AppColors.textSecondary,
-                        ),
-                      ),
-                      if (printerState.connectedName != null)
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: printerState.isConnected
+                      ? AppColors.success.withValues(alpha: 0.3)
+                      : AppColors.border,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: printerState.isConnected
+                          ? AppColors.success.withValues(alpha: 0.1)
+                          : AppColors.border.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      printerState.isConnected
+                          ? Icons.print_rounded
+                          : Icons.print_disabled_rounded,
+                      color: printerState.isConnected
+                          ? AppColors.success
+                          : AppColors.textHint,
+                      size: 28,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                         Text(
-                          printerState.connectedName!,
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      if (printerState.connectedMac != null)
-                        Text(
-                          printerState.connectedMac!,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            fontSize: 11,
-                            color: AppColors.textHint,
+                          printerState.isConnected
+                              ? 'Terhubung'
+                              : 'Tidak Terhubung',
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                            color: printerState.isConnected
+                                ? AppColors.success
+                                : AppColors.textSecondary,
                           ),
                         ),
-                    ],
-                  ),
-                ),
-                if (printerState.isConnected) ...[
-                  IconButton(
-                    icon: const Icon(
-                      Icons.print_rounded,
-                      color: AppColors.info,
-                    ),
-                    tooltip: 'Test Print',
-                    onPressed: _testPrint,
-                  ),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.link_off_rounded,
-                      color: AppColors.error,
-                    ),
-                    tooltip: 'Putuskan',
-                    onPressed: () async {
-                      await ref
-                          .read(printerStateProvider.notifier)
-                          .forgetPrinter();
-                      if (mounted) {
-                        AppToast.show(
-                          context,
-                          'Printer diputuskan',
-                          type: ToastType.info,
-                        );
-                      }
-                    },
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(height: 24),
-
-          // Info
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.info.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.info.withValues(alpha: 0.2)),
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.info_outline_rounded,
-                  size: 16,
-                  color: AppColors.info,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    'Pastikan printer sudah di-pair melalui pengaturan Bluetooth HP Anda terlebih dahulu.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppColors.info,
-                      fontSize: 12,
+                        if (printerState.connectedName != null)
+                          Text(
+                            printerState.connectedName!,
+                            style: theme.textTheme.bodySmall,
+                          ),
+                        if (printerState.connectedMac != null)
+                          Text(
+                            printerState.connectedMac!,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontSize: 11,
+                              color: AppColors.textHint,
+                            ),
+                          ),
+                      ],
                     ),
                   ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 20),
-
-          // Daftar device
-          Text(
-            'Perangkat Tersedia',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 12),
-
-          if (_isScanning)
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    CircularProgressIndicator(),
-                    SizedBox(height: 12),
-                    Text('Mencari perangkat...'),
+                  if (printerState.isConnected) ...[
+                    IconButton(
+                      icon: const Icon(
+                        Icons.print_rounded,
+                        color: AppColors.info,
+                      ),
+                      tooltip: 'Test Print',
+                      onPressed: _testPrint,
+                    ),
+                    IconButton(
+                      icon: const Icon(
+                        Icons.link_off_rounded,
+                        color: AppColors.error,
+                      ),
+                      tooltip: 'Putuskan',
+                      onPressed: () async {
+                        await ref
+                            .read(printerStateProvider.notifier)
+                            .forgetPrinter();
+                        if (mounted) {
+                          AppToast.show(
+                            context,
+                            'Printer diputuskan',
+                            type: ToastType.info,
+                          );
+                        }
+                      },
+                    ),
                   ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+
+            // Info
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.info.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.info.withValues(alpha: 0.2),
                 ),
               ),
-            )
-          else if (_devices.isEmpty)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.all(32),
-                child: Column(
-                  children: [
-                    Icon(
-                      Icons.bluetooth_disabled_rounded,
-                      size: 48,
-                      color: AppColors.textHint,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Tidak ada perangkat ditemukan',
-                      style: TextStyle(color: AppColors.textSecondary),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Pair printer di Pengaturan Bluetooth HP',
-                      style: TextStyle(
-                        color: AppColors.textHint,
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.info_outline_rounded,
+                    size: 16,
+                    color: AppColors.info,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Pastikan printer sudah di-pair melalui pengaturan Bluetooth HP Anda terlebih dahulu.',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.info,
                         fontSize: 12,
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            )
-          else
-            ..._devices.map((device) {
-              final isCurrentlyConnected =
-                  printerState.isConnected &&
-                  printerState.connectedMac == device.macAdress;
-              final isConnecting = printerState.isLoading;
+            ),
+            const SizedBox(height: 20),
 
-              return Container(
-                margin: const EdgeInsets.only(bottom: 8),
-                decoration: BoxDecoration(
-                  color: theme.cardTheme.color,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: isCurrentlyConnected
-                        ? AppColors.success
-                        : AppColors.border,
-                    width: isCurrentlyConnected ? 1.5 : 1,
+            // Daftar device
+            Text(
+              'Perangkat Tersedia',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+
+            if (_isScanning)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: Column(
+                    children: [
+                      CircularProgressIndicator(),
+                      SizedBox(height: 12),
+                      Text('Mencari perangkat...'),
+                    ],
                   ),
                 ),
-                child: ListTile(
-                  leading: Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: isCurrentlyConnected
-                          ? AppColors.success.withValues(alpha: 0.1)
-                          : AppColors.primary.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      isCurrentlyConnected
-                          ? Icons.bluetooth_connected_rounded
-                          : Icons.bluetooth_rounded,
+              )
+            else if (_devices.isEmpty)
+              const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(32),
+                  child: EmptyStateWidget(
+                    icon: Icons.bluetooth_disabled_rounded,
+                    title: 'Tidak ada perangkat ditemukan',
+                    subtitle: 'Pair printer di Pengaturan Bluetooth HP',
+                  ),
+                ),
+              )
+            else
+              ..._devices.map((device) {
+                final isCurrentlyConnected =
+                    printerState.isConnected &&
+                    printerState.connectedMac == device.macAdress;
+                final isConnecting = printerState.isLoading;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: theme.cardTheme.color,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
                       color: isCurrentlyConnected
                           ? AppColors.success
-                          : AppColors.primary,
+                          : AppColors.border,
+                      width: isCurrentlyConnected ? 1.5 : 1,
                     ),
                   ),
-                  title: Text(
-                    device.name,
-                    style: const TextStyle(fontWeight: FontWeight.w600),
-                  ),
-                  subtitle: Text(
-                    device.macAdress,
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppColors.textHint,
+                  child: ListTile(
+                    leading: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: isCurrentlyConnected
+                            ? AppColors.success.withValues(alpha: 0.1)
+                            : AppColors.primary.withValues(alpha: 0.1),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Icon(
+                        isCurrentlyConnected
+                            ? Icons.bluetooth_connected_rounded
+                            : Icons.bluetooth_rounded,
+                        color: isCurrentlyConnected
+                            ? AppColors.success
+                            : AppColors.primary,
+                      ),
                     ),
-                  ),
-                  trailing: isCurrentlyConnected
-                      ? const Chip(
-                          label: Text(
-                            'Terhubung',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: AppColors.success,
+                    title: Text(
+                      device.name,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                    subtitle: Text(
+                      device.macAdress,
+                      style: TextStyle(fontSize: 11, color: AppColors.textHint),
+                    ),
+                    trailing: isCurrentlyConnected
+                        ? const Chip(
+                            label: Text(
+                              'Terhubung',
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: AppColors.success,
+                              ),
+                            ),
+                            backgroundColor: Colors.transparent,
+                            side: BorderSide(color: AppColors.success),
+                            visualDensity: VisualDensity.compact,
+                          )
+                        : isConnecting
+                        ? const SizedBox(
+                            width: 24,
+                            height: 24,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : ElevatedButton(
+                            onPressed: () => _connectPrinter(device),
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              minimumSize: Size.zero,
+                            ),
+                            child: const Text(
+                              'Hubungkan',
+                              style: TextStyle(fontSize: 12),
                             ),
                           ),
-                          backgroundColor: Colors.transparent,
-                          side: BorderSide(color: AppColors.success),
-                          visualDensity: VisualDensity.compact,
-                        )
-                      : isConnecting
-                          ? const SizedBox(
-                              width: 24,
-                              height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : ElevatedButton(
-                              onPressed: () => _connectPrinter(device),
-                              style: ElevatedButton.styleFrom(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                minimumSize: Size.zero,
-                              ),
-                              child: const Text(
-                                'Hubungkan',
-                                style: TextStyle(fontSize: 12),
-                              ),
-                            ),
-                ),
-              );
-            }),
-        ],
+                  ),
+                );
+              }),
+          ],
+        ),
       ),
-    ));
+    );
   }
 }
