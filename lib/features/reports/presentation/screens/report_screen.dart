@@ -12,6 +12,7 @@ import '../../../../core/enums/report_period.dart';
 import '../../../../core/models/transaction_model.dart';
 import '../../../pos/data/transaction_repository.dart';
 import '../../../pos/presentation/widgets/receipt_modal.dart';
+import '../../../products/data/product_repository.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../../shared/utils/app_toast.dart';
 import 'package:intl/intl.dart';
@@ -89,8 +90,17 @@ final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   double totalHpp = 0.0;
   for (var tx in transactions) {
     if (tx.status == 'completed') {
-      totalSales += tx.total;
-      totalHpp += tx.totalCost;
+      final items = await repo.getTransactionItems(tx.id);
+      double txSales = 0.0;
+      double txHpp = 0.0;
+      for (var item in items) {
+        if (!item.isReturned) {
+          txSales += item.subtotal;
+          txHpp += (item.costPrice * item.qty);
+        }
+      }
+      totalSales += txSales;
+      totalHpp += txHpp;
     }
   }
   double labaBersih = totalSales - totalHpp;
@@ -157,11 +167,15 @@ class ReportScreen extends ConsumerWidget {
         TextCellValue('Keterangan Produk dan Jumlah'),
         TextCellValue('Harga Beli Produk'),
         TextCellValue('Harga Jual Produk'),
+        TextCellValue('Harga Karyawan'),
         TextCellValue('Keterangan Jasa'),
         TextCellValue('Keterangan Mekanik'),
         TextCellValue('Harga Jasa'),
+        TextCellValue('Pembayaran Karyawan'),
+        TextCellValue('Pembayaran Karyawan (60%)'),
+        TextCellValue('Pembayaran Karyawan (40%)'),
         TextCellValue('Harga Jual Total'),
-        TextCellValue('Laba Bersih'),
+        TextCellValue('Laba Kotor'),
         TextCellValue('Status'),
       ]);
 
@@ -171,14 +185,16 @@ class ReportScreen extends ConsumerWidget {
         fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
         bold: true,
       );
-      for (int i = 0; i < 11; i++) {
+      for (int i = 0; i < 15; i++) {
         var cell = sheetObject.cell(
           CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
         );
         cell.cellStyle = headerStyle;
+        sheetObject.setColumnAutoFit(i);
       }
 
       final repo = ref.read(transactionRepositoryProvider);
+      final productRepo = ref.read(productRepositoryProvider);
 
       // Add Data
       for (var tx in transactions) {
@@ -190,16 +206,48 @@ class ReportScreen extends ConsumerWidget {
 
         double totalProductSales = 0.0;
         double totalServiceSales = 0.0;
+        double totalWorkerPrice = 0.0;
+
+        double txTotal = 0.0;
+        double txTotalCost = 0.0;
 
         for (var item in items) {
           if (item.itemType == 'product') {
-            productDetails.add('${item.productName ?? 'Produk'} x${item.qty}');
-            totalProductSales += item.subtotal;
+            if (item.isReturned) {
+              productDetails.add(
+                '${item.productName ?? 'Produk'} x${item.qty} (Retur)',
+              );
+            } else {
+              productDetails.add(
+                '${item.productName ?? 'Produk'} x${item.qty}',
+              );
+              totalProductSales += item.subtotal;
+              txTotal += item.subtotal;
+              txTotalCost += (item.costPrice * item.qty);
+              if (item.productId != null) {
+                try {
+                  final product = await productRepo
+                      .getProductById(item.productId!)
+                      .first;
+                  if (product != null) {
+                    totalWorkerPrice += product.workerPrice * item.qty;
+                  }
+                } catch (_) {}
+              }
+            }
           } else if (item.itemType == 'service') {
-            serviceDetails.add('${item.productName ?? 'Jasa'} x${item.qty}');
-            totalServiceSales += item.subtotal;
-            if (item.workerName != null && item.workerName!.isNotEmpty) {
-              mechanics.add(item.workerName!);
+            if (item.isReturned) {
+              serviceDetails.add(
+                '${item.productName ?? 'Jasa'} x${item.qty} (Retur)',
+              );
+            } else {
+              serviceDetails.add('${item.productName ?? 'Jasa'} x${item.qty}');
+              totalServiceSales += item.subtotal;
+              txTotal += item.subtotal;
+              txTotalCost += (item.costPrice * item.qty);
+              if (item.workerName != null && item.workerName!.isNotEmpty) {
+                mechanics.add(item.workerName!);
+              }
             }
           }
         }
@@ -211,7 +259,13 @@ class ReportScreen extends ConsumerWidget {
           statusIndo = 'Tertunda';
         } else if (tx.status == 'cancelled') {
           statusIndo = 'Dibatalkan';
+        } else if (tx.status == 'returned') {
+          statusIndo = 'Diretur';
         }
+
+        double pembayaranKaryawan = totalWorkerPrice + totalServiceSales;
+        double pembayaranKaryawan60 = pembayaranKaryawan * 0.6;
+        double pembayaranKaryawan40 = pembayaranKaryawan * 0.4;
 
         sheetObject.appendRow([
           TextCellValue(DateFormatter.formatWithTime(tx.createdAt)),
@@ -219,15 +273,19 @@ class ReportScreen extends ConsumerWidget {
           TextCellValue(
             productDetails.isNotEmpty ? productDetails.join(', ') : '-',
           ),
-          TextCellValue(CurrencyFormatter.format(tx.totalCost)),
+          TextCellValue(CurrencyFormatter.format(txTotalCost)),
           TextCellValue(CurrencyFormatter.format(totalProductSales)),
+          TextCellValue(CurrencyFormatter.format(totalWorkerPrice)),
           TextCellValue(
             serviceDetails.isNotEmpty ? serviceDetails.join(', ') : '-',
           ),
           TextCellValue(mechanics.isNotEmpty ? mechanics.join(', ') : '-'),
           TextCellValue(CurrencyFormatter.format(totalServiceSales)),
-          TextCellValue(CurrencyFormatter.format(tx.total)),
-          TextCellValue(CurrencyFormatter.format(tx.total - tx.totalCost)),
+          TextCellValue(CurrencyFormatter.format(pembayaranKaryawan)),
+          TextCellValue(CurrencyFormatter.format(pembayaranKaryawan60)),
+          TextCellValue(CurrencyFormatter.format(pembayaranKaryawan40)),
+          TextCellValue(CurrencyFormatter.format(txTotal)),
+          TextCellValue(CurrencyFormatter.format(txTotal - txTotalCost)),
           TextCellValue(statusIndo),
         ]);
       }
@@ -661,11 +719,50 @@ class ReportScreen extends ConsumerWidget {
                                                 crossAxisAlignment:
                                                     CrossAxisAlignment.start,
                                                 children: [
-                                                  Text(
-                                                    txn.invoiceNo,
-                                                    style: theme
-                                                        .textTheme
-                                                        .titleSmall,
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        txn.invoiceNo,
+                                                        style: theme
+                                                            .textTheme
+                                                            .titleSmall,
+                                                      ),
+                                                      if (txn.status ==
+                                                          'returned') ...[
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 6,
+                                                                vertical: 2,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors
+                                                                .error
+                                                                .withValues(
+                                                                  alpha: 0.1,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                          child: const Text(
+                                                            'DIRETUR',
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              color: AppColors
+                                                                  .error,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
                                                   ),
                                                   const SizedBox(height: 2),
                                                   Text(

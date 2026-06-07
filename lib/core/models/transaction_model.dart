@@ -92,6 +92,7 @@ class TransactionItemModel {
   final bool isApproved;
   final String? workerName;
   final String? productName;
+  final bool isReturned;
 
   TransactionItemModel({
     required this.id,
@@ -107,6 +108,7 @@ class TransactionItemModel {
     this.isApproved = true,
     this.workerName,
     this.productName,
+    this.isReturned = false,
   });
 
   factory TransactionItemModel.fromFirestore(DocumentSnapshot doc) {
@@ -125,6 +127,7 @@ class TransactionItemModel {
       isApproved: data['isApproved'] ?? true,
       workerName: data['workerName'],
       productName: data['productName'],
+      isReturned: data['isReturned'] ?? false,
     );
   }
 
@@ -142,6 +145,7 @@ class TransactionItemModel {
       'isApproved': isApproved,
       'workerName': workerName,
       'productName': productName,
+      'isReturned': isReturned,
     };
   }
 }

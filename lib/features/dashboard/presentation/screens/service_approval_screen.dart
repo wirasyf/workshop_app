@@ -24,6 +24,7 @@ final historyApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref
       .collection('transaction_items')
       .where('itemType', isEqualTo: 'service')
       .where('isApproved', isEqualTo: true)
+      .orderBy('createdAt', descending: true)
       .limit(50)
       .snapshots()
       .map((snap) => snap.docs.map((d) => TransactionItemModel.fromFirestore(d)).toList());

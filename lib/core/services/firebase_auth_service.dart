@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'settings_service.dart';
+import 'package:uuid/uuid.dart';
 
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -36,10 +37,16 @@ class FirebaseAuthService {
       throw Exception('User data not found in Firestore');
     }
     
-    final userModel = UserModel.fromFirestore(doc);
+    final sessionId = const Uuid().v4();
+    await _firestore.collection('users').doc(credential.user!.uid).update({
+      'currentSessionId': sessionId,
+    });
+    
+    final userModel = UserModel.fromFirestore(doc).copyWith(currentSessionId: sessionId);
     await _settings.setUserId(userModel.id);
     await _settings.setUserName(userModel.name);
     await _settings.setUserRole(userModel.role);
+    await _settings.setSessionId(sessionId);
     
     return userModel;
   }
@@ -56,6 +63,8 @@ class FirebaseAuthService {
       password: password,
     );
     
+    final sessionId = const Uuid().v4();
+    
     final userModel = UserModel(
       id: credential.user!.uid,
       name: name,
@@ -63,6 +72,7 @@ class FirebaseAuthService {
       email: email,
       role: role,
       createdAt: DateTime.now(),
+      currentSessionId: sessionId,
     );
     
     await _firestore.collection('users').doc(credential.user!.uid).set(userModel.toMap());
@@ -70,6 +80,7 @@ class FirebaseAuthService {
     await _settings.setUserId(userModel.id);
     await _settings.setUserName(userModel.name);
     await _settings.setUserRole(userModel.role);
+    await _settings.setSessionId(sessionId);
     
     return userModel;
   }

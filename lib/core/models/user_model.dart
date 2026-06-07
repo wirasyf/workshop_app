@@ -9,6 +9,8 @@ class UserModel {
   final String role;
   final bool isActive;
   final DateTime createdAt;
+  final String? currentSessionId;
+  final String? password;
 
   UserModel({
     required this.id,
@@ -19,6 +21,8 @@ class UserModel {
     this.role = 'owner',
     this.isActive = true,
     required this.createdAt,
+    this.currentSessionId,
+    this.password,
   });
 
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
@@ -32,6 +36,8 @@ class UserModel {
       role: data['role'] ?? 'owner',
       isActive: data['isActive'] ?? true,
       createdAt: _parseDate(data['createdAt']),
+      currentSessionId: data['currentSessionId'],
+      password: data['password'],
     );
   }
 
@@ -51,6 +57,8 @@ class UserModel {
       'role': role,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
+      'currentSessionId': currentSessionId,
+      'password': password,
     };
   }
 
@@ -63,6 +71,8 @@ class UserModel {
     String? role,
     bool? isActive,
     DateTime? createdAt,
+    String? currentSessionId,
+    String? password,
   }) {
     return UserModel(
       id: id ?? this.id,
@@ -73,6 +83,8 @@ class UserModel {
       role: role ?? this.role,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      currentSessionId: currentSessionId ?? this.currentSessionId,
+      password: password ?? this.password,
     );
   }
 }

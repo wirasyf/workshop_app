@@ -19,6 +19,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
         (data?['items'] as List?)
             ?.map(
               (e) => ReceiptItem(
+                id: e.productId,
                 name: e.name,
                 qty: e.qty,
                 unitPrice: e.unitPrice,
@@ -61,7 +62,7 @@ class PaymentSuccessScreen extends ConsumerWidget {
                 color: Colors.white,
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 15,
                     offset: const Offset(0, -5),
                   ),

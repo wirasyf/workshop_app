@@ -120,9 +120,27 @@ class _TransactionHistoryScreenState
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      txn.invoiceNo,
-                                      style: theme.textTheme.titleSmall,
+                                    Row(
+                                      children: [
+                                        Text(
+                                          txn.invoiceNo,
+                                          style: theme.textTheme.titleSmall,
+                                        ),
+                                        if (txn.status == 'returned') ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.error.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: const Text(
+                                              'DIRETUR',
+                                              style: TextStyle(fontSize: 10, color: AppColors.error, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(

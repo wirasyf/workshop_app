@@ -7,6 +7,9 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../../shared/widgets/loading_widget.dart';
+import '../../../../shared/utils/app_toast.dart';
+import '../../../../core/services/excel_export_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/stock_badge.dart';
 
@@ -27,6 +30,27 @@ class ProductListScreen extends ConsumerWidget {
           onPressed: () => context.go(from == 'dashboard' ? '/dashboard' : '/settings'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded),
+            onPressed: () async {
+              final items = productsAsync.valueOrNull;
+              if (items == null || items.isEmpty) {
+                AppToast.show(context, 'Tidak ada data untuk diekspor', type: ToastType.warning);
+                return;
+              }
+              final user = ref.read(authStateProvider).value;
+              final isAdmin = user?.role == 'owner';
+              try {
+                AppToast.show(context, 'Menyiapkan file Excel...', type: ToastType.info);
+                await ExcelExportService.exportProducts(products: items, isAdmin: isAdmin);
+              } catch (e) {
+                if (context.mounted) {
+                  AppToast.show(context, 'Gagal mengekspor: $e', type: ToastType.error);
+                }
+              }
+            },
+            tooltip: 'Export ke Excel',
+          ),
           IconButton(
             icon: const Icon(Icons.category_rounded),
             onPressed: () => context.go('/products/categories${from == 'dashboard' ? '?from=dashboard' : ''}'),
@@ -105,7 +129,7 @@ class ProductListScreen extends ConsumerWidget {
                   child: ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: items.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {
                       return _ProductTile(product: items[i]);
                     },
@@ -158,13 +182,13 @@ class _ProductTile extends StatelessWidget {
                         ? CachedNetworkImage(
                             imageUrl: product.imageUrl!,
                             fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (_, __, ___) => const Icon(Icons.error_rounded, size: 20),
+                            placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                            errorWidget: (_, _, _) => const Icon(Icons.error_rounded, size: 20),
                           )
                         : Image.file(
                             File(product.imageUrl!),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
+                            errorBuilder: (_, _, _) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
                           ),
                     )
                   : const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),

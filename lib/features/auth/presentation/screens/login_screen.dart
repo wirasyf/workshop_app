@@ -16,7 +16,8 @@ class LoginScreen extends ConsumerStatefulWidget {
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProviderStateMixin {
+class _LoginScreenState extends ConsumerState<LoginScreen>
+    with SingleTickerProviderStateMixin {
   final _formKey = GlobalKey<FormState>();
   final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
@@ -28,7 +29,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
   @override
   void initState() {
     super.initState();
-    _animCtrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 800));
+    _animCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
     _fadeAnim = CurvedAnimation(parent: _animCtrl, curve: Curves.easeOut);
     _animCtrl.forward();
   }
@@ -47,7 +51,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
 
     try {
       String loginEmail = _emailCtrl.text.trim();
-      
+
       // Jika input tidak memiliki '@', asumsikan sebagai username
       if (!loginEmail.contains('@')) {
         try {
@@ -56,24 +60,28 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
               .where('username', isEqualTo: loginEmail)
               .limit(1)
               .get();
-              
+
           if (querySnapshot.docs.isNotEmpty) {
             loginEmail = querySnapshot.docs.first.data()['email'] as String;
           } else {
             throw Exception('Username tidak ditemukan');
           }
-        } catch (e) {
-          if (e is FirebaseException && e.code == 'permission-denied') {
-            throw Exception('Akses ditolak oleh database. Silakan login menggunakan Alamat Email kasir yang didaftarkan.');
+        } on FirebaseException catch (e) {
+          if (e.code == 'permission-denied') {
+            // Jika permission denied, coba langsung login dengan input sebagai email
+            // (misal user memang mengetik email tanpa @)
+            debugPrint(
+              'Username lookup failed: permission-denied. Trying as email...',
+            );
+          } else {
+            rethrow;
           }
-          rethrow;
         }
       }
 
-      final success = await ref.read(authStateProvider.notifier).login(
-        loginEmail,
-        _passwordCtrl.text,
-      );
+      final success = await ref
+          .read(authStateProvider.notifier)
+          .login(loginEmail, _passwordCtrl.text);
 
       if (mounted) {
         setState(() => _isLoading = false);
@@ -103,15 +111,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
     try {
       final email = 'owner@bengkel.com';
       final password = 'password123';
-      
+
       // 1. Create auth user
-      final authResult = await FirebaseAuth.instance.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
-      
+      final authResult = await FirebaseAuth.instance
+          .createUserWithEmailAndPassword(email: email, password: password);
+
       final uid = authResult.user!.uid;
-      
+
       // 2. Insert to Firestore
       await FirebaseFirestore.instance.collection('users').doc(uid).set({
         'id': uid,
@@ -122,13 +128,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
         'createdAt': FieldValue.serverTimestamp(),
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      
+
       if (mounted) {
-        AppToast.show(context, 'Akun Owner berhasil dibuat!\nSilakan login dengan owner@bengkel.com / password123', type: ToastType.success);
+        AppToast.show(
+          context,
+          'Akun Owner berhasil dibuat!\nSilakan login dengan owner@bengkel.com / password123',
+          type: ToastType.success,
+        );
       }
     } catch (e) {
       if (mounted) {
-        AppToast.show(context, 'Gagal membuat akun owner: $e', type: ToastType.error);
+        AppToast.show(
+          context,
+          'Gagal membuat akun owner: $e',
+          type: ToastType.error,
+        );
       }
     } finally {
       if (mounted) setState(() => _isLoading = false);
@@ -156,7 +170,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(24),
                         boxShadow: [
-                          BoxShadow(color: AppColors.primary.withValues(alpha: 0.3), blurRadius: 20, offset: const Offset(0, 8)),
+                          BoxShadow(
+                            color: AppColors.primary.withValues(alpha: 0.3),
+                            blurRadius: 20,
+                            offset: const Offset(0, 8),
+                          ),
                         ],
                       ),
                       child: ClipRRect(
@@ -164,7 +182,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         child: GestureDetector(
                           onLongPress: _createInitialOwner,
                           child: Image.asset(
-                            'assets/images/logo.jpg',
+                            'assets/images/logo.png',
                             width: 100,
                             height: 100,
                             fit: BoxFit.cover,
@@ -173,9 +191,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       ),
                     ),
                     const SizedBox(height: 20),
-                    Text(AppConstants.appName, style: theme.textTheme.displaySmall),
+                    Text(
+                      AppConstants.appName,
+                      style: theme.textTheme.displaySmall,
+                    ),
                     const SizedBox(height: 4),
-                    Text('Manajemen Toko Spare Part', style: theme.textTheme.bodySmall),
+                    Text(
+                      'Manajemen Toko Spare Part',
+                      style: theme.textTheme.bodySmall,
+                    ),
                     const SizedBox(height: 40),
 
                     // Email field
@@ -189,7 +213,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         prefixIcon: Icon(Icons.person_outline),
                       ),
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Email wajib diisi';
+                        if (v == null || v.trim().isEmpty)
+                          return 'Email wajib diisi';
                         return null;
                       },
                     ),
@@ -206,12 +231,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                         hintText: 'Masukkan password',
                         prefixIcon: const Icon(Icons.lock_outlined),
                         suffixIcon: IconButton(
-                          icon: Icon(_obscurePassword ? Icons.visibility_off : Icons.visibility),
-                          onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(
+                            _obscurePassword
+                                ? Icons.visibility_off
+                                : Icons.visibility,
+                          ),
+                          onPressed: () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                         ),
                       ),
                       validator: (v) {
-                        if (v == null || v.isEmpty) return 'Password wajib diisi';
+                        if (v == null || v.isEmpty)
+                          return 'Password wajib diisi';
                         return null;
                       },
                     ),
@@ -224,13 +256,18 @@ class _LoginScreenState extends ConsumerState<LoginScreen> with SingleTickerProv
                       child: ElevatedButton(
                         onPressed: _isLoading ? null : _handleLogin,
                         child: _isLoading
-                            ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                            ? const SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
                             : const Text('Masuk'),
                       ),
                     ),
                     const SizedBox(height: 20),
-
-
                   ],
                 ),
               ),

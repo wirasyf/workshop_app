@@ -62,8 +62,8 @@ class _WorkOrderFormScreenState extends ConsumerState<WorkOrderFormScreen> {
   }
 
   Future<String> _getNextOrderNo() async {
-    final countSnap = await FirebaseFirestore.instance.collection('work_orders').count().get();
-    return 'WO-${(countSnap.count ?? 0) + 1001}';
+    final now = DateTime.now();
+    return 'WO-${now.millisecondsSinceEpoch}';
   }
 
   Future<void> _createWorkOrder() async {

@@ -5,9 +5,9 @@ class AppColors {
   AppColors._();
 
   // ── Primary ──
-  static const Color primary = Color(0xFF1565C0);
-  static const Color primaryLight = Color(0xFF42A5F5);
-  static const Color primaryDark = Color(0xFF0D47A1);
+  static const Color primary = Color(0xFFFF0000);
+  static const Color primaryLight = Color(0xFFFF4D4D);
+  static const Color primaryDark = Color(0xFFCC0000);
   static const Color onPrimary = Colors.white;
 
   // ── Secondary (Accent) ──
@@ -56,7 +56,7 @@ class AppColors {
 
   // ── Chart Colors ──
   static const List<Color> chartColors = [
-    Color(0xFF1565C0),
+    Color(0xFFFF0000),
     Color(0xFF42A5F5),
     Color(0xFFFF8F00),
     Color(0xFF10B981),

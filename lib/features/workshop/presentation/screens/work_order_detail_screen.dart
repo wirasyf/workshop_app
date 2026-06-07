@@ -38,12 +38,30 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
   double get _grandTotal => _totalService + _totalParts;
 
   Future<void> _updateStatus(String newStatus) async {
+    final sItems = _serviceItems.map((e) => {
+      'serviceId': e.serviceId,
+      'name': e.name,
+      'price': e.price,
+      'qty': e.qty,
+    }).toList();
+
+    final pItems = _partItems.map((e) => {
+      'productId': e.productId,
+      'name': e.name,
+      'price': e.price,
+      'costPrice': e.costPrice,
+      'unit': e.unit,
+      'qty': e.qty,
+    }).toList();
+
     await FirebaseFirestore.instance.collection('work_orders').doc(widget.workOrderId).update({
       'status': newStatus,
       'diagnosis': _diagnosisCtrl.text.trim().isEmpty ? null : _diagnosisCtrl.text.trim(),
       'totalService': _totalService,
       'totalParts': _totalParts,
       'grandTotal': _grandTotal,
+      'serviceItems': sItems,
+      'partItems': pItems,
       'completedAt': newStatus == 'completed' ? FieldValue.serverTimestamp() : null,
     });
 
@@ -60,6 +78,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
   void _processPayment() {
     final cartNotifier = ref.read(cartProvider.notifier);
     cartNotifier.clear();
+    ref.read(cartWorkOrderIdProvider.notifier).state = widget.workOrderId;
 
     for (final s in _serviceItems) {
       cartNotifier.addItem(CartItem(
@@ -77,6 +96,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         productId: p.productId,
         name: p.name,
         unitPrice: p.price,
+        costPrice: p.costPrice,
         unit: p.unit,
         type: CartItemType.product,
         qty: p.qty,
@@ -220,7 +240,13 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
         if (existing >= 0) {
           _partItems[existing].qty++;
         } else {
-          _partItems.add(_WoPartItem(productId: selected.id, name: selected.name, price: selected.sellPrice, unit: selected.unit));
+          _partItems.add(_WoPartItem(
+            productId: selected.id,
+            name: selected.name,
+            price: selected.sellPrice,
+            costPrice: selected.costPrice,
+            unit: selected.unit,
+          ));
         }
       });
     }
@@ -237,8 +263,46 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
       data: (wo) {
         if (wo == null) return const Scaffold(body: Center(child: Text('Work Order tidak ditemukan')));
 
-        if (_diagnosisCtrl.text.isEmpty && wo.diagnosis != null) {
-          _diagnosisCtrl.text = wo.diagnosis!;
+        if (wo.diagnosis != null && wo.diagnosis!.isNotEmpty) {
+          if (_diagnosisCtrl.text.isEmpty) _diagnosisCtrl.text = wo.diagnosis!;
+        } else {
+          _diagnosisCtrl.text = '';
+        }
+        
+        // Load items if they are empty
+        if (_serviceItems.isEmpty && wo.serviceItems.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _serviceItems.isEmpty) {
+              setState(() {
+                for (final item in wo.serviceItems) {
+                  _serviceItems.add(_WoServiceItem(
+                    serviceId: item['serviceId'],
+                    name: item['name'],
+                    price: (item['price'] as num).toDouble(),
+                  )..qty = item['qty']);
+                }
+              });
+            }
+          });
+        }
+        
+        if (_partItems.isEmpty && wo.partItems.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted && _partItems.isEmpty) {
+              setState(() {
+                for (final item in wo.partItems) {
+                  _partItems.add(_WoPartItem(
+                    productId: item['productId'],
+                    name: item['name'],
+                    price: (item['price'] as num).toDouble(),
+                    costPrice: (item['costPrice'] as num?)?.toDouble() ?? 0.0,
+                    unit: item['unit'] ?? '-',
+                    qty: item['qty'],
+                  ));
+                }
+              });
+            }
+          });
         }
 
         final vehicleAsync = ref.watch(vehicleDetailProvider(wo.vehicleId));
@@ -452,7 +516,16 @@ class _WoPartItem {
   final String productId;
   final String name;
   final double price;
+  final double costPrice;
   final String unit;
-  int qty = 1;
-  _WoPartItem({required this.productId, required this.name, required this.price, required this.unit});
+  int qty;
+
+  _WoPartItem({
+    required this.productId,
+    required this.name,
+    required this.price,
+    required this.costPrice,
+    required this.unit,
+    this.qty = 1,
+  });
 }

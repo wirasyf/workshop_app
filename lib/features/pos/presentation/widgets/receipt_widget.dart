@@ -16,6 +16,7 @@ class ReceiptWidget extends StatelessWidget {
   final double change;
   final String footer;
   final bool showSuccessIcon;
+  final void Function(ReceiptItem)? onReturnItem;
 
   const ReceiptWidget({
     super.key,
@@ -31,6 +32,7 @@ class ReceiptWidget extends StatelessWidget {
     required this.change,
     required this.footer,
     this.showSuccessIcon = false,
+    this.onReturnItem,
   });
 
   @override
@@ -159,12 +161,6 @@ class ReceiptWidget extends StatelessWidget {
             style: const TextStyle(fontSize: 11, color: Colors.black54, fontStyle: FontStyle.italic),
             textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 8),
-          const Text(
-            'Barang yang sudah dibeli tidak dapat ditukar/dikembalikan',
-            style: TextStyle(fontSize: 9, color: Colors.black38),
-            textAlign: TextAlign.center,
-          ),
         ],
       ),
     );
@@ -206,9 +202,35 @@ class ReceiptWidget extends StatelessWidget {
                     ),
                 ],
               ),
-              Text(
-                CurrencyFormatter.format(item.subtotal),
-                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.black),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    CurrencyFormatter.format(item.subtotal),
+                    style: TextStyle(
+                      fontSize: 13, 
+                      fontWeight: FontWeight.w600, 
+                      color: item.isReturned ? Colors.grey : Colors.black,
+                      decoration: item.isReturned ? TextDecoration.lineThrough : null,
+                    ),
+                  ),
+                  if (item.isReturned)
+                    const Text(
+                      'DIRETUR',
+                      style: TextStyle(fontSize: 9, color: AppColors.error, fontWeight: FontWeight.bold),
+                    )
+                  else if (onReturnItem != null && item.type == 'product')
+                    InkWell(
+                      onTap: () => onReturnItem!(item),
+                      child: const Padding(
+                        padding: EdgeInsets.only(top: 4),
+                        child: Text(
+                          'Retur',
+                          style: TextStyle(fontSize: 11, color: AppColors.error, fontWeight: FontWeight.bold, decoration: TextDecoration.underline),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ],
           ),
@@ -230,6 +252,7 @@ class ReceiptWidget extends StatelessWidget {
 }
 
 class ReceiptItem {
+  final String id;
   final String name;
   final int qty;
   final double unitPrice;
@@ -237,8 +260,10 @@ class ReceiptItem {
   final String type; // 'product' atau 'service'
   final bool isApproved;
   final String? workerName;
+  final bool isReturned;
 
   ReceiptItem({
+    required this.id,
     required this.name,
     required this.qty,
     required this.unitPrice,
@@ -246,6 +271,7 @@ class ReceiptItem {
     this.type = 'product',
     this.isApproved = true,
     this.workerName,
+    this.isReturned = false,
   });
 }
 

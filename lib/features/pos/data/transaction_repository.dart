@@ -94,4 +94,50 @@ class TransactionRepository {
         
     return snapshot.docs.map((doc) => TransactionModel.fromFirestore(doc)).toList();
   }
+
+  Future<void> returnTransactionItem(String transactionId, TransactionItemModel item) async {
+    final batch = _firestore.batch();
+    
+    // Mark item as returned
+    final itemRef = _firestore.collection('transaction_items').doc(item.id);
+    batch.update(itemRef, {'isReturned': true});
+    
+    // If it's a product, restore stock
+    if (item.itemType == 'product' && item.productId != null) {
+      final productRef = _firestore.collection('products').doc(item.productId);
+      batch.update(productRef, {
+        'stockQty': FieldValue.increment(item.qty),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    }
+    
+    await batch.commit();
+  }
+  Future<void> returnTransaction(String transactionId, List<TransactionItemModel> items) async {
+    final batch = _firestore.batch();
+    
+    // Mark transaction as returned
+    final txRef = _firestore.collection('transactions').doc(transactionId);
+    batch.update(txRef, {'status': 'returned'});
+    
+    // Process all items
+    for (final item in items) {
+      if (!item.isReturned) {
+        // Mark item as returned
+        final itemRef = _firestore.collection('transaction_items').doc(item.id);
+        batch.update(itemRef, {'isReturned': true});
+        
+        // If it's a product, restore stock
+        if (item.itemType == 'product' && item.productId != null) {
+          final productRef = _firestore.collection('products').doc(item.productId);
+          batch.update(productRef, {
+            'stockQty': FieldValue.increment(item.qty),
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+    }
+    
+    await batch.commit();
+  }
 }

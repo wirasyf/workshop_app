@@ -32,7 +32,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
   final _motorTypeCtrl = TextEditingController();
   final _costPriceCtrl = TextEditingController();
   final _sellPriceCtrl = TextEditingController();
-  final _wholesalePriceCtrl = TextEditingController();
+  final _workerPriceCtrl = TextEditingController();
   final _stockQtyCtrl = TextEditingController();
   final _stockMinCtrl = TextEditingController();
   final _unitCtrl = TextEditingController(text: 'pcs');
@@ -60,7 +60,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         _motorTypeCtrl.text = product.motorType ?? '';
         _costPriceCtrl.text = CurrencyFormatter.formatNumber(product.costPrice);
         _sellPriceCtrl.text = CurrencyFormatter.formatNumber(product.sellPrice);
-        _wholesalePriceCtrl.text = product.sellPriceWholesale != null ? CurrencyFormatter.formatNumber(product.sellPriceWholesale!) : '';
+        _workerPriceCtrl.text = CurrencyFormatter.formatNumber(product.workerPrice);
         _stockQtyCtrl.text = product.stockQty.toString();
         _stockMinCtrl.text = product.stockMin.toString();
         _unitCtrl.text = product.unit;
@@ -112,7 +112,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
 
   @override
   void dispose() {
-    for (final c in [_nameCtrl, _skuCtrl, _barcodeCtrl, _brandCtrl, _motorTypeCtrl, _costPriceCtrl, _sellPriceCtrl, _wholesalePriceCtrl, _stockQtyCtrl, _stockMinCtrl, _unitCtrl]) {
+    for (final c in [_nameCtrl, _skuCtrl, _barcodeCtrl, _brandCtrl, _motorTypeCtrl, _costPriceCtrl, _sellPriceCtrl, _workerPriceCtrl, _stockQtyCtrl, _stockMinCtrl, _unitCtrl]) {
       c.dispose();
     }
     super.dispose();
@@ -138,7 +138,7 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
         motorType: _motorTypeCtrl.text.trim().isEmpty ? null : _motorTypeCtrl.text.trim(),
         costPrice: CurrencyFormatter.parse(_costPriceCtrl.text),
         sellPrice: CurrencyFormatter.parse(_sellPriceCtrl.text),
-        sellPriceWholesale: _wholesalePriceCtrl.text.isEmpty ? null : CurrencyFormatter.parse(_wholesalePriceCtrl.text),
+        workerPrice: CurrencyFormatter.parse(_workerPriceCtrl.text),
         stockQty: int.tryParse(_stockQtyCtrl.text) ?? 0,
         stockMin: int.tryParse(_stockMinCtrl.text) ?? 5,
         unit: _unitCtrl.text.trim(),
@@ -272,7 +272,13 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                 ),
               ],
             ),
-            _field(_wholesalePriceCtrl, 'Harga Grosir (opsional)', keyboard: TextInputType.number, prefix: 'Rp ', formatters: [RupiahInputFormatter()]),
+            Row(
+              children: [
+                Expanded(
+                  child: _field(_workerPriceCtrl, 'Harga Karyawan (opsional)', keyboard: TextInputType.number, prefix: 'Rp ', formatters: [RupiahInputFormatter()]),
+                ),
+              ],
+            ),
 
             const SizedBox(height: 8),
             _sectionTitle('Stok'),

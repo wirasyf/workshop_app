@@ -151,6 +151,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
       final repo = ref.read(transactionRepositoryProvider);
       await repo.saveTransaction(txn, items);
 
+      final woId = ref.read(cartWorkOrderIdProvider);
+      if (woId != null) {
+        await FirebaseFirestore.instance.collection('work_orders').doc(woId).update({
+          'status': 'paid',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+        ref.read(cartWorkOrderIdProvider.notifier).state = null;
+      }
+
       final firestore = FirebaseFirestore.instance;
       final isCashier = user?.role == 'cashier';
 

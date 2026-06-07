@@ -77,10 +77,11 @@ final cartDiscountProvider = StateProvider<double>((ref) => 0);
 final cartTotalProvider = Provider<double>((ref) {
   final subtotal = ref.watch(cartSubtotalProvider);
   final discount = ref.watch(cartDiscountProvider);
-  return subtotal - discount;
+  return (subtotal - discount).clamp(0.0, double.infinity);
 });
 
 final paymentMethodProvider = StateProvider<String>((ref) => 'cash');
+final cartWorkOrderIdProvider = StateProvider<String?>((ref) => null);
 
 final paidAmountProvider = StateProvider<double>((ref) => 0);
 
@@ -105,7 +106,7 @@ final transactionHistoryProvider = StreamProvider<List<TransactionModel>>((ref) 
     final range = ref.watch(historyDateRangeProvider);
     final user = ref.watch(authStateProvider).value;
     return transactions.where((t) {
-      bool inRange = t.createdAt.isAfter(range.start) && t.createdAt.isBefore(range.end);
+      bool inRange = !t.createdAt.isBefore(range.start) && !t.createdAt.isAfter(range.end);
       bool isUser = user?.role == 'cashier' ? t.userId == user?.id : true;
       return inRange && isUser;
     }).toList();

@@ -94,8 +94,10 @@ class SettingsScreen extends ConsumerWidget {
           }),
           
           const Divider(height: 32),
-          _settingsTile(Icons.lock_reset_rounded, 'Ubah Kata Sandi', subtitle: 'Perbarui kata sandi akun Anda', onTap: () => context.go('/settings/change-password')),
-          const Divider(height: 32),
+          if (user?.role != 'cashier') ...[
+            _settingsTile(Icons.lock_reset_rounded, 'Ubah Kata Sandi', subtitle: 'Perbarui kata sandi akun Anda', onTap: () => context.go('/settings/change-password')),
+            const Divider(height: 32),
+          ],
           if (user?.role == 'owner')
             _settingsTile(Icons.store_rounded, 'Profil & Struk Toko', subtitle: 'Identitas toko & footer struk', onTap: () => context.go('/settings/store-profile')),
           _settingsTile(Icons.print_rounded, 'Printer Bluetooth', subtitle: 'Hubungkan printer thermal', onTap: () => context.go('/settings/bluetooth-printer')),

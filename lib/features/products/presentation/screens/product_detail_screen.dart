@@ -125,8 +125,10 @@ class ProductDetailScreen extends ConsumerWidget {
                   _buildInfoSection(theme, 'Harga', [
                     _infoRow('Harga Beli', CurrencyFormatter.format(product.costPrice)),
                     _infoRow('Harga Jual', CurrencyFormatter.format(product.sellPrice)),
-                    _infoRow('Harga Grosir', product.sellPriceWholesale != null ? CurrencyFormatter.format(product.sellPriceWholesale!) : '-'),
-                    _infoRow('Margin', '${((product.sellPrice - product.costPrice) / product.costPrice * 100).toStringAsFixed(0)}%'),
+                    _infoRow('Harga Karyawan', CurrencyFormatter.format(product.workerPrice)),
+                    _infoRow('Margin', product.costPrice > 0
+                        ? '${((product.sellPrice - product.costPrice) / product.costPrice * 100).toStringAsFixed(0)}%'
+                        : '-'),
                   ]),
                   const SizedBox(height: 16),
                   _buildInfoSection(theme, 'Stok', [

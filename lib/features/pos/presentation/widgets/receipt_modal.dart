@@ -7,6 +7,8 @@ import '../../../../main.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../providers/cart_provider.dart';
 import 'receipt_widget.dart';
+import '../../data/transaction_repository.dart';
+import '../../../../core/models/transaction_model.dart';
 
 class ReceiptModal {
   static Future<void> printReceipt(
@@ -87,6 +89,48 @@ class ReceiptModal {
     }
   }
 
+  static Future<void> _handleReturn(
+    BuildContext context,
+    WidgetRef ref,
+    dynamic txn,
+    List<dynamic> details,
+  ) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Retur'),
+        content: const Text('Apakah Anda yakin ingin meretur seluruh transaksi ini? Stok barang akan dikembalikan.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error, foregroundColor: Colors.white),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Retur Transaksi'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm != true) return;
+
+    try {
+      final items = details.map((d) => d.item as TransactionItemModel).toList();
+      await ref.read(transactionRepositoryProvider).returnTransaction(txn.id, items);
+      
+      if (context.mounted) {
+        AppToast.show(context, 'Transaksi berhasil diretur', type: ToastType.success);
+        Navigator.pop(context); // Close modal
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(context, 'Error: $e', type: ToastType.error);
+      }
+    }
+  }
+
   static void show(BuildContext context, WidgetRef ref, dynamic txn) {
     final settings = ref.read(settingsServiceProvider);
 
@@ -142,6 +186,7 @@ class ReceiptModal {
                                 items: details
                                     .map(
                                       (d) => ReceiptItem(
+                                        id: d.item.id,
                                         name: d.productName,
                                         qty: d.item.qty,
                                         unitPrice: d.item.unitPrice,
@@ -149,6 +194,7 @@ class ReceiptModal {
                                         type: d.itemType,
                                         isApproved: d.item.isApproved,
                                         workerName: d.item.workerName,
+                                        isReturned: d.item.isReturned,
                                       ),
                                     )
                                     .toList(),
@@ -156,6 +202,9 @@ class ReceiptModal {
                                 paid: txn.paidAmount,
                                 change: txn.changeAmount,
                                 footer: settings.receiptFooter,
+                                onReturnItem: (item) {
+                                  _showReturnDialog(context, ref, txn.id, item, d: details.firstWhere((element) => element.item.id == item.id).item);
+                                },
                               ),
                             ),
                           ),
@@ -165,46 +214,75 @@ class ReceiptModal {
                               color: Colors.white,
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.05),
+                                  color: Colors.black.withValues(alpha: 0.05),
                                   blurRadius: 10,
                                   offset: const Offset(0, -5),
                                 ),
                               ],
                             ),
-                            child: SizedBox(
-                              width: double.infinity,
-                              height: 48,
-                              child: ElevatedButton.icon(
-                                onPressed: () => printReceipt(
-                                  context,
-                                  ref,
-                                  settings,
-                                  txn,
-                                  details,
-                                ),
-                                icon: Icon(
-                                  printerState.isConnected
-                                      ? Icons.print_rounded
-                                      : Icons.print_disabled_rounded,
-                                ),
-                                label: Text(
-                                  printerState.isConnected
-                                      ? 'Cetak Struk'
-                                      : 'Printer Tidak Terhubung',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 48,
+                                  child: ElevatedButton.icon(
+                                    onPressed: () => printReceipt(
+                                      context,
+                                      ref,
+                                      settings,
+                                      txn,
+                                      details,
+                                    ),
+                                    icon: Icon(
+                                      printerState.isConnected
+                                          ? Icons.print_rounded
+                                          : Icons.print_disabled_rounded,
+                                    ),
+                                    label: Text(
+                                      printerState.isConnected
+                                          ? 'Cetak Struk'
+                                          : 'Printer Tidak Terhubung',
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: printerState.isConnected
+                                          ? AppColors.secondary
+                                          : AppColors.textHint,
+                                      foregroundColor: Colors.white,
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                    ),
                                   ),
                                 ),
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: printerState.isConnected
-                                      ? AppColors.secondary
-                                      : AppColors.textHint,
-                                  foregroundColor: Colors.white,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(12),
+                                if (txn.status == 'completed') ...[
+                                  const SizedBox(height: 12),
+                                  SizedBox(
+                                    width: double.infinity,
+                                    height: 48,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => _handleReturn(context, ref, txn, details),
+                                      icon: const Icon(Icons.undo_rounded, color: AppColors.error),
+                                      label: const Text(
+                                        'Retur Transaksi',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.bold,
+                                          color: AppColors.error,
+                                        ),
+                                      ),
+                                      style: OutlinedButton.styleFrom(
+                                        side: const BorderSide(color: AppColors.error),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ),
+                                ],
+                              ],
                             ),
                           ),
                         ],
@@ -216,6 +294,41 @@ class ReceiptModal {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  static void _showReturnDialog(BuildContext context, WidgetRef ref, String txnId, ReceiptItem receiptItem, {required dynamic d}) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Konfirmasi Retur'),
+        content: Text('Apakah Anda yakin ingin meretur barang ini?\n\n${receiptItem.name} (${receiptItem.qty}x)\n\nStok barang akan dikembalikan ke inventaris.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              final repo = ref.read(transactionRepositoryProvider);
+              final parentContext = context;
+              Navigator.pop(context); // Tutup dialog
+              try {
+                await repo.returnTransactionItem(txnId, d);
+                if (parentContext.mounted) {
+                  AppToast.show(parentContext, 'Retur berhasil diproses. Stok dan saldo telah diperbarui.', type: ToastType.success);
+                }
+              } catch (e) {
+                if (parentContext.mounted) {
+                  AppToast.show(parentContext, 'Gagal memproses retur: $e', type: ToastType.error);
+                }
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Ya, Retur', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

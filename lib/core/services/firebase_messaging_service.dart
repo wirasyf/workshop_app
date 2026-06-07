@@ -73,9 +73,13 @@ class FirebaseMessagingService {
   Future<void> _saveTokenToFirestore(String token) async {
     final userId = _settings.userId;
     if (userId != null && userId.isNotEmpty) {
-      await _firestore.collection('users').doc(userId).update({
-        'fcmTokens': FieldValue.arrayUnion([token])
-      });
+      try {
+        await _firestore.collection('users').doc(userId).update({
+          'fcmTokens': FieldValue.arrayUnion([token])
+        });
+      } catch (e) {
+        debugPrint('Failed to save FCM token: $e');
+      }
     }
   }
 
@@ -86,66 +90,78 @@ class FirebaseMessagingService {
     final role = _settings.userRole;
     final now = DateTime.now();
 
-    _notificationSubscription = _firestore
-        .collection('notifications')
-        .where(
-          Filter.or(
-            Filter('targetUserId', isEqualTo: userId),
-            Filter('targetRole', isEqualTo: role),
+    if (userId == null || userId.isEmpty) return;
+
+    try {
+      _notificationSubscription = _firestore
+          .collection('notifications')
+          .where(
+            Filter.or(
+              Filter('targetUserId', isEqualTo: userId),
+              Filter('targetRole', isEqualTo: role),
+            )
           )
-        )
-        // Hanya notifikasi yang masuk setelah aplikasi/listener berjalan (agar tidak spam notifikasi lama)
-        .where('createdAt', isGreaterThan: Timestamp.fromDate(now))
-        .snapshots()
-        .listen((snapshot) {
-      for (var change in snapshot.docChanges) {
-        if (change.type == DocumentChangeType.added) {
-          final data = change.doc.data();
-          if (data != null) {
-            final title = data['title'] ?? 'Notifikasi Baru';
-            final body = data['message'] ?? '';
-            final type = data['type'] ?? 'system';
-            final id = change.doc.id.hashCode;
+          // Hanya notifikasi yang masuk setelah aplikasi/listener berjalan (agar tidak spam notifikasi lama)
+          .where('createdAt', isGreaterThan: Timestamp.fromDate(now))
+          .snapshots()
+          .listen((snapshot) {
+        for (var change in snapshot.docChanges) {
+          if (change.type == DocumentChangeType.added) {
+            final data = change.doc.data();
+            if (data != null) {
+              final title = data['title'] ?? 'Notifikasi Baru';
+              final body = data['message'] ?? '';
+              final type = data['type'] ?? 'system';
+              final id = change.doc.id.hashCode;
 
-            // Jangan tampilkan notifikasi sistem jika ini dari aksi diri sendiri
-            final senderId = data['senderId'];
-            if (senderId == userId) continue;
+              // Jangan tampilkan notifikasi sistem jika ini dari aksi diri sendiri
+              final senderId = data['senderId'];
+              if (senderId == userId) continue;
 
-            if (type == 'transaction') {
-              _notificationService.showTransactionNotification(
-                id: id,
-                title: title,
-                body: body,
-              );
-            } else if (type == 'stock_alert') {
-              _notificationService.showStockWarning(
-                id: id,
-                title: title,
-                body: body,
-                isCritical: true,
-              );
-            } else if (type == 'service_approval') {
-              _notificationService.showApprovalNotification(
-                id: id,
-                title: title,
-                body: body,
-              );
-            } else {
-              _notificationService.showFCMNotification(
-                id: id,
-                title: title,
-                body: body,
-              );
+              if (type == 'transaction') {
+                _notificationService.showTransactionNotification(
+                  id: id,
+                  title: title,
+                  body: body,
+                );
+              } else if (type == 'stock_alert') {
+                _notificationService.showStockWarning(
+                  id: id,
+                  title: title,
+                  body: body,
+                  isCritical: true,
+                );
+              } else if (type == 'service_approval') {
+                _notificationService.showApprovalNotification(
+                  id: id,
+                  title: title,
+                  body: body,
+                );
+              } else {
+                _notificationService.showFCMNotification(
+                  id: id,
+                  title: title,
+                  body: body,
+                );
+              }
             }
           }
         }
-      }
-    });
+      }, onError: (e) {
+        debugPrint('Firestore notification listener error: $e');
+      });
+    } catch (e) {
+      debugPrint('Failed to start notification listener: $e');
+    }
   }
   
   Stream<List<NotificationModel>> getMyNotifications() {
     final userId = _settings.userId;
     final role = _settings.userRole;
+    
+    if (userId == null || userId.isEmpty) {
+      return Stream.value([]);
+    }
     
     return _firestore
         .collection('notifications')
@@ -160,6 +176,9 @@ class FirebaseMessagingService {
         .snapshots()
         .map((snapshot) {
       return snapshot.docs.map((doc) => NotificationModel.fromFirestore(doc)).toList();
+    }).handleError((e) {
+      debugPrint('getMyNotifications error: $e');
+      return <NotificationModel>[];
     });
   }
   

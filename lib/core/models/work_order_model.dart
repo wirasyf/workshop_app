@@ -11,6 +11,8 @@ class WorkOrderModel {
   final double totalService;
   final double totalParts;
   final double grandTotal;
+  final List<Map<String, dynamic>> serviceItems;
+  final List<Map<String, dynamic>> partItems;
   final String? transactionId;
   final DateTime createdAt;
   final DateTime? completedAt;
@@ -26,6 +28,8 @@ class WorkOrderModel {
     this.totalService = 0.0,
     this.totalParts = 0.0,
     this.grandTotal = 0.0,
+    this.serviceItems = const [],
+    this.partItems = const [],
     this.transactionId,
     required this.createdAt,
     this.completedAt,
@@ -44,6 +48,8 @@ class WorkOrderModel {
       totalService: (data['totalService'] as num?)?.toDouble() ?? 0.0,
       totalParts: (data['totalParts'] as num?)?.toDouble() ?? 0.0,
       grandTotal: (data['grandTotal'] as num?)?.toDouble() ?? 0.0,
+      serviceItems: data['serviceItems'] != null ? List<Map<String, dynamic>>.from(data['serviceItems']) : [],
+      partItems: data['partItems'] != null ? List<Map<String, dynamic>>.from(data['partItems']) : [],
       transactionId: data['transactionId'],
       createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
       completedAt: (data['completedAt'] as Timestamp?)?.toDate(),
@@ -61,6 +67,8 @@ class WorkOrderModel {
       'totalService': totalService,
       'totalParts': totalParts,
       'grandTotal': grandTotal,
+      'serviceItems': serviceItems,
+      'partItems': partItems,
       'transactionId': transactionId,
       'createdAt': Timestamp.fromDate(createdAt),
       'completedAt': completedAt != null ? Timestamp.fromDate(completedAt!) : null,
@@ -78,6 +86,8 @@ class WorkOrderModel {
     double? totalService,
     double? totalParts,
     double? grandTotal,
+    List<Map<String, dynamic>>? serviceItems,
+    List<Map<String, dynamic>>? partItems,
     String? transactionId,
     DateTime? createdAt,
     DateTime? completedAt,
@@ -93,6 +103,8 @@ class WorkOrderModel {
       totalService: totalService ?? this.totalService,
       totalParts: totalParts ?? this.totalParts,
       grandTotal: grandTotal ?? this.grandTotal,
+      serviceItems: serviceItems ?? this.serviceItems,
+      partItems: partItems ?? this.partItems,
       transactionId: transactionId ?? this.transactionId,
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,

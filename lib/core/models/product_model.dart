@@ -12,7 +12,7 @@ class ProductModel {
   final int stockMin;
   final double costPrice;
   final double sellPrice;
-  final double? sellPriceWholesale;
+  final double workerPrice;
   final String unit;
   final String? imageUrl;
   final bool isActive;
@@ -31,7 +31,7 @@ class ProductModel {
     this.stockMin = 5,
     this.costPrice = 0.0,
     this.sellPrice = 0.0,
-    this.sellPriceWholesale,
+    this.workerPrice = 0.0,
     this.unit = 'pcs',
     this.imageUrl,
     this.isActive = true,
@@ -53,7 +53,7 @@ class ProductModel {
       stockMin: data['stockMin'] ?? 5,
       costPrice: (data['costPrice'] as num?)?.toDouble() ?? 0.0,
       sellPrice: (data['sellPrice'] as num?)?.toDouble() ?? 0.0,
-      sellPriceWholesale: (data['sellPriceWholesale'] as num?)?.toDouble(),
+      workerPrice: (data['workerPrice'] as num?)?.toDouble() ?? 0.0,
       unit: data['unit'] ?? 'pcs',
       imageUrl: data['imageUrl'],
       isActive: data['isActive'] ?? true,
@@ -74,7 +74,7 @@ class ProductModel {
       'stockMin': stockMin,
       'costPrice': costPrice,
       'sellPrice': sellPrice,
-      'sellPriceWholesale': sellPriceWholesale,
+      'workerPrice': workerPrice,
       'unit': unit,
       'imageUrl': imageUrl,
       'isActive': isActive,
@@ -95,7 +95,7 @@ class ProductModel {
     int? stockMin,
     double? costPrice,
     double? sellPrice,
-    double? sellPriceWholesale,
+    double? workerPrice,
     String? unit,
     String? imageUrl,
     bool? isActive,
@@ -114,7 +114,7 @@ class ProductModel {
       stockMin: stockMin ?? this.stockMin,
       costPrice: costPrice ?? this.costPrice,
       sellPrice: sellPrice ?? this.sellPrice,
-      sellPriceWholesale: sellPriceWholesale ?? this.sellPriceWholesale,
+      workerPrice: workerPrice ?? this.workerPrice,
       unit: unit ?? this.unit,
       imageUrl: imageUrl ?? this.imageUrl,
       isActive: isActive ?? this.isActive,

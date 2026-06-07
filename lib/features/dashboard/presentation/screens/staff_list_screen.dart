@@ -122,18 +122,44 @@ class StaffListScreen extends ConsumerWidget {
                         ),
                       ],
                     ),
-                    subtitle: isMechanic
-                        ? const Text(
-                            'Pekerja Jasa (Tanpa Akun Login)',
-                            style: TextStyle(
-                              fontStyle: FontStyle.italic,
-                              fontSize: 12,
-                            ),
-                          )
-                        : Text(
-                            '@${user.username} • ${user.email}',
-                            style: const TextStyle(fontSize: 12),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Detail Karyawan'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text('Nama: ${user.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 8),
+                              Text('Peran: ${isMechanic ? 'Mekanik' : 'Kasir'}'),
+                              const SizedBox(height: 8),
+                              if (isMechanic)
+                                const Text(
+                                  'Info: Pekerja Jasa (Tanpa Akun Login)',
+                                  style: TextStyle(fontStyle: FontStyle.italic),
+                                )
+                              else ...[
+                                Text('Username: @${user.username}'),
+                                const SizedBox(height: 4),
+                                Text('Email: ${user.email}'),
+                                if (user.password != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text('Password: ${user.password}'),
+                                ],
+                              ],
+                            ],
                           ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Tutup'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
                     trailing: IconButton(
                       icon: const Icon(
                         Icons.delete_outline_rounded,
@@ -270,14 +296,22 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
                   controller: _emailCtrl,
                   decoration: const InputDecoration(labelText: 'Email'),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (v) => v?.isEmpty ?? true ? 'Wajib diisi' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Wajib diisi';
+                    if (!v.contains('@') || !v.contains('.')) return 'Format email tidak valid';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _passwordCtrl,
                   decoration: const InputDecoration(labelText: 'Password'),
                   obscureText: true,
-                  validator: (v) => v?.isEmpty ?? true ? 'Wajib diisi' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Wajib diisi';
+                    if (v.length < 6) return 'Password minimal 6 karakter';
+                    return null;
+                  },
                 ),
               ],
             ],
@@ -322,18 +356,33 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
 
     try {
       if (!isMechanic) {
-        final tempApp = await Firebase.initializeApp(
-          name: 'temp_auth_${DateTime.now().millisecondsSinceEpoch}',
-          options: Firebase.app().options,
-        );
         try {
-          final authResult = await FirebaseAuth.instanceFor(app: tempApp).createUserWithEmailAndPassword(
-            email: email,
-            password: rawPassword,
+          final tempApp = await Firebase.initializeApp(
+            name: 'temp_auth_${DateTime.now().millisecondsSinceEpoch}',
+            options: Firebase.app().options,
           );
-          id = authResult.user!.uid;
-        } finally {
-          await tempApp.delete();
+          try {
+            final authResult = await FirebaseAuth.instanceFor(app: tempApp).createUserWithEmailAndPassword(
+              email: email,
+              password: rawPassword,
+            );
+            id = authResult.user!.uid;
+          } finally {
+            try {
+              await tempApp.delete();
+            } catch (_) {
+              // Ignore delete errors (common on some desktop platforms)
+            }
+          }
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'email-already-in-use') {
+            if (mounted) {
+              AppToast.show(context, 'Gagal: Email sudah terdaftar sebelumnya', type: ToastType.error);
+              setState(() => _isLoading = false);
+            }
+            return;
+          }
+          rethrow;
         }
       }
 
@@ -345,6 +394,7 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         role: _selectedRole,
         isActive: true,
         createdAt: DateTime.now(),
+        password: rawPassword, // Save password so owner can see it
       );
 
       await FirebaseFirestore.instance

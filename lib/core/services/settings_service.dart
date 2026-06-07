@@ -17,6 +17,7 @@ class SettingsService {
   static const String keyUserId = 'user_id';
   static const String keyUserName = 'user_name';
   static const String keyUserRole = 'user_role';
+  static const String keySessionId = 'session_id';
   static const String keyThemeMode = 'theme_mode';
 
   late SharedPreferences _prefs;
@@ -32,6 +33,7 @@ class SettingsService {
   String? get userId => _prefs.getString(keyUserId);
   String? get userName => _prefs.getString(keyUserName);
   String? get userRole => _prefs.getString(keyUserRole);
+  String? get sessionId => _prefs.getString(keySessionId);
   String get themeMode => _prefs.getString(keyThemeMode) ?? 'light';
 
   Future<void> setStoreInfo(String name, String address, String phone) async {
@@ -68,10 +70,19 @@ class SettingsService {
     }
   }
 
+  Future<void> setSessionId(String? id) async {
+    if (id == null) {
+      await _prefs.remove(keySessionId);
+    } else {
+      await _prefs.setString(keySessionId, id);
+    }
+  }
+
   Future<void> clearUserSession() async {
     await _prefs.remove(keyUserId);
     await _prefs.remove(keyUserName);
     await _prefs.remove(keyUserRole);
+    await _prefs.remove(keySessionId);
   }
 
   Future<void> setThemeMode(String mode) async {

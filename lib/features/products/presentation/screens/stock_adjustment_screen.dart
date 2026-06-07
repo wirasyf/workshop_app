@@ -196,7 +196,7 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
                   ),
                   const SizedBox(height: 20),
                   DropdownButtonFormField<String>(
-                    initialValue: _type,
+                    value: _type,
                     decoration: const InputDecoration(
                       labelText: 'Tipe Penyesuaian',
                     ),

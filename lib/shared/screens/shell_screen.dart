@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -17,7 +17,11 @@ class ShellScreen extends ConsumerWidget {
     final location = GoRouterState.of(context).matchedLocation;
     final user = ref.watch(authStateProvider).value;
 
-    final showNavbar = location == '/dashboard' || location == '/pos' || location == '/reports' || location == '/settings';
+    final showNavbar =
+        location == '/dashboard' ||
+        location == '/pos' ||
+        location == '/reports' ||
+        location == '/settings';
 
     return PopScope(
       canPop: false,
@@ -30,11 +34,15 @@ class ShellScreen extends ConsumerWidget {
           if (location.startsWith('/settings/')) {
             context.go('/settings');
           } else if (location.startsWith('/products/')) {
-            context.go(from == 'dashboard' ? '/products?from=dashboard' : '/products');
+            context.go(
+              from == 'dashboard' ? '/products?from=dashboard' : '/products',
+            );
           } else if (location == '/products') {
             context.go(from == 'dashboard' ? '/dashboard' : '/settings');
           } else if (location.startsWith('/services/')) {
-            context.go(from == 'dashboard' ? '/services?from=dashboard' : '/services');
+            context.go(
+              from == 'dashboard' ? '/services?from=dashboard' : '/services',
+            );
           } else if (location == '/services') {
             context.go(from == 'dashboard' ? '/dashboard' : '/settings');
           } else if (location.startsWith('/workshop/')) {
@@ -59,7 +67,9 @@ class ShellScreen extends ConsumerWidget {
           context: context,
           builder: (ctx) => AlertDialog(
             title: const Text('Keluar Aplikasi'),
-            content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?'),
+            content: const Text(
+              'Apakah Anda yakin ingin keluar dari aplikasi?',
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(ctx, false),
@@ -78,7 +88,7 @@ class ShellScreen extends ConsumerWidget {
         );
 
         if (shouldExit == true) {
-          exit(0);
+          SystemNavigator.pop();
         }
       },
       child: Scaffold(
@@ -95,7 +105,11 @@ class ShellScreen extends ConsumerWidget {
                       child: const Text(
                         '⚡ Mode Offline — Data tersimpan lokal',
                         textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.white),
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
                       ),
                     ),
               loading: () => const SizedBox.shrink(),
@@ -104,7 +118,9 @@ class ShellScreen extends ConsumerWidget {
             Expanded(child: child),
           ],
         ),
-        bottomNavigationBar: showNavbar ? _buildBottomNav(context, location, user?.role) : null,
+        bottomNavigationBar: showNavbar
+            ? _buildBottomNav(context, location, user?.role)
+            : null,
       ),
     );
   }
@@ -113,11 +129,27 @@ class ShellScreen extends ConsumerWidget {
     final isCashier = role == 'cashier';
 
     final destinations = <NavigationDestination>[
-      const NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard_rounded), label: 'Beranda'),
-      const NavigationDestination(icon: Icon(Icons.point_of_sale_outlined), selectedIcon: Icon(Icons.point_of_sale_rounded), label: 'POS'),
+      const NavigationDestination(
+        icon: Icon(Icons.dashboard_outlined),
+        selectedIcon: Icon(Icons.dashboard_rounded),
+        label: 'Beranda',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.point_of_sale_outlined),
+        selectedIcon: Icon(Icons.point_of_sale_rounded),
+        label: 'POS',
+      ),
       if (!isCashier)
-        const NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart_rounded), label: 'Laporan'),
-      const NavigationDestination(icon: Icon(Icons.more_horiz_rounded), selectedIcon: Icon(Icons.more_horiz_rounded), label: 'Lainnya'),
+        const NavigationDestination(
+          icon: Icon(Icons.bar_chart_outlined),
+          selectedIcon: Icon(Icons.bar_chart_rounded),
+          label: 'Laporan',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.more_horiz_rounded),
+        selectedIcon: Icon(Icons.more_horiz_rounded),
+        label: 'Lainnya',
+      ),
     ];
 
     int index = 0;
@@ -125,9 +157,12 @@ class ShellScreen extends ConsumerWidget {
       index = 1;
     } else if (location.startsWith('/reports')) {
       index = isCashier ? 0 : 2;
-    } else if (location.startsWith('/settings') || location.startsWith('/products') || 
-               location.startsWith('/history') || location.startsWith('/notifications') ||
-               location.startsWith('/services') || location.startsWith('/staff')) {
+    } else if (location.startsWith('/settings') ||
+        location.startsWith('/products') ||
+        location.startsWith('/history') ||
+        location.startsWith('/notifications') ||
+        location.startsWith('/services') ||
+        location.startsWith('/staff')) {
       index = isCashier ? 2 : 3;
     }
 
@@ -136,16 +171,23 @@ class ShellScreen extends ConsumerWidget {
       onDestinationSelected: (i) {
         if (isCashier) {
           switch (i) {
-            case 0: context.go('/dashboard');
-            case 1: context.go('/pos');
-            case 2: context.go('/settings');
+            case 0:
+              context.go('/dashboard');
+            case 1:
+              context.go('/pos');
+            case 2:
+              context.go('/settings');
           }
         } else {
           switch (i) {
-            case 0: context.go('/dashboard');
-            case 1: context.go('/pos');
-            case 2: context.go('/reports');
-            case 3: context.go('/settings');
+            case 0:
+              context.go('/dashboard');
+            case 1:
+              context.go('/pos');
+            case 2:
+              context.go('/reports');
+            case 3:
+              context.go('/settings');
           }
         }
       },
