@@ -13,6 +13,7 @@ class FirebaseMessagingService {
   final SettingsService _settings;
   final NotificationService _notificationService;
   StreamSubscription<QuerySnapshot>? _notificationSubscription;
+  StreamSubscription<User?>? _authSubscription;
 
   FirebaseMessagingService(this._settings, this._notificationService);
 
@@ -49,7 +50,8 @@ class FirebaseMessagingService {
     });
 
     // Handle token updates when user logs in
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    _authSubscription?.cancel();
+    _authSubscription = FirebaseAuth.instance.authStateChanges().listen((User? user) {
       if (user != null) {
         _updateToken();
         _startFirestoreNotificationListener();
@@ -71,15 +73,22 @@ class FirebaseMessagingService {
   }
 
   Future<void> _saveTokenToFirestore(String token) async {
-    final userId = _settings.userId;
-    if (userId != null && userId.isNotEmpty) {
-      try {
-        await _firestore.collection('users').doc(userId).update({
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    final userId = user.uid;
+    try {
+      final docRef = _firestore.collection('users').doc(userId);
+      final doc = await docRef.get();
+      if (doc.exists) {
+        await docRef.update({
           'fcmTokens': FieldValue.arrayUnion([token])
         });
-      } catch (e) {
-        debugPrint('Failed to save FCM token: $e');
+      } else {
+        debugPrint('User doc not found for FCM token save. Skipping.');
       }
+    } catch (e) {
+      debugPrint('Failed to save FCM token: $e');
     }
   }
 
@@ -103,6 +112,7 @@ class FirebaseMessagingService {
           )
           // Hanya notifikasi yang masuk setelah aplikasi/listener berjalan (agar tidak spam notifikasi lama)
           .where('createdAt', isGreaterThan: Timestamp.fromDate(now))
+          .orderBy('createdAt', descending: true)
           .snapshots()
           .listen((snapshot) {
         for (var change in snapshot.docChanges) {
@@ -178,7 +188,6 @@ class FirebaseMessagingService {
       return snapshot.docs.map((doc) => NotificationModel.fromFirestore(doc)).toList();
     }).handleError((e) {
       debugPrint('getMyNotifications error: $e');
-      return <NotificationModel>[];
     });
   }
   

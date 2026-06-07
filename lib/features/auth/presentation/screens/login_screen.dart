@@ -5,7 +5,6 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../providers/auth_provider.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 /// Layar login — email + password
@@ -106,48 +105,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
     }
   }
 
-  Future<void> _createInitialOwner() async {
-    setState(() => _isLoading = true);
-    try {
-      final email = 'owner@bengkel.com';
-      final password = 'password123';
-
-      // 1. Create auth user
-      final authResult = await FirebaseAuth.instance
-          .createUserWithEmailAndPassword(email: email, password: password);
-
-      final uid = authResult.user!.uid;
-
-      // 2. Insert to Firestore
-      await FirebaseFirestore.instance.collection('users').doc(uid).set({
-        'id': uid,
-        'name': 'Owner Bengkel',
-        'username': 'owner',
-        'email': email,
-        'role': 'owner',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-
-      if (mounted) {
-        AppToast.show(
-          context,
-          'Akun Owner berhasil dibuat!\nSilakan login dengan owner@bengkel.com / password123',
-          type: ToastType.success,
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        AppToast.show(
-          context,
-          'Gagal membuat akun owner: $e',
-          type: ToastType.error,
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -179,14 +136,11 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(24),
-                        child: GestureDetector(
-                          onLongPress: _createInitialOwner,
-                          child: Image.asset(
-                            'assets/images/logo.png',
-                            width: 100,
-                            height: 100,
-                            fit: BoxFit.cover,
-                          ),
+                        child: Image.asset(
+                          'assets/images/logo.png',
+                          width: 100,
+                          height: 100,
+                          fit: BoxFit.cover,
                         ),
                       ),
                     ),

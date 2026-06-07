@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../../../../core/services/password_service.dart';
 
 class ChangePasswordScreen extends ConsumerStatefulWidget {
   const ChangePasswordScreen({super.key});
@@ -65,6 +67,11 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
       await FirebaseAuth.instance.currentUser!.updatePassword(
         _newPassCtrl.text,
       );
+      
+      final hashedPass = PasswordService.hashPassword(_newPassCtrl.text);
+      await FirebaseFirestore.instance.collection('users').doc(user.id).update({
+        'password': hashedPass,
+      });
 
       if (mounted) {
         AppToast.show(

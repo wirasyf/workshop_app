@@ -109,7 +109,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
     final invoiceNo = 'INV-${DateTime.now().millisecondsSinceEpoch}';
     final totalCost = cart.fold<double>(
       0,
-      (sum, item) => sum + (item.costPrice * item.qty),
+      (acc, item) => acc + (item.costPrice * item.qty),
     );
 
     try {
@@ -145,6 +145,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           isApproved: isApproved,
           workerName: isService ? selectedWorker : null,
           productName: item.name,
+          createdAt: DateTime.now(),
         );
       }).toList();
 
@@ -324,7 +325,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                     child: ListView.separated(
                       padding: const EdgeInsets.all(16),
                       itemCount: cart.length,
-                      separatorBuilder: (_, __) => const Divider(height: 20),
+                      separatorBuilder: (context, index) => const Divider(height: 20),
                       itemBuilder: (_, i) {
                         final item = cart[i];
                         final isService = item.type == CartItemType.service;
@@ -496,6 +497,27 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           bold: true,
                         ),
                         const SizedBox(height: 12),
+                        DropdownButtonFormField<String>(
+                          initialValue: method,
+                          decoration: const InputDecoration(
+                            labelText: 'Metode Pembayaran',
+                            prefixIcon: Icon(Icons.payment_rounded, size: 18, color: AppColors.primary),
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'cash', child: Text('Tunai (Cash)')),
+                            DropdownMenuItem(value: 'transfer', child: Text('Transfer Bank')),
+                            DropdownMenuItem(value: 'qris', child: Text('QRIS')),
+                          ],
+                          onChanged: (val) {
+                            if (val != null) {
+                              ref.read(paymentMethodProvider.notifier).state = val;
+                              if (val != 'cash') {
+                                _paidCtrl.clear();
+                              }
+                            }
+                          },
+                        ),
+                        const SizedBox(height: 12),
                         if (method == 'cash') ...[
                           TextField(
                             controller: _paidCtrl,
@@ -533,7 +555,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                   final mechanics = staff
                                       .where((u) => u.role == 'mechanic')
                                       .toList();
-                                  if (mechanics.isEmpty)
+                                  if (mechanics.isEmpty) {
                                     return const Text(
                                       'Belum ada data mekanik.',
                                       style: TextStyle(
@@ -541,8 +563,9 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                         fontSize: 12,
                                       ),
                                     );
+                                  }
                                   return DropdownButtonFormField<String>(
-                                    value: selectedWorker,
+                                    initialValue: selectedWorker,
                                     decoration: const InputDecoration(
                                       prefixIcon: Icon(
                                         Icons.build_rounded,
@@ -664,6 +687,11 @@ class _CartScreenState extends ConsumerState<CartScreen> {
           ElevatedButton(
             onPressed: () {
               final d = CurrencyFormatter.parse(ctrl.text);
+              final subtotal = ref.read(cartSubtotalProvider);
+              if (d > subtotal) {
+                AppToast.show(context, 'Diskon tidak boleh lebih dari subtotal', type: ToastType.error);
+                return;
+              }
               ref.read(cartDiscountProvider.notifier).state = d;
               Navigator.pop(context);
             },

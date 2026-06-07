@@ -40,13 +40,7 @@ final workOrdersByStatusProvider = StreamProvider.family<List<WorkOrderModel>, S
 
 final workOrderDetailProvider = StreamProvider.family<WorkOrderModel?, String>((ref, id) {
   final repo = ref.watch(workshopRepositoryProvider);
-  return repo.getWorkOrders().map((orders) {
-    try {
-      return orders.firstWhere((w) => w.id == id);
-    } catch (_) {
-      return null;
-    }
-  });
+  return repo.getWorkOrderById(id);
 });
 
 final vehicleDetailProvider = StreamProvider.family<VehicleModel?, String>((ref, id) {
@@ -98,7 +92,7 @@ class WorkOrderStatus {
   static String getLabel(String value) {
     return all.firstWhere(
       (s) => s['value'] == value,
-      orElse: () => {'label': value},
+      orElse: () => {'value': value, 'label': value},
     )['label']!;
   }
 }

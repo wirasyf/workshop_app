@@ -195,12 +195,7 @@ class NotificationService {
     );
 
     try {
-      await _plugin.show(
-        id: id,
-        title: title,
-        body: body,
-        notificationDetails: details,
-      );
+      await _plugin.show(id: id, title: title, body: body, notificationDetails: details);
       debugPrint('✅ Notification shown: [$channelId] $title');
     } catch (e, st) {
       debugPrint('❌ Error showing local notification: $e');

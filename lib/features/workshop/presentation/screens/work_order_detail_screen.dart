@@ -265,8 +265,6 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
 
         if (wo.diagnosis != null && wo.diagnosis!.isNotEmpty) {
           if (_diagnosisCtrl.text.isEmpty) _diagnosisCtrl.text = wo.diagnosis!;
-        } else {
-          _diagnosisCtrl.text = '';
         }
         
         // Load items if they are empty
@@ -279,7 +277,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                     serviceId: item['serviceId'],
                     name: item['name'],
                     price: (item['price'] as num).toDouble(),
-                  )..qty = item['qty']);
+                  )..qty = item['qty'] ?? 1);
                 }
               });
             }
@@ -297,7 +295,7 @@ class _WorkOrderDetailScreenState extends ConsumerState<WorkOrderDetailScreen> {
                     price: (item['price'] as num).toDouble(),
                     costPrice: (item['costPrice'] as num?)?.toDouble() ?? 0.0,
                     unit: item['unit'] ?? '-',
-                    qty: item['qty'],
+                    qty: item['qty'] ?? 1,
                   ));
                 }
               });

@@ -120,6 +120,27 @@ class StaffListScreen extends ConsumerWidget {
                             ),
                           ),
                         ),
+                        if (!user.isActive) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Nonaktif',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                     onTap: () {
@@ -146,7 +167,7 @@ class StaffListScreen extends ConsumerWidget {
                                 Text('Email: ${user.email}'),
                                 if (user.password != null) ...[
                                   const SizedBox(height: 4),
-                                  Text('Password: ${user.password}'),
+                                  Text('Password: (terenkripsi)'),
                                 ],
                               ],
                             ],
@@ -160,13 +181,13 @@ class StaffListScreen extends ConsumerWidget {
                         ),
                       );
                     },
-                    trailing: IconButton(
+                    trailing: user.isActive ? IconButton(
                       icon: const Icon(
                         Icons.delete_outline_rounded,
                         color: AppColors.error,
                       ),
-                      onPressed: () => _showDeleteConfirm(context, ref, user),
-                    ),
+                      onPressed: () => _showDeactivateConfirm(context, ref, user),
+                    ) : null,
                   ),
                 );
               },
@@ -187,13 +208,13 @@ class StaffListScreen extends ConsumerWidget {
     );
   }
 
-  void _showDeleteConfirm(BuildContext context, WidgetRef ref, UserModel user) {
+  void _showDeactivateConfirm(BuildContext context, WidgetRef ref, UserModel user) {
     final isMechanic = user.role == 'mechanic';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isMechanic ? 'Hapus Mekanik' : 'Hapus Karyawan'),
-        content: Text('Apakah Anda yakin ingin menghapus data ${user.name}?'),
+        title: Text(isMechanic ? 'Nonaktifkan Mekanik' : 'Nonaktifkan Karyawan'),
+        content: Text('Apakah Anda yakin ingin menonaktifkan data ${user.name}? Akun ini tidak akan bisa login lagi.'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -204,17 +225,17 @@ class StaffListScreen extends ConsumerWidget {
               await FirebaseFirestore.instance
                   .collection('users')
                   .doc(user.id)
-                  .delete();
+                  .update({'isActive': false});
               if (context.mounted) {
                 Navigator.pop(context);
                 AppToast.show(
                   context,
-                  isMechanic ? 'Mekanik dihapus' : 'Karyawan dihapus',
+                  isMechanic ? 'Mekanik dinonaktifkan' : 'Karyawan dinonaktifkan',
                 );
               }
             },
             child: const Text(
-              'Hapus',
+              'Nonaktifkan',
               style: TextStyle(color: AppColors.error),
             ),
           ),
@@ -352,7 +373,7 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         ? 'mekanik_$shortUuid@bengkel.com'
         : _emailCtrl.text.trim();
     final rawPassword = isMechanic ? '123456' : _passwordCtrl.text;
-    PasswordService.hashPassword(rawPassword);
+    final hashedPassword = PasswordService.hashPassword(rawPassword);
 
     try {
       if (!isMechanic) {
@@ -394,7 +415,7 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         role: _selectedRole,
         isActive: true,
         createdAt: DateTime.now(),
-        password: rawPassword, // Save password so owner can see it
+        password: hashedPassword, // Save hashed password
       );
 
       await FirebaseFirestore.instance

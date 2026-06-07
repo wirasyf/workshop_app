@@ -36,28 +36,47 @@ class TransactionRepository {
   }
 
   Future<void> saveTransaction(TransactionModel transaction, List<TransactionItemModel> items) async {
-    final batch = _firestore.batch();
-    
-    // Save transaction
-    final txRef = _firestore.collection('transactions').doc(transaction.id);
-    batch.set(txRef, transaction.toMap());
-    
-    // Save items
-    for (final item in items) {
-      final itemRef = _firestore.collection('transaction_items').doc(item.id);
-      batch.set(itemRef, item.toMap());
-      
-      // If it's a product, reduce stock
-      if (item.itemType == 'product' && item.productId != null) {
-        final productRef = _firestore.collection('products').doc(item.productId);
-        batch.update(productRef, {
-          'stockQty': FieldValue.increment(-item.qty),
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+    await _firestore.runTransaction((tx) async {
+      // 1. Read all required products first (Firestore requirement: reads before writes)
+      final productDocs = <String, DocumentSnapshot>{};
+      for (final item in items) {
+        if (item.itemType == 'product' && item.productId != null) {
+          final productRef = _firestore.collection('products').doc(item.productId);
+          final doc = await tx.get(productRef);
+          if (!doc.exists) {
+            throw Exception('Produk ${item.productName ?? 'Unknown'} tidak ditemukan');
+          }
+          productDocs[item.productId!] = doc;
+        }
       }
-    }
-    
-    await batch.commit();
+
+      // 2. Validate stock and prepare updates
+      for (final item in items) {
+        if (item.itemType == 'product' && item.productId != null) {
+          final doc = productDocs[item.productId!]!;
+          final data = doc.data() as Map<String, dynamic>;
+          final currentStock = (data['stockQty'] as num?)?.toInt() ?? 0;
+          
+          if (currentStock < item.qty) {
+            throw Exception('Stok tidak cukup untuk ${item.productName ?? 'Unknown'}. Sisa: $currentStock');
+          }
+          
+          tx.update(doc.reference, {
+            'stockQty': currentStock - item.qty,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      // 3. Save transaction & items
+      final txRef = _firestore.collection('transactions').doc(transaction.id);
+      tx.set(txRef, transaction.toMap());
+      
+      for (final item in items) {
+        final itemRef = _firestore.collection('transaction_items').doc(item.id);
+        tx.set(itemRef, item.toMap());
+      }
+    });
   }
 
   Future<List<TransactionItemModel>> getTransactionItems(String transactionId) async {

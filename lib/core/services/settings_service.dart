@@ -9,7 +9,7 @@ final themeModeProvider = StateProvider<ThemeMode>((ref) {
   return mode == 'dark' ? ThemeMode.dark : mode == 'system' ? ThemeMode.system : ThemeMode.light;
 });
 
-class SettingsService {
+class SettingsService extends ChangeNotifier {
   static const String keyStoreName = 'store_name';
   static const String keyStoreAddress = 'store_address';
   static const String keyStorePhone = 'store_phone';
@@ -40,10 +40,12 @@ class SettingsService {
     await _prefs.setString(keyStoreName, name);
     await _prefs.setString(keyStoreAddress, address);
     await _prefs.setString(keyStorePhone, phone);
+    notifyListeners();
   }
 
   Future<void> setReceiptFooter(String footer) async {
     await _prefs.setString(keyReceiptFooter, footer);
+    notifyListeners();
   }
 
   Future<void> setUserId(String? id) async {
@@ -52,6 +54,7 @@ class SettingsService {
     } else {
       await _prefs.setString(keyUserId, id);
     }
+    notifyListeners();
   }
 
   Future<void> setUserName(String? name) async {
@@ -60,6 +63,7 @@ class SettingsService {
     } else {
       await _prefs.setString(keyUserName, name);
     }
+    notifyListeners();
   }
 
   Future<void> setUserRole(String? role) async {
@@ -68,6 +72,7 @@ class SettingsService {
     } else {
       await _prefs.setString(keyUserRole, role);
     }
+    notifyListeners();
   }
 
   Future<void> setSessionId(String? id) async {
@@ -76,6 +81,7 @@ class SettingsService {
     } else {
       await _prefs.setString(keySessionId, id);
     }
+    notifyListeners();
   }
 
   Future<void> clearUserSession() async {
@@ -83,10 +89,12 @@ class SettingsService {
     await _prefs.remove(keyUserName);
     await _prefs.remove(keyUserRole);
     await _prefs.remove(keySessionId);
+    notifyListeners();
   }
 
   Future<void> setThemeMode(String mode) async {
     await _prefs.setString(keyThemeMode, mode);
+    notifyListeners();
   }
 
 }

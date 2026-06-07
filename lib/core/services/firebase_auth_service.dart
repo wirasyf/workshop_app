@@ -3,6 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/user_model.dart';
 import 'settings_service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 
 class FirebaseAuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -20,7 +21,12 @@ class FirebaseAuthService {
     if (user != null) {
       final doc = await _firestore.collection('users').doc(user.uid).get();
       if (doc.exists) {
-        return UserModel.fromFirestore(doc);
+        final userModel = UserModel.fromFirestore(doc);
+        if (!userModel.isActive) {
+          await signOut();
+          return null;
+        }
+        return userModel;
       }
     }
     return null;
@@ -37,18 +43,24 @@ class FirebaseAuthService {
       throw Exception('User data not found in Firestore');
     }
     
+    final userModel = UserModel.fromFirestore(doc);
+    if (!userModel.isActive) {
+      await _auth.signOut();
+      throw Exception('Akun ini telah dinonaktifkan.');
+    }
+
     final sessionId = const Uuid().v4();
     await _firestore.collection('users').doc(credential.user!.uid).update({
       'currentSessionId': sessionId,
     });
     
-    final userModel = UserModel.fromFirestore(doc).copyWith(currentSessionId: sessionId);
+    final updatedModel = userModel.copyWith(currentSessionId: sessionId);
     await _settings.setUserId(userModel.id);
     await _settings.setUserName(userModel.name);
     await _settings.setUserRole(userModel.role);
     await _settings.setSessionId(sessionId);
     
-    return userModel;
+    return updatedModel;
   }
 
   Future<UserModel> signUp({
@@ -86,6 +98,19 @@ class FirebaseAuthService {
   }
 
   Future<void> signOut() async {
+    final uid = _auth.currentUser?.uid;
+    if (uid != null) {
+      try {
+        final token = await FirebaseMessaging.instance.getToken();
+        if (token != null) {
+          await _firestore.collection('users').doc(uid).update({
+            'fcmTokens': FieldValue.arrayRemove([token]),
+          });
+        }
+      } catch (e) {
+        // Ignore errors if token is unavailable or network error
+      }
+    }
     await _auth.signOut();
     await _settings.clearUserSession();
   }

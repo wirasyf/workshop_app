@@ -22,6 +22,14 @@ class WorkshopRepository {
     });
   }
 
+  Stream<WorkOrderModel?> getWorkOrderById(String id) {
+    return _firestore
+        .collection('work_orders')
+        .doc(id)
+        .snapshots()
+        .map((doc) => doc.exists ? WorkOrderModel.fromFirestore(doc) : null);
+  }
+
   Stream<List<WorkOrderModel>> getActiveWorkOrders() {
     return _firestore
         .collection('work_orders')

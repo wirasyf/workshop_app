@@ -49,7 +49,7 @@ class UserModel {
   }
 
   Map<String, dynamic> toMap() {
-    return {
+    final map = <String, dynamic>{
       'name': name,
       'username': username,
       'email': email,
@@ -58,8 +58,11 @@ class UserModel {
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
       'currentSessionId': currentSessionId,
-      'password': password,
     };
+    if (password != null) {
+      map['password'] = password;
+    }
+    return map;
   }
 
   UserModel copyWith({

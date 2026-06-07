@@ -1,1 +1,1 @@
-// Obsolete file
+// File deleted as part of stub cleanup.

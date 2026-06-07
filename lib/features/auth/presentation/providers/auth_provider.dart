@@ -38,8 +38,9 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
     _sessionSub = _firestore.collection('users').doc(userId).snapshots().listen((doc) {
       if (doc.exists) {
         final dbSessionId = doc.data()?['currentSessionId'];
+        final isActive = doc.data()?['isActive'] ?? true;
         final localSessionId = _settings.sessionId;
-        if (dbSessionId != null && localSessionId != null && dbSessionId != localSessionId) {
+        if (!isActive || (dbSessionId != null && localSessionId != null && dbSessionId != localSessionId)) {
           logout();
         }
       }

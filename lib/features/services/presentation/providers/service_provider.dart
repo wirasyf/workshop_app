@@ -22,31 +22,28 @@ final serviceSearchProvider = StateProvider<String>((ref) => '');
 
 final serviceSelectedCategoryProvider = StateProvider<String?>((ref) => null);
 
-final filteredServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
+final filteredServicesProvider = Provider<AsyncValue<List<ServiceModel>>>((ref) {
   final search = ref.watch(serviceSearchProvider);
   final categoryId = ref.watch(serviceSelectedCategoryProvider);
   final servicesAsync = ref.watch(servicesProvider);
 
-  // Jika masih loading, kembalikan loading state secara otomatis
-  // melalui dependency ke servicesProvider
-  final allServices = servicesAsync.valueOrNull;
-  if (allServices == null) return Stream.value([]);
-
-  var filtered = allServices.toList();
-  
-  if (search.isNotEmpty) {
-    final query = search.toLowerCase();
-    filtered = filtered.where((s) =>
-        s.name.toLowerCase().contains(query) ||
-        (s.description?.toLowerCase().contains(query) ?? false)
-    ).toList();
-  }
-  
-  if (categoryId != null) {
-    filtered = filtered.where((s) => s.categoryId == categoryId).toList();
-  }
-  
-  return Stream.value(filtered);
+  return servicesAsync.whenData((allServices) {
+    var filtered = allServices.toList();
+    
+    if (search.isNotEmpty) {
+      final query = search.toLowerCase();
+      filtered = filtered.where((s) =>
+          s.name.toLowerCase().contains(query) ||
+          (s.description?.toLowerCase().contains(query) ?? false)
+      ).toList();
+    }
+    
+    if (categoryId != null) {
+      filtered = filtered.where((s) => s.categoryId == categoryId).toList();
+    }
+    
+    return filtered;
+  });
 });
 
 final serviceCategoriesProvider = StreamProvider<List<ServiceCategoryModel>>((ref) {

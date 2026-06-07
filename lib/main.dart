@@ -10,9 +10,10 @@ import 'core/router/app_router.dart';
 import 'core/services/settings_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/firebase_messaging_service.dart';
+import 'core/services/seeder_service.dart';
 import 'core/constants/app_theme.dart';
 
-final settingsServiceProvider = Provider<SettingsService>(
+final settingsServiceProvider = ChangeNotifierProvider<SettingsService>(
   (ref) => throw UnimplementedError(),
 );
 
@@ -51,6 +52,13 @@ void main() async {
     debugPrint('Firebase init failed: $e');
   }
 
+  // Jalankan seeder akun owner jika belum ada
+  try {
+    await SeederService.seedOwnerAccount();
+  } catch (e) {
+    debugPrint('Seeder init failed: $e');
+  }
+
   // Inisialisasi Firebase Messaging
   final fcmService = FirebaseMessagingService(settingsService, notificationService);
   try {
@@ -62,7 +70,7 @@ void main() async {
   runApp(
     ProviderScope(
       overrides: [
-        settingsServiceProvider.overrideWithValue(settingsService),
+        settingsServiceProvider.overrideWith((ref) => settingsService),
         notificationServiceProvider.overrideWithValue(notificationService),
         firebaseMessagingServiceProvider.overrideWithValue(fcmService),
       ],

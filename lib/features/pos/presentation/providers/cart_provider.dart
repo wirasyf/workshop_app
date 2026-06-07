@@ -101,10 +101,11 @@ final historyDateRangeProvider = StateProvider<DateTimeRange>((ref) {
 
 final transactionHistoryProvider = StreamProvider<List<TransactionModel>>((ref) {
   final repo = ref.watch(transactionRepositoryProvider);
+  final range = ref.watch(historyDateRangeProvider);
+  final user = ref.watch(authStateProvider).value;
+  
   // Temporary: get recent and filter locally, in real app use firestore compound queries
   return repo.getRecentTransactions(100).map((transactions) {
-    final range = ref.watch(historyDateRangeProvider);
-    final user = ref.watch(authStateProvider).value;
     return transactions.where((t) {
       bool inRange = !t.createdAt.isBefore(range.start) && !t.createdAt.isAfter(range.end);
       bool isUser = user?.role == 'cashier' ? t.userId == user?.id : true;

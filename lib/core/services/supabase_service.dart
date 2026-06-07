@@ -1,1 +1,1 @@
-// File dihapus karena migrasi ke Firebase
+// File deleted as part of stub cleanup.

@@ -93,6 +93,7 @@ class TransactionItemModel {
   final String? workerName;
   final String? productName;
   final bool isReturned;
+  final DateTime createdAt;
 
   TransactionItemModel({
     required this.id,
@@ -109,6 +110,7 @@ class TransactionItemModel {
     this.workerName,
     this.productName,
     this.isReturned = false,
+    required this.createdAt,
   });
 
   factory TransactionItemModel.fromFirestore(DocumentSnapshot doc) {
@@ -128,6 +130,7 @@ class TransactionItemModel {
       workerName: data['workerName'],
       productName: data['productName'],
       isReturned: data['isReturned'] ?? false,
+      createdAt: (data['createdAt'] as Timestamp?)?.toDate() ?? DateTime.now(),
     );
   }
 
@@ -146,6 +149,7 @@ class TransactionItemModel {
       'workerName': workerName,
       'productName': productName,
       'isReturned': isReturned,
+      'createdAt': Timestamp.fromDate(createdAt),
     };
   }
 }

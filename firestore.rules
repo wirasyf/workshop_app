@@ -27,7 +27,7 @@ service cloud.firestore {
       return data.keys().hasAll(['name', 'sellPrice', 'stockQty']) &&
              data.name is string &&
              data.sellPrice is number && data.sellPrice >= 0 &&
-             data.stockQty is number;
+             data.stockQty is number && data.stockQty >= 0;
     }
 
     function isValidTransaction(data) {
