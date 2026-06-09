@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/constants/app_constants.dart';
 import '../../../../shared/utils/app_toast.dart';
@@ -67,38 +66,43 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
           }
         } on FirebaseException catch (e) {
           if (e.code == 'permission-denied') {
-            // Jika permission denied, coba langsung login dengan input sebagai email
-            // (misal user memang mengetik email tanpa @)
-            debugPrint(
-              'Username lookup failed: permission-denied. Trying as email...',
-            );
+            debugPrint('Username lookup failed: permission-denied. Trying as email...');
           } else {
             rethrow;
           }
         }
       }
 
+      debugPrint('🔐 Mencoba login dengan email: $loginEmail');
+
       final success = await ref
           .read(authStateProvider.notifier)
           .login(loginEmail, _passwordCtrl.text);
 
+      debugPrint('🔐 Login result: $success');
+
       if (mounted) {
         setState(() => _isLoading = false);
       }
 
+      // Navigasi ke dashboard ditangani otomatis oleh GoRouter redirect
+      // saat authStateProvider berubah — tidak perlu context.go() manual.
       if (success && mounted) {
         AppToast.show(context, 'Login berhasil', type: ToastType.success);
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (!mounted) return;
-          context.go('/dashboard');
-        });
       }
     } catch (e) {
+      debugPrint('🔐 Login exception: $e');
       if (mounted) {
         setState(() => _isLoading = false);
         String errorMsg = e.toString();
+        // Bersihkan prefix exception bawaan Dart/Firebase
         if (errorMsg.startsWith('Exception: ')) {
           errorMsg = errorMsg.substring(11);
+        }
+        if (errorMsg.startsWith('[firebase_auth/')) {
+          // Format: [firebase_auth/error-code] Pesan error
+          final msgStart = errorMsg.indexOf('] ');
+          if (msgStart != -1) errorMsg = errorMsg.substring(msgStart + 2);
         }
         AppToast.show(context, errorMsg, type: ToastType.error);
       }

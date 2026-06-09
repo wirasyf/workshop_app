@@ -10,7 +10,7 @@ import 'core/router/app_router.dart';
 import 'core/services/settings_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/firebase_messaging_service.dart';
-import 'core/services/seeder_service.dart';
+import 'core/services/firebase_auth_service.dart';
 import 'core/constants/app_theme.dart';
 
 final settingsServiceProvider = ChangeNotifierProvider<SettingsService>(
@@ -25,7 +25,7 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   // Load environment variables
-  await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: '.env');
 
   // Inisialisasi data lokalisasi (Indonesian)
   await initializeDateFormatting('id_ID', null);
@@ -42,8 +42,10 @@ void main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
-    // Aktifkan Firestore persistence agar data di-cache lokal
-    // dan loading lebih cepat (data dari cache dulu, lalu sync dari server)
+
+    // Aktifkan Firestore persistence — data di-cache lokal sehingga
+    // loading lebih cepat (data dari cache dulu, lalu sync dari server)
+    // dan aplikasi tetap berfungsi saat offline.
     FirebaseFirestore.instance.settings = const Settings(
       persistenceEnabled: true,
       cacheSizeBytes: Settings.CACHE_SIZE_UNLIMITED,
@@ -52,20 +54,27 @@ void main() async {
     debugPrint('Firebase init failed: $e');
   }
 
-  // Jalankan seeder akun owner jika belum ada
+  // Pastikan akun owner tersedia di Firebase Auth.
+  // Ini akan membuat akun owner@gmail.com / password123 jika belum ada.
   try {
-    await SeederService.seedOwnerAccount();
+    final authService = FirebaseAuthService(settingsService);
+    await authService.ensureOwnerAccount();
   } catch (e) {
-    debugPrint('Seeder init failed: $e');
+    debugPrint('ensureOwnerAccount failed: $e');
   }
 
-  // Inisialisasi Firebase Messaging
-  final fcmService = FirebaseMessagingService(settingsService, notificationService);
-  try {
-    await fcmService.init();
-  } catch (e) {
-    debugPrint('FCM init failed: $e');
-  }
+  // Init FCM secara async — tidak memblokir cold-start UI.
+  final fcmService = FirebaseMessagingService(
+    settingsService,
+    notificationService,
+  );
+  Future(() async {
+    try {
+      await fcmService.init();
+    } catch (e) {
+      debugPrint('FCM init failed: $e');
+    }
+  });
 
   runApp(
     ProviderScope(

@@ -10,14 +10,26 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOwner() {
+    // Membaca role dari dokumen users — mengembalikan string kosong jika
+    // dokumen belum ada (mencegah error NullPointerException di evaluasi rule).
+    function userRole() {
       return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'owner';
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : '';
+    }
+
+    function isOwner() {
+      return userRole() == 'owner';
     }
 
     function isAdmin() {
-      return isAuthenticated() &&
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['owner', 'admin'];
+      return userRole() in ['owner', 'admin'];
+    }
+
+    // True saat user yang sedang login membuat dokumennya sendiri
+    function isCreatingOwnDoc(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
     }
 
     // ============================================================
@@ -46,12 +58,15 @@ service cloud.firestore {
     // USERS
     // ============================================================
     match /users/{userId} {
-      // Allow reading user docs for username lookup (login)
+      // Allow reading user docs for username lookup (login) — diperlukan
+      // sebelum user terautentikasi sehingga dibiarkan terbuka.
       allow read: if true;
-      allow create: if (isAuthenticated() && request.auth.uid == userId) || isOwner();
+      // Izinkan user membuat dokumennya sendiri (auto-provision saat first login)
+      // atau owner membuat akun staff baru.
+      allow create: if isCreatingOwnDoc(userId) || isOwner();
       // Mencegah user mengubah rolenya sendiri menjadi owner
       allow update: if isAuthenticated() && (
-        (request.auth.uid == userId && request.resource.data.role == resource.data.role) || 
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
         isOwner()
       );
       allow delete: if isOwner();

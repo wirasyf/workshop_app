@@ -9,6 +9,7 @@ class UserModel {
   final String role;
   final bool isActive;
   final DateTime createdAt;
+  // Disimpan untuk kompatibilitas dengan data lama di Firestore
   final String? currentSessionId;
   final String? password;
 
@@ -57,8 +58,8 @@ class UserModel {
       'role': role,
       'isActive': isActive,
       'createdAt': Timestamp.fromDate(createdAt),
-      'currentSessionId': currentSessionId,
     };
+    // Simpan password hashed jika ada (untuk kompatibilitas staff lama)
     if (password != null) {
       map['password'] = password;
     }
