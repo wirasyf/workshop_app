@@ -12,24 +12,23 @@ final stockFilterProvider = StateProvider<StockFilter>(
 final productSearchProvider = StateProvider<String>((ref) => '');
 final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 
-final categoriesProvider = StreamProvider<List<CategoryModel>>((ref) {
+final categoriesProvider = StreamProvider<List<CategoryModel>>((ref) async* {
   final authState = ref.watch(authStateProvider);
-  if (authState.isLoading) return const Stream.empty();
-  if (authState.value == null) return Stream.value([]);
+  if (authState.isLoading || authState.value == null) return;
   final repo = ref.watch(productRepositoryProvider);
-  return repo.getCategories();
+  yield* repo.getCategories();
 });
 
-final productsProvider = StreamProvider<List<ProductModel>>((ref) {
+final productsProvider = StreamProvider<List<ProductModel>>((ref) async* {
   final authState = ref.watch(authStateProvider);
-  if (authState.isLoading) return const Stream.empty();
-  if (authState.value == null) return Stream.value([]);
+  if (authState.isLoading || authState.value == null) return;
+  
   final repo = ref.watch(productRepositoryProvider);
   final search = ref.watch(productSearchProvider);
   final filter = ref.watch(stockFilterProvider);
   final categoryId = ref.watch(selectedCategoryProvider);
 
-  return repo.getProducts().map((products) {
+  yield* repo.getProducts().map((products) {
     var filtered = products;
 
     if (search.isNotEmpty) {

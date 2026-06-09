@@ -23,6 +23,7 @@ import '../../features/settings/presentation/screens/settings_screen.dart';
 import '../../features/settings/presentation/screens/store_profile_screen.dart';
 import '../../features/settings/presentation/screens/edit_profile_screen.dart';
 import '../../features/settings/presentation/screens/change_password_screen.dart';
+import '../../features/settings/presentation/screens/change_email_screen.dart';
 import '../../features/settings/presentation/screens/bluetooth_printer_screen.dart';
 import '../../features/services/presentation/screens/service_list_screen.dart';
 import '../../features/services/presentation/screens/service_form_screen.dart';
@@ -197,6 +198,10 @@ final routerProvider = Provider<GoRouter>((ref) {
               GoRoute(
                 path: 'edit-profile',
                 builder: (_, __) => const EditProfileScreen(),
+              ),
+              GoRoute(
+                path: 'change-email',
+                builder: (_, __) => const ChangeEmailScreen(),
               ),
               GoRoute(
                 path: 'change-password',

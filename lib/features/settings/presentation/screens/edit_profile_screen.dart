@@ -22,7 +22,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
   bool _isLoading = false;
   File? _imageFile;
   String? _currentAvatarUrl;
@@ -34,7 +33,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     if (user != null) {
       _nameCtrl.text = user.name;
       _usernameCtrl.text = user.username;
-      _emailCtrl.text = user.email;
       _currentAvatarUrl = user.avatarUrl;
     }
   }
@@ -43,7 +41,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
   void dispose() {
     _nameCtrl.dispose();
     _usernameCtrl.dispose();
-    _emailCtrl.dispose();
     super.dispose();
   }
 
@@ -87,7 +84,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final updatedUser = user.copyWith(
         name: _nameCtrl.text.trim(),
         username: _usernameCtrl.text.trim(),
-        email: _emailCtrl.text.trim(),
         avatarUrl: newAvatarUrl,
       );
       ref.read(authStateProvider.notifier).setUser(updatedUser);
@@ -177,16 +173,6 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                  if (v.contains(' ')) return 'Username tidak boleh spasi';
                  return null;
               },
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: _emailCtrl,
-              keyboardType: TextInputType.emailAddress,
-              readOnly: true,
-              decoration: const InputDecoration(
-                labelText: 'Email',
-                helperText: 'Email tidak dapat diubah karena terikat dengan kredensial login.',
-              ),
             ),
             const SizedBox(height: 32),
             SizedBox(

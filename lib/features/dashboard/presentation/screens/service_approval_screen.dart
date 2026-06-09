@@ -7,11 +7,15 @@ import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../../core/models/transaction_model.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
 final approvalTabProvider = StateProvider<int>((ref) => 0); // 0 = Menunggu, 1 = Riwayat
 
-final pendingApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref) {
-  return FirebaseFirestore.instance
+final pendingApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref) async* {
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.value == null) return;
+
+  yield* FirebaseFirestore.instance
       .collection('transaction_items')
       .where('itemType', isEqualTo: 'service')
       .where('isApproved', isEqualTo: false)
@@ -19,8 +23,11 @@ final pendingApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref
       .map((snap) => snap.docs.map((d) => TransactionItemModel.fromFirestore(d)).toList());
 });
 
-final historyApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref) {
-  return FirebaseFirestore.instance
+final historyApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref) async* {
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.value == null) return;
+
+  yield* FirebaseFirestore.instance
       .collection('transaction_items')
       .where('itemType', isEqualTo: 'service')
       .where('isApproved', isEqualTo: true)

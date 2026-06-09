@@ -98,6 +98,7 @@ class SettingsScreen extends ConsumerWidget {
           
           const Divider(height: 32),
           if (user?.role != 'cashier') ...[
+            _settingsTile(Icons.email_rounded, 'Ubah Email', subtitle: 'Perbarui alamat email login Anda', onTap: () => context.go('/settings/change-email')),
             _settingsTile(Icons.lock_reset_rounded, 'Ubah Kata Sandi', subtitle: 'Perbarui kata sandi akun Anda', onTap: () => context.go('/settings/change-password')),
             const Divider(height: 32),
           ],

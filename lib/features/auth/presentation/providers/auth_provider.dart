@@ -40,7 +40,7 @@ class AuthNotifier extends StateNotifier<AsyncValue<UserModel?>> {
   Future<void> _loadSession() async {
     try {
       debugPrint('🔑 _loadSession: menunggu authStateChanges...');
-
+      // Tunggu stream auth Firebase stabil di awal
       final firebaseUser = await _authService.authStateChanges.first;
       debugPrint(
         '🔑 _loadSession: firebaseUser=${firebaseUser?.uid ?? 'null'}',

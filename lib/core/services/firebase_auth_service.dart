@@ -31,84 +31,70 @@ class FirebaseAuthService {
     try {
       debugPrint('🔧 Memastikan akun owner tersedia...');
 
-      // Cek apakah ada user yang sudah login — jika ada, simpan dulu
-      // agar tidak terganggu oleh proses pengecekan owner account.
-      final existingUser = _auth.currentUser;
-      final hadExistingSession = existingUser != null;
-
-      if (hadExistingSession) {
-        debugPrint(
-          '🔧 Ada sesi aktif (${existingUser.uid}), skip cek owner lewat signIn',
-        );
-        // Hanya pastikan dokumen Firestore owner ada — tanpa sign in ulang
-        // karena itu akan mengganggu sesi yang sudah ada.
-        await _ensureOwnerFirestoreDoc(null);
-        return;
+      // 1. Cek apakah sudah ada akun owner di Firestore
+      try {
+        final ownerSnap = await _firestore
+            .collection('users')
+            .where('role', isEqualTo: 'owner')
+            .limit(1)
+            .get();
+        
+        if (ownerSnap.docs.isNotEmpty) {
+          debugPrint('✅ Akun owner sudah ada di Firestore. Skip pembuatan akun default.');
+          return; // Jika sudah ada owner (siapapun emailnya), berhenti di sini
+        }
+      } catch (e) {
+        debugPrint('⚠️ Gagal cek owner di Firestore: $e');
+        // Jika offline, kita tidak bisa mengecek, lebih aman return untuk mencegah duplikasi
+        return; 
       }
 
+      // 2. Jika tidak ada owner sama sekali, barulah kita buat owner default
       String? ownerUid;
-
       try {
         final result = await _auth.signInWithEmailAndPassword(
           email: OwnerConfig.email,
           password: OwnerConfig.password,
         );
         ownerUid = result.user?.uid;
-        debugPrint('✅ Akun owner sudah ada di Firebase Auth: $ownerUid');
+        debugPrint('✅ Akun owner default sudah ada di Firebase Auth: $ownerUid');
       } on FirebaseAuthException catch (e) {
-        // 'user-not-found'      → akun belum pernah dibuat
-        // 'invalid-credential'  → akun tidak ditemukan (Firebase SDK baru)
-        //                         atau sudah dihapus dari Firebase Console
-        // Kedua kasus ini ditangani sama: buat akun baru.
         if (e.code == 'user-not-found' ||
             e.code == 'invalid-credential' ||
             e.code == 'wrong-password') {
-          debugPrint('⚠️ Akun owner tidak ditemukan (${e.code}), membuat ulang...');
+          debugPrint('⚠️ Akun owner default tidak ditemukan (${e.code}), membuat baru...');
           try {
             final result = await _auth.createUserWithEmailAndPassword(
               email: OwnerConfig.email,
               password: OwnerConfig.password,
             );
             ownerUid = result.user?.uid;
-            debugPrint('✅ Akun owner berhasil dibuat: $ownerUid');
+            debugPrint('✅ Akun owner default berhasil dibuat: $ownerUid');
           } on FirebaseAuthException catch (createErr) {
             if (createErr.code == 'email-already-in-use') {
-              // Race condition — akun sudah ada, coba login lagi
-              debugPrint('⚠️ email-already-in-use, coba login ulang...');
+              // Coba login lagi
               try {
                 final result = await _auth.signInWithEmailAndPassword(
                   email: OwnerConfig.email,
                   password: OwnerConfig.password,
                 );
                 ownerUid = result.user?.uid;
-                debugPrint('✅ Login ulang owner berhasil: $ownerUid');
-              } catch (retryErr) {
-                debugPrint('❌ Login ulang owner gagal: $retryErr');
-              }
-            } else {
-              debugPrint('❌ Gagal membuat akun owner: $createErr');
+              } catch (_) {}
             }
           }
-        } else {
-          debugPrint('⚠️ ensureOwnerAccount auth error: ${e.code} - ${e.message}');
         }
       }
 
-      // Pastikan dokumen Firestore untuk owner ada dan lengkap
+      // 3. Pastikan dokumen Firestore untuk owner default ada
       if (ownerUid != null) {
         await _ensureOwnerFirestoreDoc(ownerUid);
       }
 
-      // Sign out setelah cek/buat akun owner — user masih belum login
-      // saat cold start, jadi kita sign out agar authStateChanges tetap null.
+      // 4. Pastikan kita sign out agar tidak ada sesi nyangkut saat cold start
       await _auth.signOut();
       debugPrint('✅ ensureOwnerAccount selesai');
     } catch (e) {
       debugPrint('❌ ensureOwnerAccount error: $e');
-      // Jangan crash app jika gagal — user masih bisa login manual
-      try {
-        await _auth.signOut();
-      } catch (_) {}
     }
   }
 
@@ -173,7 +159,19 @@ class FirebaseAuthService {
   }
 
   Future<UserModel?> getCurrentUserData() async {
-    final user = _auth.currentUser;
+    User? user = _auth.currentUser;
+    if (user == null) return null;
+
+    try {
+      // Reload user untuk memastikan kita mendapatkan email terbaru
+      // jika user baru saja memverifikasi perubahan email di luar aplikasi.
+      await user.reload();
+      user = _auth.currentUser; // Ambil instance yang sudah direload
+    } catch (e) {
+      debugPrint('⚠️ Gagal reload user: $e');
+      // Lanjutkan dengan data yang ada jika offline/gagal
+    }
+
     if (user == null) return null;
 
     try {
@@ -209,7 +207,18 @@ class FirebaseAuthService {
         return userModel;
       }
 
-      final userModel = UserModel.fromFirestore(doc);
+      UserModel userModel = UserModel.fromFirestore(doc);
+
+      // Auto-sync email if verified and changed in Firebase Auth
+      if (user.email != null && user.email!.isNotEmpty && userModel.email != user.email) {
+        try {
+          await _firestore.collection('users').doc(user.uid).update({'email': user.email});
+          userModel = userModel.copyWith(email: user.email);
+          debugPrint('✅ Auto-sync email to Firestore: ${user.email}');
+        } catch (syncErr) {
+          debugPrint('⚠️ Gagal auto-sync email: $syncErr');
+        }
+      }
 
       // Jangan logout otomatis berdasarkan isActive — biarkan user tetap login.
       // Pengecekan isActive hanya pada saat login eksplisit.

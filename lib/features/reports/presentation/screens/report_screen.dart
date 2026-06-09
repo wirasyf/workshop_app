@@ -10,6 +10,7 @@ import '../../../../core/utils/date_formatter.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../core/enums/report_period.dart';
 import '../../../../core/models/transaction_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../../pos/data/transaction_repository.dart';
 import '../../../pos/presentation/widgets/receipt_modal.dart';
 import '../../../products/data/product_repository.dart';
@@ -27,6 +28,12 @@ final customEndDateProvider = StateProvider<DateTime?>((ref) => null);
 final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 
 final reportDataProvider = StreamProvider<Map<String, dynamic>>((ref) async* {
+  // Tunggu sampai user benar-benar terautentikasi untuk menghindari permission-denied dari Firestore
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.value == null) {
+    return;
+  }
+
   final period = ref.watch(reportPeriodProvider);
   final repo = ref.watch(transactionRepositoryProvider);
   final selectedDate = ref.watch(selectedDateProvider);
@@ -84,7 +91,10 @@ final reportDataProvider = StreamProvider<Map<String, dynamic>>((ref) async* {
       break;
   }
 
-  await for (final transactions in repo.getTransactionsByDateRangeStream(start, end)) {
+  await for (final transactions in repo.getTransactionsByDateRangeStream(
+    start,
+    end,
+  )) {
     double totalSales = 0.0;
     double totalHpp = 0.0;
     for (var tx in transactions) {
