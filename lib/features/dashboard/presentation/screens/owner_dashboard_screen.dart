@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:dnd_markasban_app/features/products/presentation/providers/product_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -18,15 +19,17 @@ import '../../../pos/data/transaction_repository.dart';
 
 final recentDashboardTransactionsProvider =
     StreamProvider<List<TransactionModel>>((ref) {
-      final user = ref.watch(authStateProvider).value;
-      if (user == null) return Stream.value([]);
+      final authState = ref.watch(authStateProvider);
+      if (authState.isLoading) return const Stream.empty();
+      if (authState.value == null) return Stream.value([]);
       final repo = ref.watch(transactionRepositoryProvider);
       return repo.getRecentTransactions(20); // increased limit
     });
 
 final todayTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(transactionRepositoryProvider);
   return repo.getTodayTransactionsStream();
 });
@@ -36,17 +39,29 @@ final ownerDashboardProvider = Provider<AsyncValue<Map<String, dynamic>>>((
 ) {
   final txAsync = ref.watch(todayTransactionsProvider);
   final lowStockAsync = ref.watch(lowStockProvider);
-  final user = ref.watch(authStateProvider).value;
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
 
-  if (txAsync is AsyncLoading || lowStockAsync is AsyncLoading) {
+  if (authState.isLoading || txAsync is AsyncLoading || lowStockAsync is AsyncLoading) {
     return const AsyncValue.loading();
   }
 
   if (txAsync is AsyncError) {
-    return AsyncValue.error(txAsync.error!, txAsync.stackTrace!);
+    final errStr = txAsync.error.toString().toLowerCase();
+    final isPermissionDenied = errStr.contains('permission-denied') || errStr.contains('permission denied');
+    if (!isPermissionDenied || !txAsync.hasValue) {
+      if (isPermissionDenied) return const AsyncValue.loading();
+      return AsyncValue.error(txAsync.error!, txAsync.stackTrace!);
+    }
   }
+  
   if (lowStockAsync is AsyncError) {
-    return AsyncValue.error(lowStockAsync.error!, lowStockAsync.stackTrace!);
+    final errStr = lowStockAsync.error.toString().toLowerCase();
+    final isPermissionDenied = errStr.contains('permission-denied') || errStr.contains('permission denied');
+    if (!isPermissionDenied || !lowStockAsync.hasValue) {
+      if (isPermissionDenied) return const AsyncValue.loading();
+      return AsyncValue.error(lowStockAsync.error!, lowStockAsync.stackTrace!);
+    }
   }
 
   final transactions = txAsync.value ?? [];
@@ -117,7 +132,13 @@ class OwnerDashboardScreen extends ConsumerWidget {
       ),
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) {
+          final errorStr = e.toString().toLowerCase();
+          if (errorStr.contains('permission-denied') || errorStr.contains('permission denied')) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Center(child: Text('$e'));
+        },
         data: (data) {
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -147,10 +168,11 @@ class OwnerDashboardScreen extends ConsumerWidget {
                       backgroundColor: AppColors.primary,
                       backgroundImage:
                           user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                          ? (user.avatarUrl!.startsWith('http')
-                                ? CachedNetworkImageProvider(user.avatarUrl!)
-                                : FileImage(File(user.avatarUrl!))
-                                      as ImageProvider)
+                          ? (user.avatarUrl!.startsWith('data:image')
+                              ? MemoryImage(base64Decode(user.avatarUrl!.split(',').last))
+                              : user.avatarUrl!.startsWith('http')
+                                  ? CachedNetworkImageProvider(user.avatarUrl!)
+                                  : FileImage(File(user.avatarUrl!))) as ImageProvider
                           : null,
                       child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
                           ? Text(
@@ -271,11 +293,17 @@ class OwnerDashboardScreen extends ConsumerWidget {
               Consumer(
                 builder: (context, ref, child) {
                   final recentAsync = ref.watch(todayTransactionsProvider);
-                  return recentAsync.when(
-                    loading: () =>
-                        const Center(child: CircularProgressIndicator()),
-                    error: (err, stack) => Text('Error: $err'),
-                    data: (transactions) {
+                  final isPermissionError = recentAsync.hasError && (recentAsync.error.toString().toLowerCase().contains('permission-denied') || recentAsync.error.toString().toLowerCase().contains('permission denied'));
+                  
+                  if (!recentAsync.hasValue && (recentAsync.isLoading || isPermissionError)) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (recentAsync.hasError && !isPermissionError && !recentAsync.hasValue) {
+                    return Text('Error: ${recentAsync.error}');
+                  }
+                  
+                  final transactions = recentAsync.value ?? [];
                       final todaysTransactions = user?.role == 'cashier'
                           ? transactions.where((t) => t.userId == user?.id).toList()
                           : transactions;
@@ -380,8 +408,6 @@ class OwnerDashboardScreen extends ConsumerWidget {
                           );
                         },
                       );
-                    },
-                  );
                 },
               ),
             ],

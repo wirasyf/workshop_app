@@ -5,15 +5,17 @@ import '../../../auth/presentation/providers/auth_provider.dart';
 import '../../data/service_repository.dart';
 
 final servicesProvider = StreamProvider<List<ServiceModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(serviceRepositoryProvider);
   return repo.getServices();
 });
 
 final allServicesProvider = StreamProvider<List<ServiceModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(serviceRepositoryProvider);
   return repo.getServices(activeOnly: false);
 });
@@ -47,8 +49,9 @@ final filteredServicesProvider = Provider<AsyncValue<List<ServiceModel>>>((ref) 
 });
 
 final serviceCategoriesProvider = StreamProvider<List<ServiceCategoryModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(serviceRepositoryProvider);
   return repo.getServiceCategories();
 });

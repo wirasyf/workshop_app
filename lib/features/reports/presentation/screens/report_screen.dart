@@ -26,7 +26,7 @@ final customEndDateProvider = StateProvider<DateTime?>((ref) => null);
 
 final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
 
-final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+final reportDataProvider = StreamProvider<Map<String, dynamic>>((ref) async* {
   final period = ref.watch(reportPeriodProvider);
   final repo = ref.watch(transactionRepositoryProvider);
   final selectedDate = ref.watch(selectedDateProvider);
@@ -84,36 +84,36 @@ final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
       break;
   }
 
-  final transactions = await repo.getTransactionsByDateRange(start, end);
-
-  double totalSales = 0.0;
-  double totalHpp = 0.0;
-  for (var tx in transactions) {
-    if (tx.status == 'completed') {
-      final items = await repo.getTransactionItems(tx.id);
-      double txSales = 0.0;
-      double txHpp = 0.0;
-      for (var item in items) {
-        if (!item.isReturned) {
-          txSales += item.subtotal;
-          txHpp += (item.costPrice * item.qty);
+  await for (final transactions in repo.getTransactionsByDateRangeStream(start, end)) {
+    double totalSales = 0.0;
+    double totalHpp = 0.0;
+    for (var tx in transactions) {
+      if (tx.status == 'completed') {
+        final items = await repo.getTransactionItems(tx.id);
+        double txSales = 0.0;
+        double txHpp = 0.0;
+        for (var item in items) {
+          if (!item.isReturned) {
+            txSales += item.subtotal;
+            txHpp += (item.costPrice * item.qty);
+          }
         }
+        totalSales += txSales;
+        totalHpp += txHpp;
       }
-      totalSales += txSales;
-      totalHpp += txHpp;
     }
-  }
-  double labaBersih = totalSales - totalHpp;
+    double labaBersih = totalSales - totalHpp;
 
-  return {
-    'totalSales': totalSales,
-    'totalHpp': totalHpp,
-    'labaBersih': labaBersih,
-    'txnCount': transactions.where((t) => t.status == 'completed').length,
-    'transactions': transactions,
-    'start': start,
-    'end': end,
-  };
+    yield {
+      'totalSales': totalSales,
+      'totalHpp': totalHpp,
+      'labaBersih': labaBersih,
+      'txnCount': transactions.where((t) => t.status == 'completed').length,
+      'transactions': transactions,
+      'start': start,
+      'end': end,
+    };
+  }
 });
 
 class ReportScreen extends ConsumerWidget {

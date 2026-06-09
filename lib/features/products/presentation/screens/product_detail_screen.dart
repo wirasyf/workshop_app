@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -99,9 +100,11 @@ class ProductDetailScreen extends ConsumerWidget {
                           child: product.imageUrl != null && product.imageUrl!.isNotEmpty
                               ? ClipRRect(
                                   borderRadius: BorderRadius.circular(20),
-                                  child: product.imageUrl!.startsWith('http')
-                                      ? CachedNetworkImage(imageUrl: product.imageUrl!, fit: BoxFit.cover, placeholder: (_, __) => const Center(child: CircularProgressIndicator()), errorWidget: (_, __, ___) => const Icon(Icons.error_rounded, size: 40))
-                                      : Image.file(File(product.imageUrl!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, size: 40, color: AppColors.primary)),
+                                  child: product.imageUrl!.startsWith('data:image')
+                                      ? Image.memory(base64Decode(product.imageUrl!.split(',').last), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, size: 40, color: AppColors.primary))
+                                      : product.imageUrl!.startsWith('http')
+                                          ? CachedNetworkImage(imageUrl: product.imageUrl!, fit: BoxFit.cover, placeholder: (_, __) => const Center(child: CircularProgressIndicator()), errorWidget: (_, __, ___) => const Icon(Icons.error_rounded, size: 40))
+                                          : Image.file(File(product.imageUrl!), fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, size: 40, color: AppColors.primary)),
                                 )
                               : const Icon(Icons.settings_rounded, size: 40, color: AppColors.primary),
                         ),

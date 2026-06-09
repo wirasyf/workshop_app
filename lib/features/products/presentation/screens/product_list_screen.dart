@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -178,18 +179,24 @@ class _ProductTile extends StatelessWidget {
               child: product.imageUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: product.imageUrl!.startsWith('http')
-                        ? CachedNetworkImage(
-                            imageUrl: product.imageUrl!,
+                      child: product.imageUrl!.startsWith('data:image')
+                        ? Image.memory(
+                            base64Decode(product.imageUrl!.split(',').last),
                             fit: BoxFit.cover,
-                            placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (_, _, _) => const Icon(Icons.error_rounded, size: 20),
+                            errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
                           )
-                        : Image.file(
-                            File(product.imageUrl!),
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, _, _) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
-                          ),
+                        : product.imageUrl!.startsWith('http')
+                          ? CachedNetworkImage(
+                              imageUrl: product.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                              errorWidget: (_, _, _) => const Icon(Icons.error_rounded, size: 20),
+                            )
+                          : Image.file(
+                              File(product.imageUrl!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
+                            ),
                     )
                   : const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
             ),

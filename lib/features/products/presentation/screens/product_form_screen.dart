@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -103,8 +104,8 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
     if (source != null) {
       final pickedFile = await picker.pickImage(
         source: source,
-        imageQuality: 70,
-        maxWidth: 800,
+        imageQuality: 40,
+        maxWidth: 400,
       );
       if (pickedFile != null) {
         setState(() {
@@ -253,20 +254,25 @@ class _ProductFormScreenState extends ConsumerState<ProductFormScreen> {
                         : _imagePath != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(20),
-                            child: _imagePath!.startsWith('http')
-                                ? CachedNetworkImage(
-                                    imageUrl: _imagePath!,
+                            child: _imagePath!.startsWith('data:image')
+                                ? Image.memory(
+                                    base64Decode(_imagePath!.split(',').last),
                                     fit: BoxFit.cover,
-                                    placeholder: (_, __) => const Center(
-                                      child: CircularProgressIndicator(),
-                                    ),
-                                    errorWidget: (_, __, ___) =>
-                                        const Icon(Icons.error_rounded),
                                   )
-                                : Image.file(
-                                    File(_imagePath!),
-                                    fit: BoxFit.cover,
-                                  ),
+                                : _imagePath!.startsWith('http')
+                                    ? CachedNetworkImage(
+                                        imageUrl: _imagePath!,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => const Center(
+                                          child: CircularProgressIndicator(),
+                                        ),
+                                        errorWidget: (_, __, ___) =>
+                                            const Icon(Icons.error_rounded),
+                                      )
+                                    : Image.file(
+                                        File(_imagePath!),
+                                        fit: BoxFit.cover,
+                                      ),
                           )
                         : const Column(
                             mainAxisAlignment: MainAxisAlignment.center,

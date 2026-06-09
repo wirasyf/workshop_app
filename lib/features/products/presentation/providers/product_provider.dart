@@ -13,15 +13,17 @@ final productSearchProvider = StateProvider<String>((ref) => '');
 final selectedCategoryProvider = StateProvider<String?>((ref) => null);
 
 final categoriesProvider = StreamProvider<List<CategoryModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(productRepositoryProvider);
   return repo.getCategories();
 });
 
 final productsProvider = StreamProvider<List<ProductModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(productRepositoryProvider);
   final search = ref.watch(productSearchProvider);
   final filter = ref.watch(stockFilterProvider);
@@ -72,8 +74,9 @@ final productDetailProvider = StreamProvider.family<ProductModel?, String>((
 });
 
 final lowStockProvider = StreamProvider<List<ProductModel>>((ref) {
-  final user = ref.watch(authStateProvider).value;
-  if (user == null) return Stream.value([]);
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
   final repo = ref.watch(productRepositoryProvider);
   return repo.getProducts().map((products) {
     return products

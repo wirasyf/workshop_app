@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -191,7 +192,13 @@ class _ProductGrid extends ConsumerWidget {
     return products.when(
       loading: () =>
           const Padding(padding: EdgeInsets.all(16), child: LoadingWidget()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) {
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('permission-denied') || errorStr.contains('permission denied')) {
+          return const Padding(padding: EdgeInsets.all(16), child: LoadingWidget());
+        }
+        return Center(child: Text('Error: $e'));
+      },
       data: (items) {
         if (items.isEmpty) {
           return const EmptyStateWidget(
@@ -226,7 +233,13 @@ class _ServiceGrid extends ConsumerWidget {
     return servicesAsync.when(
       loading: () =>
           const Padding(padding: EdgeInsets.all(16), child: LoadingWidget()),
-      error: (e, _) => Center(child: Text('Error: $e')),
+      error: (e, _) {
+        final errorStr = e.toString().toLowerCase();
+        if (errorStr.contains('permission-denied') || errorStr.contains('permission denied')) {
+          return const Padding(padding: EdgeInsets.all(16), child: LoadingWidget());
+        }
+        return Center(child: Text('Error: $e'));
+      },
       data: (items) {
         if (items.isEmpty) {
           return const EmptyStateWidget(
@@ -331,22 +344,9 @@ class _PosProductCard extends ConsumerWidget {
                     child: product.imageUrl != null
                         ? ClipRRect(
                             borderRadius: BorderRadius.circular(10),
-                            child: product.imageUrl!.startsWith('http')
-                                ? CachedNetworkImage(
-                                    imageUrl: product.imageUrl!,
-                                    fit: BoxFit.cover,
-                                    placeholder: (_, __) => const Center(
-                                      child: CircularProgressIndicator(
-                                        strokeWidth: 2,
-                                      ),
-                                    ),
-                                    errorWidget: (_, __, ___) => const Icon(
-                                      Icons.error_rounded,
-                                      size: 20,
-                                    ),
-                                  )
-                                : Image.file(
-                                    File(product.imageUrl!),
+                            child: product.imageUrl!.startsWith('data:image')
+                                ? Image.memory(
+                                    base64Decode(product.imageUrl!.split(',').last),
                                     fit: BoxFit.cover,
                                     errorBuilder: (_, __, ___) => Icon(
                                       Icons.settings_rounded,
@@ -355,7 +355,32 @@ class _PosProductCard extends ConsumerWidget {
                                           ? AppColors.textHint
                                           : AppColors.primary,
                                     ),
-                                  ),
+                                  )
+                                : product.imageUrl!.startsWith('http')
+                                    ? CachedNetworkImage(
+                                        imageUrl: product.imageUrl!,
+                                        fit: BoxFit.cover,
+                                        placeholder: (_, __) => const Center(
+                                          child: CircularProgressIndicator(
+                                            strokeWidth: 2,
+                                          ),
+                                        ),
+                                        errorWidget: (_, __, ___) => const Icon(
+                                          Icons.error_rounded,
+                                          size: 20,
+                                        ),
+                                      )
+                                    : Image.file(
+                                        File(product.imageUrl!),
+                                        fit: BoxFit.cover,
+                                        errorBuilder: (_, __, ___) => Icon(
+                                          Icons.settings_rounded,
+                                          size: 36,
+                                          color: isOutOfStock
+                                              ? AppColors.textHint
+                                              : AppColors.primary,
+                                        ),
+                                      ),
                           )
                         : Icon(
                             Icons.settings_rounded,
@@ -464,13 +489,13 @@ class _PosServiceCard extends ConsumerWidget {
           color: theme.cardTheme.color,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
-            color: totalInCartQty > 0 ? AppColors.info : AppColors.border,
+            color: totalInCartQty > 0 ? AppColors.secondary : AppColors.border,
             width: totalInCartQty > 0 ? 1.5 : 1,
           ),
           boxShadow: totalInCartQty > 0
               ? [
                   BoxShadow(
-                    color: AppColors.info.withValues(alpha: 0.1),
+                    color: AppColors.secondary.withValues(alpha: 0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -486,13 +511,13 @@ class _PosServiceCard extends ConsumerWidget {
                   child: Container(
                     width: double.infinity,
                     decoration: BoxDecoration(
-                      color: AppColors.info.withValues(alpha: 0.06),
+                      color: AppColors.secondary.withValues(alpha: 0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: const Icon(
                       Icons.build_rounded,
                       size: 36,
-                      color: AppColors.info,
+                      color: AppColors.secondary,
                     ),
                   ),
                 ),
@@ -507,7 +532,7 @@ class _PosServiceCard extends ConsumerWidget {
                 Text(
                   CurrencyFormatter.format(service.price),
                   style: theme.textTheme.labelLarge?.copyWith(
-                    color: AppColors.info,
+                    color: AppColors.secondary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
@@ -530,7 +555,7 @@ class _PosServiceCard extends ConsumerWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.info,
+                    color: AppColors.secondary,
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Text(
@@ -647,7 +672,7 @@ class _ChipWidget extends StatelessWidget {
         selected: isSelected,
         onSelected: (_) => onTap(),
         selectedColor: AppColors.primary,
-        backgroundColor: AppColors.infoLight,
+        backgroundColor: AppColors.secondaryLight,
         labelStyle: TextStyle(
           color: isSelected ? Colors.white : AppColors.primary,
           fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,

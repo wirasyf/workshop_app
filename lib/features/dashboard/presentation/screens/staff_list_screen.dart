@@ -152,9 +152,16 @@ class StaffListScreen extends ConsumerWidget {
                             mainAxisSize: MainAxisSize.min,
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text('Nama: ${user.name}', style: const TextStyle(fontWeight: FontWeight.bold)),
+                              Text(
+                                'Nama: ${user.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                               const SizedBox(height: 8),
-                              Text('Peran: ${isMechanic ? 'Mekanik' : 'Kasir'}'),
+                              Text(
+                                'Peran: ${isMechanic ? 'Mekanik' : 'Kasir'}',
+                              ),
                               const SizedBox(height: 8),
                               if (isMechanic)
                                 const Text(
@@ -167,7 +174,9 @@ class StaffListScreen extends ConsumerWidget {
                                 Text('Email: ${user.email}'),
                                 if (user.password != null) ...[
                                   const SizedBox(height: 4),
-                                  Text('Password: (terenkripsi)'),
+                                  Text(
+                                    'Password: ${PasswordService.isHashed(user.password!) ? '(terenkripsi)' : user.password}',
+                                  ),
                                 ],
                               ],
                             ],
@@ -181,13 +190,16 @@ class StaffListScreen extends ConsumerWidget {
                         ),
                       );
                     },
-                    trailing: user.isActive ? IconButton(
-                      icon: const Icon(
-                        Icons.delete_outline_rounded,
-                        color: AppColors.error,
-                      ),
-                      onPressed: () => _showDeactivateConfirm(context, ref, user),
-                    ) : null,
+                    trailing: user.isActive
+                        ? IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.error,
+                            ),
+                            onPressed: () =>
+                                _showDeactivateConfirm(context, ref, user),
+                          )
+                        : null,
                   ),
                 );
               },
@@ -208,13 +220,21 @@ class StaffListScreen extends ConsumerWidget {
     );
   }
 
-  void _showDeactivateConfirm(BuildContext context, WidgetRef ref, UserModel user) {
+  void _showDeactivateConfirm(
+    BuildContext context,
+    WidgetRef ref,
+    UserModel user,
+  ) {
     final isMechanic = user.role == 'mechanic';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isMechanic ? 'Nonaktifkan Mekanik' : 'Nonaktifkan Karyawan'),
-        content: Text('Apakah Anda yakin ingin menonaktifkan data ${user.name}? Akun ini tidak akan bisa login lagi.'),
+        title: Text(
+          isMechanic ? 'Nonaktifkan Mekanik' : 'Nonaktifkan Karyawan',
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menonaktifkan data ${user.name}? Akun ini tidak akan bisa login lagi.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -230,7 +250,9 @@ class StaffListScreen extends ConsumerWidget {
                 Navigator.pop(context);
                 AppToast.show(
                   context,
-                  isMechanic ? 'Mekanik dinonaktifkan' : 'Karyawan dinonaktifkan',
+                  isMechanic
+                      ? 'Mekanik dinonaktifkan'
+                      : 'Karyawan dinonaktifkan',
                 );
               }
             },
@@ -319,7 +341,8 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
                   keyboardType: TextInputType.emailAddress,
                   validator: (v) {
                     if (v == null || v.isEmpty) return 'Wajib diisi';
-                    if (!v.contains('@') || !v.contains('.')) return 'Format email tidak valid';
+                    if (!v.contains('@') || !v.contains('.'))
+                      return 'Format email tidak valid';
                     return null;
                   },
                 ),
@@ -373,7 +396,7 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         ? 'mekanik_$shortUuid@bengkel.com'
         : _emailCtrl.text.trim();
     final rawPassword = isMechanic ? '123456' : _passwordCtrl.text;
-    final hashedPassword = PasswordService.hashPassword(rawPassword);
+    PasswordService.hashPassword(rawPassword);
 
     try {
       if (!isMechanic) {
@@ -383,10 +406,11 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
             options: Firebase.app().options,
           );
           try {
-            final authResult = await FirebaseAuth.instanceFor(app: tempApp).createUserWithEmailAndPassword(
-              email: email,
-              password: rawPassword,
-            );
+            final authResult = await FirebaseAuth.instanceFor(app: tempApp)
+                .createUserWithEmailAndPassword(
+                  email: email,
+                  password: rawPassword,
+                );
             id = authResult.user!.uid;
           } finally {
             try {
@@ -398,7 +422,11 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         } on FirebaseAuthException catch (e) {
           if (e.code == 'email-already-in-use') {
             if (mounted) {
-              AppToast.show(context, 'Gagal: Email sudah terdaftar sebelumnya', type: ToastType.error);
+              AppToast.show(
+                context,
+                'Gagal: Email sudah terdaftar sebelumnya',
+                type: ToastType.error,
+              );
               setState(() => _isLoading = false);
             }
             return;
@@ -415,7 +443,7 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         role: _selectedRole,
         isActive: true,
         createdAt: DateTime.now(),
-        password: hashedPassword, // Save hashed password
+        password: rawPassword, // Save raw password for owner visibility
       );
 
       await FirebaseFirestore.instance

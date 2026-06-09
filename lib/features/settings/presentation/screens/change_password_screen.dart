@@ -80,7 +80,7 @@ class _ChangePasswordScreenState extends ConsumerState<ChangePasswordScreen> {
           type: ToastType.success,
         );
         Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) context.pop();
+          if (mounted) context.go('/settings');
         });
       }
     } catch (e) {

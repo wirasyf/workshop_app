@@ -337,7 +337,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                               decoration: BoxDecoration(
                                 color:
                                     (isService
-                                            ? AppColors.info
+                                            ? AppColors.secondary
                                             : AppColors.primary)
                                         .withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
@@ -348,7 +348,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                     : Icons.settings_rounded,
                                 size: 16,
                                 color: isService
-                                    ? AppColors.info
+                                    ? AppColors.secondary
                                     : AppColors.primary,
                               ),
                             ),
@@ -466,7 +466,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                           _summaryRow(
                             'Subtotal Jasa',
                             CurrencyFormatter.format(serviceSubtotal),
-                            color: AppColors.info,
+                            color: AppColors.secondary,
                           ),
                           _summaryRow(
                             'Subtotal Sparepart',
@@ -498,24 +498,15 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                         ),
                         const SizedBox(height: 12),
                         DropdownButtonFormField<String>(
-                          initialValue: method,
+                          initialValue: 'cash',
                           decoration: const InputDecoration(
                             labelText: 'Metode Pembayaran',
                             prefixIcon: Icon(Icons.payment_rounded, size: 18, color: AppColors.primary),
                           ),
                           items: const [
                             DropdownMenuItem(value: 'cash', child: Text('Tunai (Cash)')),
-                            DropdownMenuItem(value: 'transfer', child: Text('Transfer Bank')),
-                            DropdownMenuItem(value: 'qris', child: Text('QRIS')),
                           ],
-                          onChanged: (val) {
-                            if (val != null) {
-                              ref.read(paymentMethodProvider.notifier).state = val;
-                              if (val != 'cash') {
-                                _paidCtrl.clear();
-                              }
-                            }
-                          },
+                          onChanged: null,
                         ),
                         const SizedBox(height: 12),
                         if (method == 'cash') ...[
@@ -570,7 +561,7 @@ class _CartScreenState extends ConsumerState<CartScreen> {
                                       prefixIcon: Icon(
                                         Icons.build_rounded,
                                         size: 18,
-                                        color: AppColors.info,
+                                        color: AppColors.secondary,
                                       ),
                                       hintText: 'Pilih Mekanik / Pekerja',
                                     ),

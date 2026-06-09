@@ -8,6 +8,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/services/file_storage_service.dart';
+import 'dart:convert';
 
 class EditProfileScreen extends ConsumerStatefulWidget {
   const EditProfileScreen({super.key});
@@ -49,9 +51,9 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
     final picker = ImagePicker();
     final pickedFile = await picker.pickImage(
       source: ImageSource.gallery,
-      maxWidth: 512,
-      maxHeight: 512,
-      imageQuality: 80,
+      maxWidth: 200,
+      maxHeight: 200,
+      imageQuality: 40,
     );
 
     if (pickedFile != null) {
@@ -69,12 +71,16 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
       final user = ref.read(authStateProvider).value;
       if (user == null) throw Exception('User tidak ditemukan');
 
+      String? newAvatarUrl = _currentAvatarUrl;
+      if (_imageFile != null) {
+        newAvatarUrl = await FileStorageService.saveProductImage(_imageFile!);
+      }
+
       // Update in Firestore directly
       await FirebaseFirestore.instance.collection('users').doc(user.id).update({
         'name': _nameCtrl.text.trim(),
         'username': _usernameCtrl.text.trim(),
-        'email': _emailCtrl.text.trim(),
-        // Avatar upload to Firebase Storage not implemented here for brevity, keeping old logic commented
+        if (newAvatarUrl != null) 'avatarUrl': newAvatarUrl,
       });
 
       // Update session locally
@@ -82,13 +88,14 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
         name: _nameCtrl.text.trim(),
         username: _usernameCtrl.text.trim(),
         email: _emailCtrl.text.trim(),
+        avatarUrl: newAvatarUrl,
       );
       ref.read(authStateProvider.notifier).setUser(updatedUser);
 
       if (mounted) {
         AppToast.show(context, 'Profil berhasil diperbarui', type: ToastType.success);
         Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) context.pop();
+          if (mounted) context.go('/settings');
         });
       }
     } catch (e) {
@@ -130,9 +137,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
                     backgroundImage: _imageFile != null 
                         ? FileImage(_imageFile!) 
                         : (_currentAvatarUrl != null && _currentAvatarUrl!.isNotEmpty 
-                            ? (_currentAvatarUrl!.startsWith('http') 
-                                ? CachedNetworkImageProvider(_currentAvatarUrl!) 
-                                : (File(_currentAvatarUrl!).existsSync() ? FileImage(File(_currentAvatarUrl!)) : null)) 
+                            ? (_currentAvatarUrl!.startsWith('data:image')
+                                ? MemoryImage(base64Decode(_currentAvatarUrl!.split(',').last))
+                                : _currentAvatarUrl!.startsWith('http') 
+                                  ? CachedNetworkImageProvider(_currentAvatarUrl!) 
+                                  : (File(_currentAvatarUrl!).existsSync() ? FileImage(File(_currentAvatarUrl!)) : null)) 
                             : null) as ImageProvider?,
                     child: (_imageFile == null && (_currentAvatarUrl == null || _currentAvatarUrl!.isEmpty))
                         ? const Icon(Icons.person_rounded, size: 50, color: AppColors.primary)
@@ -173,13 +182,11 @@ class _EditProfileScreenState extends ConsumerState<EditProfileScreen> {
             TextFormField(
               controller: _emailCtrl,
               keyboardType: TextInputType.emailAddress,
-              decoration: const InputDecoration(labelText: 'Email'),
-              validator: (v) {
-                if (v == null || v.isEmpty) return 'Wajib diisi';
-                final emailRegex = RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$');
-                if (!emailRegex.hasMatch(v)) return 'Email tidak valid';
-                return null;
-              },
+              readOnly: true,
+              decoration: const InputDecoration(
+                labelText: 'Email',
+                helperText: 'Email tidak dapat diubah karena terikat dengan kredensial login.',
+              ),
             ),
             const SizedBox(height: 32),
             SizedBox(

@@ -114,6 +114,18 @@ class TransactionRepository {
     return snapshot.docs.map((doc) => TransactionModel.fromFirestore(doc)).toList();
   }
 
+  Stream<List<TransactionModel>> getTransactionsByDateRangeStream(DateTime start, DateTime end) {
+    return _firestore
+        .collection('transactions')
+        .where('createdAt', isGreaterThanOrEqualTo: start)
+        .where('createdAt', isLessThanOrEqualTo: end)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => TransactionModel.fromFirestore(doc)).toList();
+    });
+  }
+
   Future<void> returnTransactionItem(String transactionId, TransactionItemModel item) async {
     final batch = _firestore.batch();
     

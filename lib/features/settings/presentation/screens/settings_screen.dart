@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -37,9 +38,11 @@ class SettingsScreen extends ConsumerWidget {
                 radius: 28,
                 backgroundColor: AppColors.primary,
                 backgroundImage: user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
-                    ? (user.avatarUrl!.startsWith('http')
-                        ? CachedNetworkImageProvider(user.avatarUrl!)
-                        : FileImage(File(user.avatarUrl!)))
+                    ? (user.avatarUrl!.startsWith('data:image')
+                        ? MemoryImage(base64Decode(user.avatarUrl!.split(',').last))
+                        : user.avatarUrl!.startsWith('http')
+                            ? CachedNetworkImageProvider(user.avatarUrl!)
+                            : FileImage(File(user.avatarUrl!))) as ImageProvider?
                     : null,
                 child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
                     ? Text(user?.name.substring(0, 1).toUpperCase() ?? 'U',
