@@ -1,24 +1,22 @@
-import 'package:drift/drift.dart' hide Column;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/constants/app_colors.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
-import '../../../../features/auth/presentation/providers/auth_provider.dart';
-import '../../../../shared/utils/app_toast.dart';
-import '../../../dashboard/presentation/screens/notification_screen.dart';
-import '../../../dashboard/presentation/screens/owner_dashboard_screen.dart';
-import '../../../../core/services/notification_service.dart';
-import '../providers/product_provider.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:uuid/uuid.dart';
-/// Form penyesuaian stok manual
+import '../../../../core/constants/app_colors.dart';
+import '../../../../shared/utils/app_toast.dart';
+import '../../../../features/auth/presentation/providers/auth_provider.dart';
+import '../providers/product_provider.dart';
+import '../../data/product_repository.dart';
+import '../../../../core/services/direct_fcm_service.dart';
+
 class StockAdjustmentScreen extends ConsumerStatefulWidget {
   final String productId;
   const StockAdjustmentScreen({super.key, required this.productId});
 
   @override
-  ConsumerState<StockAdjustmentScreen> createState() => _StockAdjustmentScreenState();
+  ConsumerState<StockAdjustmentScreen> createState() =>
+      _StockAdjustmentScreenState();
 }
 
 class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
@@ -40,87 +38,80 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final db = ref.read(databaseProvider);
+    final repo = ref.read(productRepositoryProvider);
     final user = ref.read(authStateProvider).value;
     final qty = int.parse(_qtyCtrl.text);
     final change = _isAdd ? qty : -qty;
 
     try {
-      final product = await db.getProductById(widget.productId);
-      if (product == null) {
-        throw 'Produk tidak ditemukan';
-      }
+      final product = await repo.getProductById(widget.productId).first;
+      if (product == null) throw 'Produk tidak ditemukan';
+
       if (!_isAdd && qty > product.stockQty) {
         throw 'Jumlah pengurangan melebihi stok saat ini (${product.stockQty})';
       }
 
       final id = const Uuid().v4();
-      await db.insertStockAdjustment(StockAdjustmentsCompanion.insert(
-        id: id,
-        productId: widget.productId,
-        userId: user?.id ?? '1',
-        type: _type,
-        qtyChange: change,
-        reason: Value(_reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim()),
-      ));
-      await db.updateStock(widget.productId, change);
-      
-      // Enqueue sync
-      final syncService = ref.read(syncServiceProvider);
-      final now = DateTime.now();
-      
-      await syncService.enqueue(
-        tableName: 'stock_adjustments',
-        recordId: id,
-        operation: 'create',
-        data: {
-          'id': id,
-          'product_id': widget.productId,
-          'user_id': user?.id ?? '1',
-          'type': _type,
-          'qty_change': change,
-          'reason': _reasonCtrl.text.trim().isEmpty ? null : _reasonCtrl.text.trim(),
-          'created_at': now.toIso8601String(),
-        },
-      );
 
-      final updatedProduct = await db.getProductById(widget.productId);
-      if (updatedProduct != null) {
-        await syncService.enqueue(
-          tableName: 'products',
-          recordId: widget.productId,
-          operation: 'update',
-          data: {
-            'stock_qty': updatedProduct.stockQty,
-            'updated_at': now.toIso8601String(),
-          },
+      await FirebaseFirestore.instance
+          .collection('stock_adjustments')
+          .doc(id)
+          .set({
+            'id': id,
+            'productId': widget.productId,
+            'userId': user?.id ?? '1',
+            'type': _type,
+            'qtyChange': change,
+            'reason': _reasonCtrl.text.trim().isEmpty
+                ? null
+                : _reasonCtrl.text.trim(),
+            'createdAt': FieldValue.serverTimestamp(),
+          });
+
+      final newQty = product.stockQty + change;
+      await FirebaseFirestore.instance
+          .collection('products')
+          .doc(widget.productId)
+          .update({
+            'stockQty': newQty,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      if (newQty <= product.stockMin) {
+        final isZero = newQty == 0;
+        final title = isZero ? 'Stok Habis: ${product.name}' : 'Stok Menipis: ${product.name}';
+        final message = isZero ? 'Stok produk ${product.name} sudah habis. Segera lakukan restok.' : 'Sisa stok ${product.name} tinggal $newQty ${product.unit}.';
+        final type = isZero ? 'error' : 'warning';
+        
+        await FirebaseFirestore.instance.collection('notifications').add({
+          'title': title,
+          'message': message,
+          'type': type,
+          'isRead': false,
+          'createdAt': FieldValue.serverTimestamp(),
+          'targetRole': 'owner',
+          'senderId': user?.id,
+        });
+        
+        DirectFcmService.sendPushNotification(
+          targetRole: 'owner',
+          title: title,
+          body: message,
+          type: 'stock_alert',
+          senderId: user?.id,
         );
-
-        // Cek jika penyesuaian membuat stok menipis/habis, picu notifikasi OS
-        if (updatedProduct.stockQty <= updatedProduct.stockMin) {
-          final isZero = updatedProduct.stockQty == 0;
-          ref.read(notificationServiceProvider).showStockWarning(
-            id: updatedProduct.id.hashCode,
-            title: isZero ? 'Stok Habis: ${updatedProduct.name}' : 'Stok Menipis: ${updatedProduct.name}',
-            body: isZero 
-                ? 'Stok produk ${updatedProduct.name} sudah habis. Segera lakukan restok.'
-                : 'Sisa stok ${updatedProduct.name} tinggal ${updatedProduct.stockQty} ${updatedProduct.unit}.',
-            isCritical: isZero,
-          );
-        }
       }
-      
-      syncService.syncPendingChanges().catchError((_) {});
-
-      ref.invalidate(productsProvider);
-      ref.invalidate(productDetailProvider(widget.productId));
-      ref.invalidate(notificationNotifierProvider);
-      ref.invalidate(ownerDashboardProvider);
 
       if (mounted) {
-        AppToast.show(context, 'Stok ${_isAdd ? "ditambah" : "dikurangi"} $qty', type: ToastType.success);
+        AppToast.show(
+          context,
+          'Stok ${_isAdd ? "ditambah" : "dikurangi"} $qty',
+          type: ToastType.success,
+        );
         final from = GoRouterState.of(context).uri.queryParameters['from'];
-        context.go('/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}');
+        context.go(
+          '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}',
+        );
       }
     } catch (e) {
       if (mounted) {
@@ -133,14 +124,19 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
   }
 
   @override
-  void dispose() { _qtyCtrl.dispose(); _reasonCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _qtyCtrl.dispose();
+    _reasonCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final productAsync = ref.watch(productDetailProvider(widget.productId));
     final theme = Theme.of(context);
     final from = GoRouterState.of(context).uri.queryParameters['from'];
-    final target = '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}';
+    final target =
+        '/products/${widget.productId}${from == 'dashboard' ? '?from=dashboard' : ''}';
 
     return PopScope(
       canPop: false,
@@ -151,93 +147,146 @@ class _StockAdjustmentScreenState extends ConsumerState<StockAdjustmentScreen> {
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Sesuaikan Stok'),
-          leading: IconButton(icon: const Icon(Icons.chevron_left_rounded), onPressed: () => context.go(target)),
+          leading: IconButton(
+            icon: const Icon(Icons.chevron_left_rounded),
+            onPressed: () => context.go(target),
+          ),
         ),
-      body: productAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
-        data: (product) {
-          if (product == null) return const Center(child: Text('Produk tidak ditemukan'));
-          return Form(
-            key: _formKey,
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                // Info produk
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(color: AppColors.infoLight, borderRadius: BorderRadius.circular(12)),
-                  child: Row(children: [
-                    const Icon(Icons.inventory_2_rounded, color: AppColors.info),
-                    const SizedBox(width: 12),
-                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                      Text(product.name, style: theme.textTheme.titleSmall),
-                      Text('Stok saat ini: ${product.stockQty} ${product.unit}', style: theme.textTheme.bodySmall),
-                    ])),
-                  ]),
-                ),
-                const SizedBox(height: 20),
-
-                // Tipe penyesuaian
-                DropdownButtonFormField<String>(
-                  value: _type,
-                  decoration: const InputDecoration(labelText: 'Tipe Penyesuaian'),
-                  items: _types.entries.map((e) => DropdownMenuItem(value: e.key, child: Text(e.value))).toList(),
-                  onChanged: (v) => setState(() => _type = v!),
-                ),
-                const SizedBox(height: 16),
-
-                // Tambah / Kurang
-                Row(children: [
-                  Expanded(child: _toggleButton('Tambah', true, Icons.add_rounded)),
-                  const SizedBox(width: 12),
-                  Expanded(child: _toggleButton('Kurangi', false, Icons.remove_rounded)),
-                ]),
-                const SizedBox(height: 16),
-
-                TextFormField(
-                  controller: _qtyCtrl,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(labelText: 'Jumlah *'),
-                  validator: (v) {
-                    if (v == null || v.isEmpty) return 'Wajib diisi';
-                    final n = int.tryParse(v);
-                    if (n == null || n <= 0) return 'Harus angka positif';
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 16),
-                TextFormField(
-                  controller: _reasonCtrl,
-                  maxLines: 3,
-                  decoration: const InputDecoration(labelText: 'Alasan (opsional)'),
-                ),
-                const SizedBox(height: 24),
-                SizedBox(
-                  height: 52,
-                  child: ElevatedButton(
-                    onPressed: _isLoading ? null : _save,
-                    child: _isLoading
-                        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : const Text('Simpan Penyesuaian'),
+        body: productAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('$e')),
+          data: (product) {
+            if (product == null)
+              return const Center(child: Text('Produk tidak ditemukan'));
+            return Form(
+              key: _formKey,
+              child: ListView(
+                padding: const EdgeInsets.all(16),
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.infoLight,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.inventory_2_rounded,
+                          color: AppColors.info,
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                product.name,
+                                style: theme.textTheme.titleSmall,
+                              ),
+                              Text(
+                                'Stok saat ini: ${product.stockQty} ${product.unit}',
+                                style: theme.textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
-            ),
-          );
-        },
+                  const SizedBox(height: 20),
+                  DropdownButtonFormField<String>(
+                    value: _type,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipe Penyesuaian',
+                    ),
+                    items: _types.entries
+                        .map(
+                          (e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (v) => setState(() => _type = v!),
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _toggleButton('Tambah', true, Icons.add_rounded),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _toggleButton(
+                          'Kurangi',
+                          false,
+                          Icons.remove_rounded,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _qtyCtrl,
+                    keyboardType: TextInputType.number,
+                    decoration: const InputDecoration(labelText: 'Jumlah *'),
+                    validator: (v) {
+                      if (v == null || v.isEmpty) return 'Wajib diisi';
+                      final n = int.tryParse(v);
+                      if (n == null || n <= 0) return 'Harus angka positif';
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: _reasonCtrl,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      labelText: 'Alasan (opsional)',
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    height: 52,
+                    child: ElevatedButton(
+                      onPressed: _isLoading ? null : _save,
+                      child: _isLoading
+                          ? const SizedBox(
+                              width: 22,
+                              height: 22,
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                                color: Colors.white,
+                              ),
+                            )
+                          : const Text('Simpan Penyesuaian'),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
       ),
-    ));
+    );
   }
 
   Widget _toggleButton(String label, bool isAddOption, IconData icon) {
     final selected = _isAdd == isAddOption;
     return ChoiceChip(
-      label: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Icon(icon, size: 16, color: selected ? Colors.white : AppColors.primary),
-        const SizedBox(width: 8),
-        Text(label),
-      ]),
+      label: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            icon,
+            size: 16,
+            color: selected ? Colors.white : AppColors.primary,
+          ),
+          const SizedBox(width: 8),
+          Text(label),
+        ],
+      ),
       selected: selected,
       onSelected: (_) => setState(() => _isAdd = isAddOption),
       selectedColor: AppColors.primary,

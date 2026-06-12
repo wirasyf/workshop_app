@@ -73,6 +73,8 @@ class DatePickerUtils {
       case ReportPeriod.monthly:
       case ReportPeriod.yearly:
         return '${date.year}';
+      case ReportPeriod.custom:
+        return '${date.day.toString().padLeft(2, '0')} ${months[date.month - 1]} ${date.year}';
     }
   }
 }

@@ -2,17 +2,29 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
+import '../../../../core/models/user_model.dart';
 import '../../../../core/services/password_service.dart';
 import '../../../../shared/utils/app_toast.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
-import 'package:drift/drift.dart' as drift;
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-final staffProvider = FutureProvider<List<User>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  return db.getStaffUsers();
+final staffProvider = StreamProvider<List<UserModel>>((ref) {
+  final user = ref.watch(authStateProvider).value;
+  if (user == null) return Stream.value([]);
+
+  return FirebaseFirestore.instance
+      .collection('users')
+      .where('role', whereIn: ['cashier', 'mechanic'])
+      .snapshots()
+      .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => UserModel.fromFirestore(doc))
+            .toList();
+      });
 });
 
 class StaffListScreen extends ConsumerWidget {
@@ -37,115 +49,217 @@ class StaffListScreen extends ConsumerWidget {
             icon: const Icon(Icons.chevron_left_rounded),
             onPressed: () => context.go(target),
           ),
-      ),
-      body: staffAsync.when(
-        loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('Error: $e')),
-        data: (staff) {
-          if (staff.isEmpty) {
-            return const EmptyStateWidget(
-              icon: Icons.people_outline_rounded,
-              title: 'Belum ada data',
-              subtitle: 'Tambahkan akun kasir atau pekerja/mekanik',
-            );
-          }
+        ),
+        body: staffAsync.when(
+          loading: () => const Center(child: CircularProgressIndicator()),
+          error: (e, _) => Center(child: Text('Error: $e')),
+          data: (staff) {
+            if (staff.isEmpty) {
+              return const EmptyStateWidget(
+                icon: Icons.people_outline_rounded,
+                title: 'Belum ada data',
+                subtitle: 'Tambahkan akun kasir atau pekerja/mekanik',
+              );
+            }
 
-          return ListView.separated(
-            padding: const EdgeInsets.all(16),
-            itemCount: staff.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 12),
-            itemBuilder: (context, index) {
-              final user = staff[index];
-              final isMechanic = user.role == 'mechanic';
-              return Card(
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  side: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-                ),
-                child: ListTile(
-                  leading: CircleAvatar(
-                    backgroundColor: (isMechanic ? AppColors.success : AppColors.primary).withValues(alpha: 0.1),
-                    child: Icon(isMechanic ? Icons.build_rounded : Icons.person_rounded, color: isMechanic ? AppColors.success : AppColors.primary),
+            return ListView.separated(
+              padding: const EdgeInsets.all(16),
+              itemCount: staff.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 12),
+              itemBuilder: (context, index) {
+                final user = staff[index];
+                final isMechanic = user.role == 'mechanic';
+                return Card(
+                  elevation: 0,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                    side: BorderSide(
+                      color: AppColors.border.withValues(alpha: 0.5),
+                    ),
                   ),
-                  title: Row(
-                    children: [
-                      Text(user.name, style: const TextStyle(fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: (isMechanic ? AppColors.success : AppColors.primary).withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(12),
+                  child: ListTile(
+                    leading: CircleAvatar(
+                      backgroundColor:
+                          (isMechanic ? AppColors.success : AppColors.primary)
+                              .withValues(alpha: 0.1),
+                      child: Icon(
+                        isMechanic ? Icons.build_rounded : Icons.person_rounded,
+                        color: isMechanic
+                            ? AppColors.success
+                            : AppColors.primary,
+                      ),
+                    ),
+                    title: Row(
+                      children: [
+                        Text(
+                          user.name,
+                          style: const TextStyle(fontWeight: FontWeight.bold),
                         ),
-                        child: Text(
-                          isMechanic ? 'Mekanik' : 'Kasir',
-                          style: TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.bold,
-                            color: isMechanic ? AppColors.success : AppColors.primary,
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color:
+                                (isMechanic
+                                        ? AppColors.success
+                                        : AppColors.primary)
+                                    .withValues(alpha: 0.1),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Text(
+                            isMechanic ? 'Mekanik' : 'Kasir',
+                            style: TextStyle(
+                              fontSize: 10,
+                              fontWeight: FontWeight.bold,
+                              color: isMechanic
+                                  ? AppColors.success
+                                  : AppColors.primary,
+                            ),
                           ),
                         ),
-                      ),
-                    ],
+                        if (!user.isActive) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.error.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Text(
+                              'Nonaktif',
+                              style: TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                                color: AppColors.error,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    onTap: () {
+                      showDialog(
+                        context: context,
+                        builder: (ctx) => AlertDialog(
+                          title: const Text('Detail Karyawan'),
+                          content: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Nama: ${user.name}',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Text(
+                                'Peran: ${isMechanic ? 'Mekanik' : 'Kasir'}',
+                              ),
+                              const SizedBox(height: 8),
+                              if (isMechanic)
+                                const Text(
+                                  'Info: Pekerja Jasa (Tanpa Akun Login)',
+                                  style: TextStyle(fontStyle: FontStyle.italic),
+                                )
+                              else ...[
+                                Text('Username: @${user.username}'),
+                                const SizedBox(height: 4),
+                                Text('Email: ${user.email}'),
+                                if (user.password != null) ...[
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    'Password: ${PasswordService.isHashed(user.password!) ? '(terenkripsi)' : user.password}',
+                                  ),
+                                ],
+                              ],
+                            ],
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(ctx),
+                              child: const Text('Tutup'),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                    trailing: user.isActive
+                        ? IconButton(
+                            icon: const Icon(
+                              Icons.delete_outline_rounded,
+                              color: AppColors.error,
+                            ),
+                            onPressed: () =>
+                                _showDeactivateConfirm(context, ref, user),
+                          )
+                        : null,
                   ),
-                  subtitle: isMechanic
-                      ? const Text('Pekerja Jasa (Tanpa Akun Login)', style: TextStyle(fontStyle: FontStyle.italic, fontSize: 12))
-                      : Text('@${user.username} • ${user.email}', style: const TextStyle(fontSize: 12)),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline_rounded, color: AppColors.error),
-                    onPressed: () => _showDeleteConfirm(context, ref, user),
-                  ),
-                ),
-              );
-            },
-          );
-        },
+                );
+              },
+            );
+          },
+        ),
+        floatingActionButton: FloatingActionButton.extended(
+          onPressed: () {
+            showDialog(
+              context: context,
+              builder: (context) => const _AddStaffDialog(),
+            );
+          },
+          label: const Text('Tambah Data'),
+          icon: const Icon(Icons.add_rounded),
+        ),
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          showDialog(
-            context: context,
-            builder: (context) => const _AddStaffDialog(),
-          );
-        },
-        label: const Text('Tambah Data'),
-        icon: const Icon(Icons.add_rounded),
-      ),
-    ));
+    );
   }
 
-  void _showDeleteConfirm(BuildContext context, WidgetRef ref, User user) {
+  void _showDeactivateConfirm(
+    BuildContext context,
+    WidgetRef ref,
+    UserModel user,
+  ) {
     final isMechanic = user.role == 'mechanic';
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text(isMechanic ? 'Hapus Mekanik' : 'Hapus Karyawan'),
-        content: Text('Apakah Anda yakin ingin menghapus data ${user.name}?'),
+        title: Text(
+          isMechanic ? 'Nonaktifkan Mekanik' : 'Nonaktifkan Karyawan',
+        ),
+        content: Text(
+          'Apakah Anda yakin ingin menonaktifkan data ${user.name}? Akun ini tidak akan bisa login lagi.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Batal'),
+          ),
           TextButton(
             onPressed: () async {
-              final db = ref.read(databaseProvider);
-              final syncService = ref.read(syncServiceProvider);
-
-              await db.deleteUser(user.id);
-              await syncService.enqueue(
-                tableName: 'users',
-                recordId: user.id,
-                operation: 'delete',
-                data: {'id': user.id},
-              );
-              
-              syncService.syncPendingChanges().catchError((_) {});
-
-              ref.invalidate(staffProvider);
+              await FirebaseFirestore.instance
+                  .collection('users')
+                  .doc(user.id)
+                  .update({'isActive': false});
               if (context.mounted) {
                 Navigator.pop(context);
-                AppToast.show(context, isMechanic ? 'Mekanik dihapus' : 'Karyawan dihapus');
+                AppToast.show(
+                  context,
+                  isMechanic
+                      ? 'Mekanik dinonaktifkan'
+                      : 'Karyawan dinonaktifkan',
+                );
               }
             },
-            child: const Text('Hapus', style: TextStyle(color: AppColors.error)),
+            child: const Text(
+              'Nonaktifkan',
+              style: TextStyle(color: AppColors.error),
+            ),
           ),
         ],
       ),
@@ -170,15 +284,6 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
   bool _isLoading = false;
 
   @override
-  void dispose() {
-    _nameCtrl.dispose();
-    _usernameCtrl.dispose();
-    _emailCtrl.dispose();
-    _passwordCtrl.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return AlertDialog(
       title: const Text('Tambah Data'),
@@ -188,12 +293,14 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Pemilihan Role
               Row(
                 children: [
                   Expanded(
                     child: RadioListTile<String>(
-                      title: const Text('Kasir (Akses POS)', style: TextStyle(fontSize: 12)),
+                      title: const Text(
+                        'Kasir (Akses POS)',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       value: 'cashier',
                       groupValue: _selectedRole,
                       onChanged: (v) => setState(() => _selectedRole = v!),
@@ -202,7 +309,10 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
                   ),
                   Expanded(
                     child: RadioListTile<String>(
-                      title: const Text('Mekanik / Pekerja', style: TextStyle(fontSize: 12)),
+                      title: const Text(
+                        'Mekanik / Pekerja',
+                        style: TextStyle(fontSize: 12),
+                      ),
                       value: 'mechanic',
                       groupValue: _selectedRole,
                       onChanged: (v) => setState(() => _selectedRole = v!),
@@ -229,14 +339,23 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
                   controller: _emailCtrl,
                   decoration: const InputDecoration(labelText: 'Email'),
                   keyboardType: TextInputType.emailAddress,
-                  validator: (v) => v?.isEmpty ?? true ? 'Wajib diisi' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Wajib diisi';
+                    if (!v.contains('@') || !v.contains('.'))
+                      return 'Format email tidak valid';
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _passwordCtrl,
                   decoration: const InputDecoration(labelText: 'Password'),
                   obscureText: true,
-                  validator: (v) => v?.isEmpty ?? true ? 'Wajib diisi' : null,
+                  validator: (v) {
+                    if (v == null || v.isEmpty) return 'Wajib diisi';
+                    if (v.length < 6) return 'Password minimal 6 karakter';
+                    return null;
+                  },
                 ),
               ],
             ],
@@ -244,10 +363,19 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Batal')),
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Batal'),
+        ),
         ElevatedButton(
           onPressed: _isLoading ? null : _save,
-          child: _isLoading ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)) : const Text('Simpan'),
+          child: _isLoading
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Text('Simpan'),
         ),
       ],
     );
@@ -257,50 +385,81 @@ class _AddStaffDialogState extends ConsumerState<_AddStaffDialog> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
-    final db = ref.read(databaseProvider);
-    final syncService = ref.read(syncServiceProvider);
-    final id = const Uuid().v4();
+    String id = const Uuid().v4();
     final isMechanic = _selectedRole == 'mechanic';
 
     final shortUuid = id.substring(0, 8);
-    final username = isMechanic ? 'mekanik_$shortUuid' : _usernameCtrl.text.trim();
-    final email = isMechanic ? 'mekanik_$shortUuid@bengkel.com' : _emailCtrl.text.trim();
+    final username = isMechanic
+        ? 'mekanik_$shortUuid'
+        : _usernameCtrl.text.trim();
+    final email = isMechanic
+        ? 'mekanik_$shortUuid@bengkel.com'
+        : _emailCtrl.text.trim();
     final rawPassword = isMechanic ? '123456' : _passwordCtrl.text;
-    final passwordHash = PasswordService.hashPassword(rawPassword);
+    PasswordService.hashPassword(rawPassword);
 
     try {
-      await db.insertUser(UsersCompanion.insert(
+      if (!isMechanic) {
+        try {
+          final tempApp = await Firebase.initializeApp(
+            name: 'temp_auth_${DateTime.now().millisecondsSinceEpoch}',
+            options: Firebase.app().options,
+          );
+          try {
+            final authResult = await FirebaseAuth.instanceFor(app: tempApp)
+                .createUserWithEmailAndPassword(
+                  email: email,
+                  password: rawPassword,
+                );
+            id = authResult.user!.uid;
+          } finally {
+            try {
+              await tempApp.delete();
+            } catch (_) {
+              // Ignore delete errors (common on some desktop platforms)
+            }
+          }
+        } on FirebaseAuthException catch (e) {
+          if (e.code == 'email-already-in-use') {
+            if (mounted) {
+              AppToast.show(
+                context,
+                'Gagal: Email sudah terdaftar sebelumnya',
+                type: ToastType.error,
+              );
+              setState(() => _isLoading = false);
+            }
+            return;
+          }
+          rethrow;
+        }
+      }
+
+      final user = UserModel(
         id: id,
         name: _nameCtrl.text.trim(),
         username: username,
         email: email,
-        passwordHash: passwordHash,
-        role: drift.Value(_selectedRole),
-        isActive: const drift.Value(true),
-      ));
-
-      await syncService.enqueue(
-        tableName: 'users',
-        recordId: id,
-        operation: 'create',
-        data: {
-          'id': id,
-          'name': _nameCtrl.text.trim(),
-          'username': username,
-          'email': email,
-          'password_hash': passwordHash,
-          'role': _selectedRole,
-          'is_active': true,
-          'created_at': DateTime.now().toIso8601String(),
-        },
+        role: _selectedRole,
+        isActive: true,
+        createdAt: DateTime.now(),
+        password: rawPassword, // Save raw password for owner visibility
       );
-      
-      syncService.syncPendingChanges().catchError((_) {});
 
-      ref.invalidate(staffProvider);
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(id)
+          .set(user.toMap());
+
       if (mounted) {
         Navigator.pop(context);
-        AppToast.show(context, isMechanic ? 'Mekanik berhasil ditambahkan' : 'Karyawan berhasil ditambahkan', type: ToastType.success);
+        AppToast.show(
+          context,
+          isMechanic
+              ? 'Mekanik berhasil ditambahkan'
+              : 'Karyawan berhasil ditambahkan',
+          type: ToastType.success,
+        );
       }
     } catch (e) {
       if (mounted) {

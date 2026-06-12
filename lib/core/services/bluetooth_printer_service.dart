@@ -2,7 +2,6 @@ import 'dart:typed_data';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:print_bluetooth_thermal/print_bluetooth_thermal.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,20 +24,19 @@ class PrinterState {
     String? connectedName,
     String? connectedMac,
     bool? isLoading,
-  }) =>
-      PrinterState(
-        isConnected: isConnected ?? this.isConnected,
-        connectedName: connectedName ?? this.connectedName,
-        connectedMac: connectedMac ?? this.connectedMac,
-        isLoading: isLoading ?? this.isLoading,
-      );
+  }) => PrinterState(
+    isConnected: isConnected ?? this.isConnected,
+    connectedName: connectedName ?? this.connectedName,
+    connectedMac: connectedMac ?? this.connectedMac,
+    isLoading: isLoading ?? this.isLoading,
+  );
 }
 
 /// Provider state printer
 final printerStateProvider =
     StateNotifierProvider<PrinterNotifier, PrinterState>(
-  (ref) => PrinterNotifier(),
-);
+      (ref) => PrinterNotifier(),
+    );
 
 /// Provider daftar device bluetooth paired
 final pairedDevicesProvider = FutureProvider<List<BluetoothInfo>>((ref) async {
@@ -71,8 +69,9 @@ class PrinterNotifier extends StateNotifier<PrinterState> {
   Future<bool> connect(String mac, String name) async {
     state = state.copyWith(isLoading: true);
     try {
-      final result =
-          await PrintBluetoothThermal.connect(macPrinterAddress: mac);
+      final result = await PrintBluetoothThermal.connect(
+        macPrinterAddress: mac,
+      );
       if (result) {
         state = state.copyWith(
           isConnected: true,
@@ -129,12 +128,12 @@ class ThermalPrintService {
     required double total,
     required double paid,
     required double change,
+    String? cashierName,
     String footer = '',
     int paperWidth = 58,
   }) async {
     final profile = await CapabilityProfile.load();
-    final paperSize =
-        paperWidth == 80 ? PaperSize.mm80 : PaperSize.mm58;
+    final paperSize = paperWidth == 80 ? PaperSize.mm80 : PaperSize.mm58;
     final gen = Generator(paperSize, profile);
     List<int> bytes = [];
 
@@ -165,17 +164,20 @@ class ThermalPrintService {
 
     // Invoice & tanggal
     bytes += gen.row([
-      PosColumn(
-        text: invoiceNo,
-        width: 7,
-        styles: const PosStyles(bold: true),
-      ),
+      PosColumn(text: invoiceNo, width: 7, styles: const PosStyles(bold: true)),
       PosColumn(
         text: _formatDate(date),
         width: 5,
         styles: const PosStyles(align: PosAlign.right),
       ),
     ]);
+
+    if (cashierName != null && cashierName.isNotEmpty) {
+      bytes += gen.text(
+        'Dibuat oleh: $cashierName',
+        styles: const PosStyles(align: PosAlign.left),
+      );
+    }
 
     bytes += gen.hr();
 
@@ -216,8 +218,12 @@ class ThermalPrintService {
       PosColumn(
         text: _formatRp(total),
         width: 6,
-        styles: const PosStyles(align: PosAlign.right, bold: true,
-            height: PosTextSize.size2, width: PosTextSize.size1),
+        styles: const PosStyles(
+          align: PosAlign.right,
+          bold: true,
+          height: PosTextSize.size2,
+          width: PosTextSize.size1,
+        ),
       ),
     ]);
 
@@ -263,15 +269,15 @@ class ThermalPrintService {
 
   static List<int> _printItem(Generator gen, PrintReceiptItem item) {
     List<int> bytes = [];
-    final nameStr = (item.workerName != null && item.workerName!.isNotEmpty && !item.name.contains('(${item.workerName})'))
+    final nameStr =
+        (item.workerName != null &&
+            item.workerName!.isNotEmpty &&
+            !item.name.contains('(${item.workerName})'))
         ? '${item.name} [Mek: ${item.workerName}]'
         : item.name;
     bytes += gen.text(nameStr);
     bytes += gen.row([
-      PosColumn(
-        text: '${item.qty} x ${_formatRp(item.unitPrice)}',
-        width: 7,
-      ),
+      PosColumn(text: '${item.qty} x ${_formatRp(item.unitPrice)}', width: 7),
       PosColumn(
         text: _formatRp(item.subtotal),
         width: 5,
@@ -286,15 +292,19 @@ class ThermalPrintService {
     final isConnected = await PrintBluetoothThermal.connectionStatus;
     if (!isConnected) return false;
 
-    final result = await PrintBluetoothThermal.writeBytes(Uint8List.fromList(bytes));
+    final result = await PrintBluetoothThermal.writeBytes(
+      Uint8List.fromList(bytes),
+    );
     return result;
   }
 
   static String _formatRp(double amount) {
-    final formatted = amount.toStringAsFixed(0).replaceAllMapped(
-      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-      (m) => '${m[1]}.',
-    );
+    final formatted = amount
+        .toStringAsFixed(0)
+        .replaceAllMapped(
+          RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+          (m) => '${m[1]}.',
+        );
     return 'Rp $formatted';
   }
 

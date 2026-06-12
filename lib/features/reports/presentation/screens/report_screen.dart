@@ -1,68 +1,465 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import 'package:go_router/go_router.dart';
+import 'package:excel/excel.dart' hide Border;
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
-import '../../../../core/services/sync_service.dart';
-import '../../../../core/utils/excel_export_service.dart';
 import '../../../../shared/widgets/metric_card.dart';
-import 'package:fl_chart/fl_chart.dart';
-import '../../../../core/utils/report_utils.dart';
-import '../../../../core/utils/date_picker_utils.dart';
 import '../../../../core/enums/report_period.dart';
+import '../../../../core/models/transaction_model.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../pos/data/transaction_repository.dart';
+import '../../../pos/presentation/widgets/receipt_modal.dart';
+import '../../../products/data/product_repository.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../../shared/utils/app_toast.dart';
+import 'package:intl/intl.dart';
 
-final reportPeriodProvider = StateProvider<ReportPeriod>((ref) => ReportPeriod.daily);
-final reportDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+final reportPeriodProvider = StateProvider<ReportPeriod>(
+  (ref) => ReportPeriod.daily,
+);
 
-final reportDataProvider = FutureProvider<Map<String, dynamic>>((ref) async {
-  final db = ref.watch(databaseProvider);
+final customStartDateProvider = StateProvider<DateTime?>((ref) => null);
+final customEndDateProvider = StateProvider<DateTime?>((ref) => null);
+
+final selectedDateProvider = StateProvider<DateTime>((ref) => DateTime.now());
+
+final reportDataProvider = StreamProvider<Map<String, dynamic>>((ref) async* {
+  // Tunggu sampai user benar-benar terautentikasi untuk menghindari permission-denied dari Firestore
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.value == null) {
+    return;
+  }
+
   final period = ref.watch(reportPeriodProvider);
-  final selectedDate = ref.watch(reportDateProvider);
+  final repo = ref.watch(transactionRepositoryProvider);
+  final selectedDate = ref.watch(selectedDateProvider);
 
-  late DateTime start;
-  late DateTime end;
+  DateTime start;
+  DateTime end;
 
   switch (period) {
     case ReportPeriod.daily:
-      start = DateFormatter.startOfDay(selectedDate);
-      end = DateFormatter.endOfDay(selectedDate);
+      start = DateTime(selectedDate.year, selectedDate.month, selectedDate.day);
+      end = DateTime(
+        selectedDate.year,
+        selectedDate.month,
+        selectedDate.day,
+        23,
+        59,
+        59,
+        999,
+      );
+      break;
     case ReportPeriod.weekly:
-      start = DateTime(selectedDate.year, selectedDate.month, 1);
-      end = DateTime(selectedDate.year, selectedDate.month + 1, 0, 23, 59, 59);
+      start = selectedDate.subtract(Duration(days: selectedDate.weekday - 1));
+      start = DateTime(start.year, start.month, start.day);
+      end = start.add(
+        const Duration(days: 6, hours: 23, minutes: 59, seconds: 59),
+      );
+      break;
     case ReportPeriod.monthly:
-      start = DateTime(selectedDate.year, 1, 1);
-      end = DateTime(selectedDate.year, 12, 31, 23, 59, 59);
+      start = DateTime(selectedDate.year, selectedDate.month, 1);
+      final nextMonth = DateTime(selectedDate.year, selectedDate.month + 1, 1);
+      end = nextMonth.subtract(const Duration(milliseconds: 1));
+      break;
     case ReportPeriod.yearly:
-      start = DateTime(selectedDate.year - 6, 1, 1);
-      end = DateTime(selectedDate.year, 12, 31, 23, 59, 59);
+      start = DateTime(selectedDate.year, 1, 1);
+      end = DateTime(selectedDate.year, 12, 31, 23, 59, 59, 999);
+      break;
+    case ReportPeriod.custom:
+      start =
+          ref.watch(customStartDateProvider) ??
+          DateTime(
+            DateTime.now().year,
+            DateTime.now().month,
+            DateTime.now().day,
+          );
+      final customEnd = ref.watch(customEndDateProvider) ?? DateTime.now();
+      end = DateTime(
+        customEnd.year,
+        customEnd.month,
+        customEnd.day,
+        23,
+        59,
+        59,
+        999,
+      );
+      break;
   }
 
-  final chartStart = period == ReportPeriod.daily ? start.subtract(const Duration(days: 6)) : start;
-  final chartEnd = end;
+  await for (final transactions in repo.getTransactionsByDateRangeStream(
+    start,
+    end,
+  )) {
+    double totalSales = 0.0;
+    double totalHpp = 0.0;
+    for (var tx in transactions) {
+      if (tx.status == 'completed') {
+        final items = await repo.getTransactionItems(tx.id);
+        double txSales = 0.0;
+        double txHpp = 0.0;
+        for (var item in items) {
+          if (!item.isReturned) {
+            txSales += item.subtotal;
+            txHpp += (item.costPrice * item.qty);
+          }
+        }
+        totalSales += txSales;
+        totalHpp += txHpp;
+      }
+    }
+    double labaBersih = totalSales - totalHpp;
 
-  final profitSummary = await db.getSummaryProfit(start, end);
-
-  return {
-    'totalSales': profitSummary['totalSales'] ?? 0.0,
-    'totalCost': profitSummary['totalCost'] ?? 0.0,
-    'grossProfit': profitSummary['grossProfit'] ?? 0.0,
-    'margin': profitSummary['margin'] ?? 0.0,
-    'serviceRevenue': profitSummary['serviceRevenue'] ?? 0.0,
-    'partsRevenue': profitSummary['partsRevenue'] ?? 0.0,
-    'txnCount': await db.getTransactionCount(start, end),
-    'topProducts': await db.getTopProducts(start, end, limit: 5),
-    'dailySales': await db.getSalesByDateRange(chartStart, chartEnd),
-    'start': start,
-    'end': end,
-  };
+    yield {
+      'totalSales': totalSales,
+      'totalHpp': totalHpp,
+      'labaBersih': labaBersih,
+      'txnCount': transactions.where((t) => t.status == 'completed').length,
+      'transactions': transactions,
+      'start': start,
+      'end': end,
+    };
+  }
 });
 
-/// Layar laporan penjualan & profit
 class ReportScreen extends ConsumerWidget {
   const ReportScreen({super.key});
+
+  Future<void> _exportToExcel(
+    BuildContext context,
+    WidgetRef ref,
+    Map<String, dynamic> data,
+  ) async {
+    try {
+      final transactions = data['transactions'] as List<TransactionModel>;
+      final period = ref.read(reportPeriodProvider);
+
+      String periodType = '';
+      switch (period) {
+        case ReportPeriod.daily:
+          periodType = 'Harian';
+          break;
+        case ReportPeriod.weekly:
+          periodType = 'Mingguan';
+          break;
+        case ReportPeriod.monthly:
+          periodType = 'Bulanan';
+          break;
+        case ReportPeriod.yearly:
+          periodType = 'Tahunan';
+          break;
+        case ReportPeriod.custom:
+          periodType = 'Kustom';
+          break;
+      }
+
+      final label = _getFilterLabel(ref, period);
+      final safePeriodLabel = label.replaceAll('/', '-').replaceAll(' ', '_');
+
+      var excel = Excel.createExcel();
+
+      if (excel.tables.keys.isNotEmpty &&
+          excel.tables.keys.first != 'Laporan') {
+        excel.rename(excel.tables.keys.first, 'Laporan');
+      }
+
+      Sheet sheetObject = excel['Laporan'];
+      excel.setDefaultSheet('Laporan');
+
+      // Add Headers
+      sheetObject.appendRow([
+        TextCellValue('Tanggal dan Waktu'),
+        TextCellValue('No Invoice'),
+        TextCellValue('Keterangan Produk dan Jumlah'),
+        TextCellValue('Harga Beli Produk'),
+        TextCellValue('Harga Jual Produk'),
+        TextCellValue('Harga Karyawan'),
+        TextCellValue('Keterangan Jasa'),
+        TextCellValue('Keterangan Mekanik'),
+        TextCellValue('Harga Jasa'),
+        TextCellValue('Pembayaran Karyawan'),
+        TextCellValue('Pembayaran Karyawan (60%)'),
+        TextCellValue('Pembayaran Karyawan (40%)'),
+        TextCellValue('Harga Jual Total'),
+        TextCellValue('Laba Kotor'),
+        TextCellValue('Status'),
+      ]);
+
+      // Apply style to header row
+      final headerStyle = CellStyle(
+        backgroundColorHex: ExcelColor.fromHexString('#1976D2'),
+        fontColorHex: ExcelColor.fromHexString('#FFFFFF'),
+        bold: true,
+      );
+      for (int i = 0; i < 15; i++) {
+        var cell = sheetObject.cell(
+          CellIndex.indexByColumnRow(columnIndex: i, rowIndex: 0),
+        );
+        cell.cellStyle = headerStyle;
+        sheetObject.setColumnAutoFit(i);
+      }
+
+      final repo = ref.read(transactionRepositoryProvider);
+      final productRepo = ref.read(productRepositoryProvider);
+
+      // Add Data
+      for (var tx in transactions) {
+        final items = await repo.getTransactionItems(tx.id);
+
+        List<String> productDetails = [];
+        List<String> serviceDetails = [];
+        Set<String> mechanics = {};
+
+        double totalProductSales = 0.0;
+        double totalServiceSales = 0.0;
+        double totalWorkerPrice = 0.0;
+
+        double txTotal = 0.0;
+        double txTotalCost = 0.0;
+
+        for (var item in items) {
+          if (item.itemType == 'product') {
+            if (item.isReturned) {
+              productDetails.add(
+                '${item.productName ?? 'Produk'} x${item.qty} (Retur)',
+              );
+            } else {
+              productDetails.add(
+                '${item.productName ?? 'Produk'} x${item.qty}',
+              );
+              totalProductSales += item.subtotal;
+              txTotal += item.subtotal;
+              txTotalCost += (item.costPrice * item.qty);
+              if (item.productId != null) {
+                try {
+                  final product = await productRepo
+                      .getProductById(item.productId!)
+                      .first;
+                  if (product != null) {
+                    totalWorkerPrice += product.workerPrice * item.qty;
+                  }
+                } catch (_) {}
+              }
+            }
+          } else if (item.itemType == 'service') {
+            if (item.isReturned) {
+              serviceDetails.add(
+                '${item.productName ?? 'Jasa'} x${item.qty} (Retur)',
+              );
+            } else {
+              serviceDetails.add('${item.productName ?? 'Jasa'} x${item.qty}');
+              totalServiceSales += item.subtotal;
+              txTotal += item.subtotal;
+              txTotalCost += (item.costPrice * item.qty);
+              if (item.workerName != null && item.workerName!.isNotEmpty) {
+                mechanics.add(item.workerName!);
+              }
+            }
+          }
+        }
+
+        String statusIndo = tx.status;
+        if (tx.status == 'completed') {
+          statusIndo = 'Selesai';
+        } else if (tx.status == 'pending') {
+          statusIndo = 'Tertunda';
+        } else if (tx.status == 'cancelled') {
+          statusIndo = 'Dibatalkan';
+        } else if (tx.status == 'returned') {
+          statusIndo = 'Diretur';
+        }
+
+        double pembayaranKaryawan = totalWorkerPrice + totalServiceSales;
+        double pembayaranKaryawan60 = pembayaranKaryawan * 0.6;
+        double pembayaranKaryawan40 = pembayaranKaryawan * 0.4;
+
+        sheetObject.appendRow([
+          TextCellValue(DateFormatter.formatWithTime(tx.createdAt)),
+          TextCellValue(tx.invoiceNo),
+          TextCellValue(
+            productDetails.isNotEmpty ? productDetails.join(', ') : '-',
+          ),
+          TextCellValue(CurrencyFormatter.format(txTotalCost)),
+          TextCellValue(CurrencyFormatter.format(totalProductSales)),
+          TextCellValue(CurrencyFormatter.format(totalWorkerPrice)),
+          TextCellValue(
+            serviceDetails.isNotEmpty ? serviceDetails.join(', ') : '-',
+          ),
+          TextCellValue(mechanics.isNotEmpty ? mechanics.join(', ') : '-'),
+          TextCellValue(CurrencyFormatter.format(totalServiceSales)),
+          TextCellValue(CurrencyFormatter.format(pembayaranKaryawan)),
+          TextCellValue(CurrencyFormatter.format(pembayaranKaryawan60)),
+          TextCellValue(CurrencyFormatter.format(pembayaranKaryawan40)),
+          TextCellValue(CurrencyFormatter.format(txTotal)),
+          TextCellValue(CurrencyFormatter.format(txTotal - txTotalCost)),
+          TextCellValue(statusIndo),
+        ]);
+      }
+
+      var fileBytes = excel.save();
+      if (fileBytes != null) {
+        final directory = await getApplicationDocumentsDirectory();
+        final path =
+            '${directory.path}/Laporan_${periodType}_$safePeriodLabel.xlsx';
+        final file = File(path);
+        await file.writeAsBytes(fileBytes);
+
+        if (context.mounted) {
+          AppToast.show(
+            context,
+            'Laporan $periodType ($label) berhasil diunduh!',
+            type: ToastType.success,
+          );
+          await Share.shareXFiles([
+            XFile(path),
+          ], text: 'Laporan $periodType ($label)');
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(
+          context,
+          'Gagal mengekspor laporan: $e',
+          type: ToastType.error,
+        );
+      }
+    }
+  }
+
+  Future<void> _showMonthYearPicker(
+    BuildContext context,
+    WidgetRef ref,
+    bool isYearOnly,
+  ) async {
+    final current = ref.read(selectedDateProvider);
+    int selectedYear = current.year;
+    int selectedMonth = current.month;
+
+    await showDialog(
+      context: context,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setState) {
+            return AlertDialog(
+              title: Text(isYearOnly ? 'Pilih Tahun' : 'Pilih Bulan & Tahun'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.chevron_left),
+                        onPressed: () => setState(() => selectedYear--),
+                      ),
+                      Text(
+                        '$selectedYear',
+                        style: const TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.chevron_right),
+                        onPressed: () => setState(() => selectedYear++),
+                      ),
+                    ],
+                  ),
+                  if (!isYearOnly) ...[
+                    const SizedBox(height: 16),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(12, (index) {
+                        final month = index + 1;
+                        final isSelected = month == selectedMonth;
+                        return InkWell(
+                          onTap: () => setState(() => selectedMonth = month),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: isSelected
+                                  ? AppColors.primary
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                              border: Border.all(color: AppColors.primary),
+                            ),
+                            child: Text(
+                              DateFormat(
+                                'MMM',
+                                'id_ID',
+                              ).format(DateTime(2020, month)),
+                              style: TextStyle(
+                                color: isSelected
+                                    ? Colors.white
+                                    : AppColors.primary,
+                              ),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ],
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('Batal'),
+                ),
+                ElevatedButton(
+                  onPressed: () {
+                    ref.read(selectedDateProvider.notifier).state = DateTime(
+                      selectedYear,
+                      isYearOnly ? 1 : selectedMonth,
+                      1,
+                    );
+                    Navigator.pop(ctx);
+                  },
+                  child: const Text('Pilih'),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  String _getFilterLabel(WidgetRef ref, ReportPeriod period) {
+    if (period == ReportPeriod.custom) {
+      final start = ref.watch(customStartDateProvider);
+      final end = ref.watch(customEndDateProvider);
+      if (start != null && end != null) {
+        return '${DateFormatter.formatShort(start)} - ${DateFormatter.formatShort(end)}';
+      }
+      return 'Pilih Tanggal';
+    }
+
+    final selected = ref.watch(selectedDateProvider);
+    switch (period) {
+      case ReportPeriod.daily:
+        return DateFormatter.formatShort(selected);
+      case ReportPeriod.weekly:
+        final start = selected.subtract(Duration(days: selected.weekday - 1));
+        final end = start.add(const Duration(days: 6));
+        return '${DateFormatter.formatShort(start)} - ${DateFormatter.formatShort(end)}';
+      case ReportPeriod.monthly:
+        return DateFormat('MMMM yyyy', 'id_ID').format(selected);
+      case ReportPeriod.yearly:
+        return '${selected.year}';
+      default:
+        return 'Pilih Tanggal';
+    }
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -74,317 +471,41 @@ class ReportScreen extends ConsumerWidget {
       appBar: AppBar(
         title: const Text('Laporan Keuangan'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.file_download_rounded),
-            tooltip: 'Unduh Laporan Excel',
-            onPressed: () => _exportExcel(context, ref),
+          report.maybeWhen(
+            data: (data) => IconButton(
+              icon: const Icon(Icons.download_rounded),
+              tooltip: 'Unduh Excel',
+              onPressed: () {
+                AppToast.show(
+                  context,
+                  'Menyiapkan file Excel...',
+                  type: ToastType.loading,
+                );
+                _exportToExcel(context, ref, data);
+              },
+            ),
+            orElse: () => const SizedBox.shrink(),
           ),
         ],
       ),
       body: Column(
         children: [
-          // Period filter
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Consumer(
-              builder: (context, ref, _) {
-                final current = ref.watch(reportDateProvider);
-                return Row(
-                  children: [
-                    Expanded(
-                      flex: 2,
-                      child: DropdownButtonFormField<ReportPeriod>(
-                        value: period,
-                        decoration: InputDecoration(
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          enabledBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.border),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                            borderSide: const BorderSide(color: AppColors.primary),
-                          ),
-                          filled: true,
-                          fillColor: theme.cardTheme.color,
-                        ),
-                        items: ReportPeriod.values.map((p) {
-                          final label = switch (p) {
-                            ReportPeriod.daily => 'Harian',
-                            ReportPeriod.weekly => 'Mingguan',
-                            ReportPeriod.monthly => 'Bulanan',
-                            ReportPeriod.yearly => 'Tahunan',
-                          };
-                          return DropdownMenuItem(
-                            value: p,
-                            child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                          );
-                        }).toList(),
-                        onChanged: (val) {
-                          if (val != null) {
-                            ref.read(reportPeriodProvider.notifier).state = val;
-                          }
-                        },
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      flex: 3,
-                      child: InkWell(
-                        onTap: () async {
-                          final picked = await DatePickerUtils.pickDate(context, period, current);
-                          if (picked != null) {
-                            ref.read(reportDateProvider.notifier).state = picked;
-                          }
-                        },
-                        borderRadius: BorderRadius.circular(12),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
-                          decoration: BoxDecoration(
-                            border: Border.all(color: AppColors.border),
-                            borderRadius: BorderRadius.circular(12),
-                            color: theme.cardTheme.color,
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(DatePickerUtils.formatSelectedDate(period, current), style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-                              const Icon(Icons.calendar_today_rounded, size: 18, color: AppColors.primary),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                );
-              }
-            ),
-          ),
-
-          Expanded(
-            child: report.when(
-              loading: () => const Center(child: CircularProgressIndicator()),
-              error: (e, _) => Center(child: Text('$e')),
-              data: (data) {
-                final daily = data['dailySales'] as List<Map<String, dynamic>>;
-                final totalSales = (data['totalSales'] as num?)?.toDouble() ?? 0;
-                final totalCost = (data['totalCost'] as num?)?.toDouble() ?? 0;
-                final grossProfit = (data['grossProfit'] as num?)?.toDouble() ?? 0;
-                final serviceRev = (data['serviceRevenue'] as num?)?.toDouble() ?? 0;
-                final partsRev = (data['partsRevenue'] as num?)?.toDouble() ?? 0;
-
-                return RefreshIndicator(
-                  onRefresh: () async => ref.invalidate(reportDataProvider),
-                  child: ListView(
-                    padding: const EdgeInsets.all(16),
-                    children: [
-                      // Metric Cards Row 1: Omzet & Transaksi
-                      Row(children: [
-                        Expanded(child: MetricCard(
-                          label: 'Omzet', value: CurrencyFormatter.format(totalSales),
-                          icon: Icons.monetization_on_rounded, iconColor: AppColors.success,
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(child: MetricCard(
-                          label: 'Transaksi', value: '${data['txnCount'] ?? 0}',
-                          icon: Icons.receipt_long_rounded, iconColor: AppColors.info,
-                        )),
-                      ]),
-                      const SizedBox(height: 12),
-
-                      // Metric Cards Row 2: Modal & Laba
-                      Row(children: [
-                        Expanded(child: MetricCard(
-                          label: 'Modal (HPP)', value: CurrencyFormatter.format(totalCost),
-                          icon: Icons.account_balance_wallet_rounded, iconColor: AppColors.warning,
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(child: MetricCard(
-                          label: 'Laba Kotor', value: CurrencyFormatter.format(grossProfit),
-                          icon: Icons.trending_up_rounded,
-                          iconColor: grossProfit >= 0 ? AppColors.success : AppColors.error,
-                        )),
-                      ]),
-                      const SizedBox(height: 12),
-
-                      // Metric Cards Row 3: Jasa & Sparepart
-                      Row(children: [
-                        Expanded(child: MetricCard(
-                          label: 'Pendapatan Jasa', value: CurrencyFormatter.format(serviceRev),
-                          icon: Icons.build_rounded, iconColor: AppColors.info,
-                        )),
-                        const SizedBox(width: 12),
-                        Expanded(child: MetricCard(
-                          label: 'Pendapatan Part', value: CurrencyFormatter.format(partsRev),
-                          icon: Icons.settings_rounded, iconColor: AppColors.primary,
-                        )),
-                      ]),
-                      const SizedBox(height: 20),
-
-                      // Chart
-                      Text('Grafik Penjualan', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 12),
-                      Consumer(
-                        builder: (context, ref, _) => _buildChart(context, daily, period, ref.watch(reportDateProvider)),
-                      ),
-                      const SizedBox(height: 24),
-
-                      const Divider(height: 40),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: OutlinedButton.icon(
-                          onPressed: () => context.go('/history'),
-                          icon: const Icon(Icons.receipt_long_rounded),
-                          label: const Text('Buka Riwayat & Detail Transaksi'),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: AppColors.primary),
-                            foregroundColor: AppColors.primary,
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildChart(BuildContext context, List<Map<String, dynamic>> daily, ReportPeriod period, DateTime selectedDate) {
-    final theme = Theme.of(context);
-    final displaySales = ReportUtils.getChartDisplayData(daily, period, selectedDate);
-    final maxY = ReportUtils.getChartMaxY(displaySales);
-
-    return Container(
-      height: 220,
-      padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
-      decoration: BoxDecoration(
-        color: theme.cardTheme.color,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.border.withValues(alpha: 0.6)),
-        boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.02), blurRadius: 10, offset: const Offset(0, 4))],
-      ),
-      child: BarChart(
-        BarChartData(
-          maxY: maxY,
-          barTouchData: BarTouchData(
-            touchTooltipData: BarTouchTooltipData(
-              getTooltipColor: (_) => const Color(0xFF334155),
-              tooltipBorder: BorderSide.none,
-              getTooltipItem: (group, groupIndex, rod, rodIndex) {
-                return BarTooltipItem(
-                  CurrencyFormatter.format(rod.toY * 1000),
-                  const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                );
-              },
-            ),
-          ),
-          barGroups: displaySales.asMap().entries.map((e) {
-            return BarChartGroupData(x: e.key, barRods: [
-              ReportUtils.buildBarRod(
-                value: (e.value['total'] as num?)?.toDouble() ?? 0,
-                maxY: maxY,
-                width: 16,
-                radius: 6,
-                backgroundBarColor: AppColors.border.withValues(alpha: 0.3),
-              ),
-            ]);
-          }).toList(),
-          borderData: FlBorderData(show: false),
-          gridData: FlGridData(
-            show: true,
-            drawVerticalLine: false,
-            getDrawingHorizontalLine: (value) => FlLine(
-              color: AppColors.border.withValues(alpha: 0.5),
-              strokeWidth: 1,
-              dashArray: [4, 4],
-            ),
-          ),
-          titlesData: FlTitlesData(
-            show: true,
-            leftTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 44,
-              getTitlesWidget: (value, meta) {
-                if (value == meta.min || value == meta.max) return const SizedBox();
-                return SideTitleWidget(
-                  meta: meta,
-                  space: 4,
-                  child: Text(
-                    CurrencyFormatter.formatCompact(value * 1000),
-                    style: TextStyle(
-                      fontSize: 9,
-                      color: theme.textTheme.bodySmall?.color ?? AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                );
-              },
-            )),
-            bottomTitles: AxisTitles(sideTitles: SideTitles(
-              showTitles: true,
-              reservedSize: 32,
-              getTitlesWidget: (value, meta) {
-                final index = value.toInt();
-                if (index < 0 || index >= displaySales.length) return const SizedBox();
-                
-                return SideTitleWidget(
-                  meta: meta,
-                  space: 8,
-                  angle: period == ReportPeriod.weekly ? 0 : -0.5,
-                  child: Text(
-                    displaySales[index]['label'] as String,
-                    style: TextStyle(
-                      fontSize: 10,
-                      color: theme.textTheme.bodySmall?.color ?? AppColors.textSecondary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                );
-              },
-            )),
-            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _exportExcel(BuildContext context, WidgetRef ref) async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (ctx) {
-        ReportPeriod tempPeriod = ref.read(reportPeriodProvider);
-        DateTime tempDate = ref.read(reportDateProvider);
-        
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Export Laporan Keuangan'),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text('Pilih periode laporan yang ingin diexport:'),
-                  const SizedBox(height: 16),
-                  DropdownButtonFormField<ReportPeriod>(
-                    value: tempPeriod,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<ReportPeriod>(
+                    value: period,
                     decoration: InputDecoration(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 12,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     items: ReportPeriod.values.map((p) {
                       final label = switch (p) {
@@ -392,108 +513,314 @@ class ReportScreen extends ConsumerWidget {
                         ReportPeriod.weekly => 'Mingguan',
                         ReportPeriod.monthly => 'Bulanan',
                         ReportPeriod.yearly => 'Tahunan',
+                        ReportPeriod.custom => 'Kustom Tanggal',
                       };
                       return DropdownMenuItem(
                         value: p,
-                        child: Text(label),
+                        child: Text(
+                          label,
+                          style: const TextStyle(fontSize: 13),
+                        ),
                       );
                     }).toList(),
                     onChanged: (val) {
                       if (val != null) {
-                        setState(() => tempPeriod = val);
+                        ref.read(reportPeriodProvider.notifier).state = val;
                       }
                     },
                   ),
-                  const SizedBox(height: 16),
-                  OutlinedButton.icon(
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  flex: 3,
+                  child: OutlinedButton.icon(
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
                     onPressed: () async {
-                      final picked = await DatePickerUtils.pickDate(context, tempPeriod, tempDate);
-                      if (picked != null) {
-                        setState(() => tempDate = picked);
+                      if (period == ReportPeriod.daily ||
+                          period == ReportPeriod.weekly) {
+                        final picked = await showDatePicker(
+                          context: context,
+                          initialDate: ref.read(selectedDateProvider),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          ref.read(selectedDateProvider.notifier).state =
+                              picked;
+                        }
+                      } else if (period == ReportPeriod.monthly ||
+                          period == ReportPeriod.yearly) {
+                        await _showMonthYearPicker(
+                          context,
+                          ref,
+                          period == ReportPeriod.yearly,
+                        );
+                      } else if (period == ReportPeriod.custom) {
+                        final currentStart =
+                            ref.read(customStartDateProvider) ?? DateTime.now();
+                        final currentEnd =
+                            ref.read(customEndDateProvider) ?? DateTime.now();
+                        final picked = await showDateRangePicker(
+                          context: context,
+                          initialDateRange: DateTimeRange(
+                            start: currentStart,
+                            end: currentEnd,
+                          ),
+                          firstDate: DateTime(2020),
+                          lastDate: DateTime(2100),
+                        );
+                        if (picked != null) {
+                          ref.read(customStartDateProvider.notifier).state =
+                              picked.start;
+                          ref.read(customEndDateProvider.notifier).state =
+                              picked.end;
+                        }
                       }
                     },
-                    icon: const Icon(Icons.edit_calendar_rounded, size: 18),
-                    label: Text(DatePickerUtils.formatSelectedDate(tempPeriod, tempDate)),
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(48),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    icon: const Icon(Icons.date_range, size: 18),
+                    label: Text(
+                      _getFilterLabel(ref, period),
+                      style: const TextStyle(fontSize: 12),
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                ],
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  child: const Text('Batal'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.pop(ctx, {'period': tempPeriod, 'date': tempDate}),
-                  child: const Text('Export'),
                 ),
               ],
-            );
-          },
-        );
-      },
+            ),
+          ),
+          Expanded(
+            child: report.when(
+              loading: () => const Center(child: CircularProgressIndicator()),
+              error: (e, stack) => Center(child: Text('Error: $e')),
+              data: (data) {
+                final transactions =
+                    data['transactions'] as List<TransactionModel>;
+
+                return CustomScrollView(
+                  slivers: [
+                    SliverPadding(
+                      padding: const EdgeInsets.all(16),
+                      sliver: SliverToBoxAdapter(
+                        child: Column(
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: MetricCard(
+                                    label: 'Total Pendapatan',
+                                    value: CurrencyFormatter.format(
+                                      data['totalSales'],
+                                    ),
+                                    icon: Icons.monetization_on_rounded,
+                                    iconColor: AppColors.success,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: MetricCard(
+                                    label: 'Jml Transaksi',
+                                    value: '${data['txnCount']}',
+                                    icon: Icons.receipt_long_rounded,
+                                    iconColor: AppColors.info,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: MetricCard(
+                                    label: 'Total HPP',
+                                    value: CurrencyFormatter.format(
+                                      data['totalHpp'],
+                                    ),
+                                    icon: Icons.inventory_2_rounded,
+                                    iconColor: AppColors.warning,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: MetricCard(
+                                    label: 'Laba Bersih',
+                                    value: CurrencyFormatter.format(
+                                      data['labaBersih'],
+                                    ),
+                                    icon: Icons.trending_up_rounded,
+                                    iconColor: AppColors.primary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverToBoxAdapter(
+                        child: Text(
+                          'Daftar Transaksi',
+                          style: Theme.of(context).textTheme.titleMedium
+                              ?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SliverToBoxAdapter(child: SizedBox(height: 8)),
+                    transactions.isEmpty
+                        ? const SliverFillRemaining(
+                            child: EmptyStateWidget(
+                              icon: Icons.receipt_long_rounded,
+                              title: 'Belum ada transaksi di periode ini',
+                            ),
+                          )
+                        : SliverPadding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            sliver: SliverList(
+                              delegate: SliverChildBuilderDelegate((
+                                context,
+                                index,
+                              ) {
+                                final txn = transactions[index];
+                                return Column(
+                                  children: [
+                                    InkWell(
+                                      onTap: () =>
+                                          ReceiptModal.show(context, ref, txn),
+                                      borderRadius: BorderRadius.circular(14),
+                                      child: Container(
+                                        padding: const EdgeInsets.all(14),
+                                        decoration: BoxDecoration(
+                                          color: theme.cardTheme.color,
+                                          borderRadius: BorderRadius.circular(
+                                            14,
+                                          ),
+                                          border: Border.all(
+                                            color: AppColors.border,
+                                          ),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Container(
+                                              padding: const EdgeInsets.all(10),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.success
+                                                    .withValues(alpha: 0.1),
+                                                borderRadius:
+                                                    BorderRadius.circular(10),
+                                              ),
+                                              child: const Icon(
+                                                Icons.receipt_rounded,
+                                                color: AppColors.success,
+                                                size: 22,
+                                              ),
+                                            ),
+                                            const SizedBox(width: 12),
+                                            Expanded(
+                                              child: Column(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.start,
+                                                children: [
+                                                  Row(
+                                                    children: [
+                                                      Text(
+                                                        txn.invoiceNo,
+                                                        style: theme
+                                                            .textTheme
+                                                            .titleSmall,
+                                                      ),
+                                                      if (txn.status ==
+                                                          'returned') ...[
+                                                        const SizedBox(
+                                                          width: 8,
+                                                        ),
+                                                        Container(
+                                                          padding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 6,
+                                                                vertical: 2,
+                                                              ),
+                                                          decoration: BoxDecoration(
+                                                            color: AppColors
+                                                                .error
+                                                                .withValues(
+                                                                  alpha: 0.1,
+                                                                ),
+                                                            borderRadius:
+                                                                BorderRadius.circular(
+                                                                  4,
+                                                                ),
+                                                          ),
+                                                          child: const Text(
+                                                            'DIRETUR',
+                                                            style: TextStyle(
+                                                              fontSize: 10,
+                                                              color: AppColors
+                                                                  .error,
+                                                              fontWeight:
+                                                                  FontWeight
+                                                                      .bold,
+                                                            ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ],
+                                                  ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    DateFormatter.formatWithTime(
+                                                      txn.createdAt,
+                                                    ),
+                                                    style: theme
+                                                        .textTheme
+                                                        .labelSmall,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            Column(
+                                              crossAxisAlignment:
+                                                  CrossAxisAlignment.end,
+                                              children: [
+                                                Text(
+                                                  CurrencyFormatter.format(
+                                                    txn.total,
+                                                  ),
+                                                  style: theme
+                                                      .textTheme
+                                                      .titleSmall
+                                                      ?.copyWith(
+                                                        color:
+                                                            AppColors.primary,
+                                                      ),
+                                                ),
+                                              ],
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                  ],
+                                );
+                              }, childCount: transactions.length),
+                            ),
+                          ),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
-
-    if (result == null) return;
-    if (!context.mounted) return;
-    
-    final selectedPeriod = result['period'] as ReportPeriod;
-    final selectedDate = result['date'] as DateTime;
-
-    final db = ref.read(databaseProvider);
-    late DateTime start;
-    late DateTime end;
-
-    switch (selectedPeriod) {
-      case ReportPeriod.daily:
-        start = DateFormatter.startOfDay(selectedDate);
-        end = DateFormatter.endOfDay(selectedDate);
-      case ReportPeriod.weekly:
-        start = DateTime(selectedDate.year, selectedDate.month, 1);
-        end = DateTime(selectedDate.year, selectedDate.month + 1, 0, 23, 59, 59);
-      case ReportPeriod.monthly:
-        start = DateTime(selectedDate.year, 1, 1);
-        end = DateTime(selectedDate.year, 12, 31, 23, 59, 59);
-      case ReportPeriod.yearly:
-        start = DateTime(selectedDate.year - 6, 1, 1);
-        end = DateTime(selectedDate.year, 12, 31, 23, 59, 59);
-    }
-
-    final periodLabel = switch (selectedPeriod) {
-      ReportPeriod.daily => 'Harian',
-      ReportPeriod.weekly => 'Mingguan',
-      ReportPeriod.monthly => 'Bulanan',
-      ReportPeriod.yearly => 'Tahunan',
-    };
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Membuat laporan Excel...')),
-    );
-
-    try {
-      final exportService = ExcelExportService(db);
-      final file = await exportService.generateReport(
-        start: start,
-        end: end,
-        periodLabel: periodLabel,
-        storeName: 'D&D Markas Ban',
-      );
-
-      if (context.mounted) {
-        await Share.shareXFiles(
-          [XFile(file.path)],
-          subject: 'Laporan Keuangan $periodLabel - D&D Markas Ban',
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Gagal mengekspor: $e')),
-        );
-      }
-    }
   }
 }

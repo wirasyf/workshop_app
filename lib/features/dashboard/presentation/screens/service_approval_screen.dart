@@ -1,27 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/services/sync_service.dart';
 import '../../../../core/utils/currency_formatter.dart';
-import '../../../../core/utils/date_formatter.dart';
-import 'package:drift/drift.dart' hide Column;
 import '../../../../shared/utils/app_toast.dart';
-import 'owner_dashboard_screen.dart';
+import '../../../../core/models/transaction_model.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 
-final pendingApprovalsProvider = FutureProvider<List<TypedResult>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  return db.getPendingServiceApprovals();
-});
-
-final approvedApprovalsProvider = FutureProvider<List<TypedResult>>((ref) async {
-  final db = ref.watch(databaseProvider);
-  return db.getApprovedServiceApprovals();
-});
-
-/// Provider to track current tab in Service Approval screen
 final approvalTabProvider = StateProvider<int>((ref) => 0); // 0 = Menunggu, 1 = Riwayat
+
+final pendingApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref) async* {
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.value == null) return;
+
+  yield* FirebaseFirestore.instance
+      .collection('transaction_items')
+      .where('itemType', isEqualTo: 'service')
+      .where('isApproved', isEqualTo: false)
+      .snapshots()
+      .map((snap) => snap.docs.map((d) => TransactionItemModel.fromFirestore(d)).toList());
+});
+
+final historyApprovalsProvider = StreamProvider<List<TransactionItemModel>>((ref) async* {
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading || authState.value == null) return;
+
+  yield* FirebaseFirestore.instance
+      .collection('transaction_items')
+      .where('itemType', isEqualTo: 'service')
+      .where('isApproved', isEqualTo: true)
+      .orderBy('createdAt', descending: true)
+      .limit(50)
+      .snapshots()
+      .map((snap) => snap.docs.map((d) => TransactionItemModel.fromFirestore(d)).toList());
+});
 
 class ServiceApprovalScreen extends ConsumerWidget {
   const ServiceApprovalScreen({super.key});
@@ -31,6 +45,9 @@ class ServiceApprovalScreen extends ConsumerWidget {
     final from = GoRouterState.of(context).uri.queryParameters['from'];
     final target = from == 'dashboard' ? '/dashboard' : '/settings';
     final activeTab = ref.watch(approvalTabProvider);
+    
+    final pendingAsync = ref.watch(pendingApprovalsProvider);
+    final historyAsync = ref.watch(historyApprovalsProvider);
 
     return PopScope(
       canPop: false,
@@ -45,19 +62,9 @@ class ServiceApprovalScreen extends ConsumerWidget {
             icon: const Icon(Icons.chevron_left_rounded),
             onPressed: () => context.go(target),
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.refresh_rounded),
-              onPressed: () {
-                ref.invalidate(pendingApprovalsProvider);
-                ref.invalidate(approvedApprovalsProvider);
-              },
-            ),
-          ],
         ),
         body: Column(
           children: [
-            // Custom Tab: Menunggu | Riwayat (styled like POS screen)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
               child: Container(
@@ -83,30 +90,116 @@ class ServiceApprovalScreen extends ConsumerWidget {
                 ),
               ),
             ),
-
             Expanded(
-              child: activeTab == 0 ? const _PendingTab() : const _HistoryTab(),
+              child: activeTab == 0
+                  ? _buildList(pendingAsync, context, ref, isPending: true)
+                  : _buildList(historyAsync, context, ref, isPending: false),
             ),
           ],
         ),
       ),
     );
   }
+
+  Widget _buildList(AsyncValue<List<TransactionItemModel>> asyncData, BuildContext context, WidgetRef ref, {required bool isPending}) {
+    return asyncData.when(
+      loading: () => const Center(child: CircularProgressIndicator()),
+      error: (e, _) => Center(child: Text('Error: $e')),
+      data: (items) {
+        if (items.isEmpty) {
+          return Center(
+            child: EmptyStateWidget(
+              icon: isPending ? Icons.assignment_turned_in_rounded : Icons.history_rounded,
+              title: isPending ? 'Tidak ada persetujuan' : 'Belum ada riwayat',
+              subtitle: isPending ? 'Tidak ada jasa menunggu persetujuan' : 'Belum ada riwayat persetujuan',
+            ),
+          );
+        }
+
+        return ListView.separated(
+          padding: const EdgeInsets.all(16),
+          itemCount: items.length,
+          separatorBuilder: (_, __) => const SizedBox(height: 12),
+          itemBuilder: (context, index) {
+            final item = items[index];
+            return Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).cardTheme.color,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Text(item.productName ?? 'Jasa Tidak Diketahui', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: isPending ? AppColors.warning.withValues(alpha: 0.1) : AppColors.success.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: isPending ? AppColors.warning : AppColors.success),
+                        ),
+                        child: Text(
+                          isPending ? 'Menunggu' : 'Disetujui',
+                          style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: isPending ? AppColors.warning : AppColors.success),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text('Mekanik: ${item.workerName ?? '-'}', style: const TextStyle(color: AppColors.textSecondary)),
+                  Text('Subtotal: ${CurrencyFormatter.format(item.subtotal)}', style: const TextStyle(color: AppColors.textSecondary)),
+                  
+                  if (isPending) ...[
+                    const SizedBox(height: 16),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () => _approveItem(context, ref, item.id),
+                        icon: const Icon(Icons.check_rounded),
+                        label: const Text('Setujui Jasa'),
+                        style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Future<void> _approveItem(BuildContext context, WidgetRef ref, String itemId) async {
+    try {
+      await FirebaseFirestore.instance.collection('transaction_items').doc(itemId).update({
+        'isApproved': true,
+      });
+      if (context.mounted) {
+        AppToast.show(context, 'Jasa berhasil disetujui', type: ToastType.success);
+      }
+    } catch (e) {
+      if (context.mounted) {
+        AppToast.show(context, 'Gagal menyetujui jasa: $e', type: ToastType.error);
+      }
+    }
+  }
 }
 
-/// Custom Tab Button designed to match POS screen style
 class _TabButton extends StatelessWidget {
   final String label;
   final IconData icon;
   final bool isSelected;
   final VoidCallback onTap;
 
-  const _TabButton({
-    required this.label,
-    required this.icon,
-    required this.isSelected,
-    required this.onTap,
-  });
+  const _TabButton({required this.label, required this.icon, required this.isSelected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -123,234 +216,13 @@ class _TabButton extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                icon,
-                size: 18,
-                color: isSelected ? Colors.white : AppColors.textSecondary,
-              ),
+              Icon(icon, size: 18, color: isSelected ? Colors.white : AppColors.textSecondary),
               const SizedBox(width: 6),
-              Text(
-                label,
-                style: TextStyle(
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
-                  color: isSelected ? Colors.white : AppColors.textSecondary,
-                  fontSize: 13,
-                ),
-              ),
+              Text(label, style: TextStyle(fontWeight: isSelected ? FontWeight.bold : FontWeight.w500, color: isSelected ? Colors.white : AppColors.textSecondary, fontSize: 13)),
             ],
           ),
         ),
       ),
-    );
-  }
-}
-
-class _PendingTab extends ConsumerWidget {
-  const _PendingTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final pending = ref.watch(pendingApprovalsProvider);
-    final theme = Theme.of(context);
-
-    return pending.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (list) {
-        if (list.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.check_circle_outline_rounded, size: 64, color: AppColors.success.withValues(alpha: 0.5)),
-                const SizedBox(height: 16),
-                const Text('Semua jasa sudah disetujui', style: TextStyle(color: AppColors.textSecondary)),
-              ],
-            ),
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final row = list[index];
-            final item = row.readTable(ref.read(databaseProvider).transactionItems);
-            final txn = row.readTable(ref.read(databaseProvider).transactions);
-            final service = row.readTableOrNull(ref.read(databaseProvider).services);
-
-            return Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: AppColors.border),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.warning.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text('MENUNGGU', style: TextStyle(color: AppColors.warning, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                        Text(DateFormatter.formatShort(txn.createdAt), style: theme.textTheme.bodySmall),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(service?.name ?? 'Jasa Tidak Diketahui', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('Invoice: ${txn.invoiceNo}', style: theme.textTheme.bodySmall),
-                    Text('Kasir ID: ${txn.userId}', style: theme.textTheme.bodySmall),
-                    const Divider(height: 24),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text('Nilai Jasa', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                            Text(CurrencyFormatter.format(item.subtotal), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                        Row(
-                          children: [
-                            TextButton(
-                              onPressed: () {
-                                AppToast.show(context, 'Fitur tolak segera hadir');
-                              },
-                              child: const Text('Tolak', style: TextStyle(color: AppColors.error)),
-                            ),
-                            const SizedBox(width: 8),
-                            ElevatedButton(
-                              onPressed: () async {
-                                await ref.read(databaseProvider).approveTransactionItem(item.id);
-                                await ref.read(syncServiceProvider).enqueue(
-                                  tableName: 'transaction_items',
-                                  recordId: item.id,
-                                  operation: 'update',
-                                  data: {
-                                    'is_approved': true,
-                                    'updated_at': DateTime.now().toIso8601String()
-                                  },
-                                );
-                                ref.invalidate(pendingApprovalsProvider);
-                                ref.invalidate(approvedApprovalsProvider);
-                                ref.invalidate(ownerDashboardProvider);
-                                if (context.mounted) {
-                                  AppToast.show(context, 'Jasa disetujui', type: ToastType.success);
-                                }
-                              },
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: AppColors.success,
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(horizontal: 16),
-                              ),
-                              child: const Text('Setujui'),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-}
-
-class _HistoryTab extends ConsumerWidget {
-  const _HistoryTab();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final history = ref.watch(approvedApprovalsProvider);
-    final theme = Theme.of(context);
-
-    return history.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(child: Text('Error: $e')),
-      data: (list) {
-        if (list.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.history_rounded, size: 64, color: AppColors.textHint.withValues(alpha: 0.5)),
-                const SizedBox(height: 16),
-                const Text('Belum ada riwayat persetujuan', style: TextStyle(color: AppColors.textSecondary)),
-              ],
-            ),
-          );
-        }
-
-        return ListView.separated(
-          padding: const EdgeInsets.all(16),
-          itemCount: list.length,
-          separatorBuilder: (_, __) => const SizedBox(height: 12),
-          itemBuilder: (context, index) {
-            final row = list[index];
-            final item = row.readTable(ref.read(databaseProvider).transactionItems);
-            final txn = row.readTable(ref.read(databaseProvider).transactions);
-            final service = row.readTableOrNull(ref.read(databaseProvider).services);
-
-            return Card(
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-                side: BorderSide(color: AppColors.border),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                            color: AppColors.success.withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(6),
-                          ),
-                          child: const Text('DISETUJUI', style: TextStyle(color: AppColors.success, fontSize: 10, fontWeight: FontWeight.bold)),
-                        ),
-                        Text(DateFormatter.formatShort(txn.createdAt), style: theme.textTheme.bodySmall),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(service?.name ?? 'Jasa Tidak Diketahui', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-                    const SizedBox(height: 4),
-                    Text('Invoice: ${txn.invoiceNo}', style: theme.textTheme.bodySmall),
-                    Text('Kasir ID: ${txn.userId}', style: theme.textTheme.bodySmall),
-                    const Divider(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Nilai Jasa', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-                        Text(CurrencyFormatter.format(item.subtotal), style: theme.textTheme.titleMedium?.copyWith(color: AppColors.primary, fontWeight: FontWeight.bold)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

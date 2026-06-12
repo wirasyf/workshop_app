@@ -46,3 +46,7 @@ app.*.map.json
 
 # Environment variables
 .env
+
+# Service Account / Firebase Admin SDK (RAHASIA!)
+**/service_account.json
+*-firebase-adminsdk-*.json

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../constants/app_colors.dart';
+import 'app_colors.dart';
 
 /// Tema aplikasi SpareArt — Material 3
 class AppTheme {
@@ -74,93 +74,160 @@ class AppTheme {
   static TextTheme _textTheme(Brightness brightness) {
     final isLight = brightness == Brightness.light;
     final base = isLight ? AppColors.textPrimary : AppColors.textPrimaryDark;
-    final secondary = isLight ? AppColors.textSecondary : AppColors.textSecondaryDark;
+    final secondary = isLight
+        ? AppColors.textSecondary
+        : AppColors.textSecondaryDark;
 
     return TextTheme(
-      displayLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.w700, color: base),
-      displayMedium: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w700, color: base),
-      displaySmall: GoogleFonts.outfit(fontSize: 24, fontWeight: FontWeight.w600, color: base),
-      headlineLarge: GoogleFonts.outfit(fontSize: 22, fontWeight: FontWeight.w600, color: base),
-      headlineMedium: GoogleFonts.outfit(fontSize: 20, fontWeight: FontWeight.w600, color: base),
-      headlineSmall: GoogleFonts.outfit(fontSize: 18, fontWeight: FontWeight.w600, color: base),
-      titleLarge: GoogleFonts.inter(fontSize: 18, fontWeight: FontWeight.w600, color: base),
-      titleMedium: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w500, color: base),
-      titleSmall: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w500, color: base),
-      bodyLarge: GoogleFonts.inter(fontSize: 16, fontWeight: FontWeight.w400, color: base),
-      bodyMedium: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w400, color: base),
-      bodySmall: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400, color: secondary),
-      labelLarge: GoogleFonts.inter(fontSize: 14, fontWeight: FontWeight.w600, color: base),
-      labelMedium: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w500, color: secondary),
-      labelSmall: GoogleFonts.inter(fontSize: 11, fontWeight: FontWeight.w500, color: secondary),
+      displayLarge: GoogleFonts.outfit(
+        fontSize: 32,
+        fontWeight: FontWeight.w700,
+        color: base,
+      ),
+      displayMedium: GoogleFonts.outfit(
+        fontSize: 28,
+        fontWeight: FontWeight.w700,
+        color: base,
+      ),
+      displaySmall: GoogleFonts.outfit(
+        fontSize: 24,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
+      headlineLarge: GoogleFonts.outfit(
+        fontSize: 22,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
+      headlineMedium: GoogleFonts.outfit(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
+      headlineSmall: GoogleFonts.outfit(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
+      titleLarge: GoogleFonts.inter(
+        fontSize: 18,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
+      titleMedium: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w500,
+        color: base,
+      ),
+      titleSmall: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w500,
+        color: base,
+      ),
+      bodyLarge: GoogleFonts.inter(
+        fontSize: 16,
+        fontWeight: FontWeight.w400,
+        color: base,
+      ),
+      bodyMedium: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w400,
+        color: base,
+      ),
+      bodySmall: GoogleFonts.inter(
+        fontSize: 12,
+        fontWeight: FontWeight.w400,
+        color: secondary,
+      ),
+      labelLarge: GoogleFonts.inter(
+        fontSize: 14,
+        fontWeight: FontWeight.w600,
+        color: base,
+      ),
+      labelMedium: GoogleFonts.inter(
+        fontSize: 12,
+        fontWeight: FontWeight.w500,
+        color: secondary,
+      ),
+      labelSmall: GoogleFonts.inter(
+        fontSize: 11,
+        fontWeight: FontWeight.w500,
+        color: secondary,
+      ),
     );
   }
 
   // ── AppBar ──
   static AppBarTheme _appBarTheme(ColorScheme cs) => AppBarTheme(
-        elevation: 0,
-        scrolledUnderElevation: 1,
-        centerTitle: false,
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
-        titleTextStyle: GoogleFonts.outfit(
-          fontSize: 20,
-          fontWeight: FontWeight.w600,
-          color: cs.onSurface,
-        ),
-      );
+    elevation: 0,
+    scrolledUnderElevation: 1,
+    centerTitle: false,
+    backgroundColor: cs.surface,
+    foregroundColor: cs.onSurface,
+    titleTextStyle: GoogleFonts.outfit(
+      fontSize: 20,
+      fontWeight: FontWeight.w600,
+      color: cs.onSurface,
+    ),
+  );
 
   // ── Card ──
   static CardThemeData _cardTheme() => CardThemeData(
-        elevation: 0,
-        color: AppColors.surfaceCard,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.border, width: 1),
-        ),
-        margin: EdgeInsets.zero,
-      );
+    elevation: 0,
+    color: AppColors.surfaceCard,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: AppColors.border, width: 1),
+    ),
+    margin: EdgeInsets.zero,
+  );
 
   static CardThemeData _cardThemeDark() => CardThemeData(
-        elevation: 0,
-        color: AppColors.surfaceCardDark,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: const BorderSide(color: AppColors.borderDark, width: 1),
-        ),
-        margin: EdgeInsets.zero,
-      );
+    elevation: 0,
+    color: AppColors.surfaceCardDark,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.circular(16),
+      side: const BorderSide(color: AppColors.borderDark, width: 1),
+    ),
+    margin: EdgeInsets.zero,
+  );
 
   // ── Elevated Button ──
-  static ElevatedButtonThemeData _elevatedButtonTheme(ColorScheme cs) =>
-      ElevatedButtonThemeData(
-        style: ElevatedButton.styleFrom(
-          backgroundColor: cs.primary,
-          foregroundColor: cs.onPrimary,
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
-        ),
-      );
+  static ElevatedButtonThemeData _elevatedButtonTheme(
+    ColorScheme cs,
+  ) => ElevatedButtonThemeData(
+    style: ElevatedButton.styleFrom(
+      backgroundColor: cs.primary,
+      foregroundColor: cs.onPrimary,
+      elevation: 0,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+    ),
+  );
 
   // ── Outlined Button ──
-  static OutlinedButtonThemeData _outlinedButtonTheme(ColorScheme cs) =>
-      OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: cs.primary,
-          side: BorderSide(color: cs.primary),
-          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
-        ),
-      );
+  static OutlinedButtonThemeData _outlinedButtonTheme(
+    ColorScheme cs,
+  ) => OutlinedButtonThemeData(
+    style: OutlinedButton.styleFrom(
+      foregroundColor: cs.primary,
+      side: BorderSide(color: cs.primary),
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      textStyle: GoogleFonts.inter(fontSize: 15, fontWeight: FontWeight.w600),
+    ),
+  );
 
   // ── Input Decoration ──
   static InputDecorationTheme _inputDecorationTheme(ColorScheme cs) =>
       InputDecorationTheme(
         filled: true,
         fillColor: cs.surface,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding: const EdgeInsets.symmetric(
+          horizontal: 16,
+          vertical: 14,
+        ),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: cs.outline.withValues(alpha: 0.3)),
@@ -191,13 +258,13 @@ class AppTheme {
 
   // ── Chip ──
   static ChipThemeData _chipTheme(ColorScheme cs) => ChipThemeData(
-        backgroundColor: cs.surface,
-        selectedColor: cs.primaryContainer,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        side: BorderSide(color: cs.outline.withValues(alpha: 0.2)),
-        labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      );
+    backgroundColor: cs.surface,
+    selectedColor: cs.primaryContainer,
+    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+    side: BorderSide(color: cs.outline.withValues(alpha: 0.2)),
+    labelStyle: GoogleFonts.inter(fontSize: 13, fontWeight: FontWeight.w500),
+    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+  );
 
   // ── Bottom Navigation ──
   static BottomNavigationBarThemeData _bottomNavTheme(ColorScheme cs) =>
@@ -206,8 +273,14 @@ class AppTheme {
         backgroundColor: cs.surface,
         selectedItemColor: cs.primary,
         unselectedItemColor: AppColors.textHint,
-        selectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w600),
-        unselectedLabelStyle: GoogleFonts.inter(fontSize: 12, fontWeight: FontWeight.w400),
+        selectedLabelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w600,
+        ),
+        unselectedLabelStyle: GoogleFonts.inter(
+          fontSize: 12,
+          fontWeight: FontWeight.w400,
+        ),
         elevation: 8,
       );
 }

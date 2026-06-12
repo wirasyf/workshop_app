@@ -1,92 +1,106 @@
 import 'dart:io';
-import 'package:dnd_markasban_app/features/pos/presentation/widgets/receipt_modal.dart';
+import 'dart:convert';
+import 'package:dnd_markasban_app/features/products/presentation/providers/product_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
 import '../../../../shared/widgets/metric_card.dart';
+import '../../../../shared/widgets/empty_state_widget.dart';
 import 'notification_screen.dart';
-
-import 'package:fl_chart/fl_chart.dart';
-import '../../../../core/utils/report_utils.dart';
-import '../../../../core/utils/date_picker_utils.dart';
-import '../../../../core/enums/report_period.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
+import '../../../../core/models/transaction_model.dart';
+import '../../../pos/presentation/widgets/receipt_modal.dart';
 
-final dashboardChartPeriodProvider = StateProvider<ReportPeriod>(
-  (ref) => ReportPeriod.daily,
-);
-final dashboardChartDateProvider = StateProvider<DateTime>(
-  (ref) => DateTime.now(),
-);
+import '../../../pos/data/transaction_repository.dart';
 
-final dashboardChartDataProvider = FutureProvider<List<Map<String, dynamic>>>((
+final recentDashboardTransactionsProvider =
+    StreamProvider<List<TransactionModel>>((ref) {
+      final authState = ref.watch(authStateProvider);
+      if (authState.isLoading) return const Stream.empty();
+      if (authState.value == null) return Stream.value([]);
+      final repo = ref.watch(transactionRepositoryProvider);
+      return repo.getRecentTransactions(20); // increased limit
+    });
+
+final todayTransactionsProvider = StreamProvider<List<TransactionModel>>((ref) {
+  final authState = ref.watch(authStateProvider);
+  if (authState.isLoading) return const Stream.empty();
+  if (authState.value == null) return Stream.value([]);
+  final repo = ref.watch(transactionRepositoryProvider);
+  return repo.getTodayTransactionsStream();
+});
+
+final ownerDashboardProvider = Provider<AsyncValue<Map<String, dynamic>>>((
   ref,
-) async {
-  final db = ref.watch(databaseProvider);
-  final period = ref.watch(dashboardChartPeriodProvider);
-  final selectedDate = ref.watch(dashboardChartDateProvider);
+) {
+  final txAsync = ref.watch(todayTransactionsProvider);
+  final lowStockAsync = ref.watch(lowStockProvider);
+  final authState = ref.watch(authStateProvider);
+  final user = authState.value;
 
-  DateTime start;
-  DateTime end;
-
-  switch (period) {
-    case ReportPeriod.daily:
-      start = DateFormatter.startOfDay(
-        selectedDate,
-      ).subtract(const Duration(days: 6));
-      end = DateFormatter.endOfDay(selectedDate);
-    case ReportPeriod.weekly:
-      start = DateTime(selectedDate.year, selectedDate.month, 1);
-      end = DateTime(selectedDate.year, selectedDate.month + 1, 0, 23, 59, 59);
-    case ReportPeriod.monthly:
-      start = DateTime(selectedDate.year, 1, 1);
-      end = DateTime(selectedDate.year, 12, 31, 23, 59, 59);
-    case ReportPeriod.yearly:
-      start = DateTime(selectedDate.year - 6, 1, 1);
-      end = DateTime(selectedDate.year, 12, 31, 23, 59, 59);
+  if (authState.isLoading || txAsync is AsyncLoading || lowStockAsync is AsyncLoading) {
+    return const AsyncValue.loading();
   }
 
-  return db.getSalesByDateRange(start, end);
-});
+  if (txAsync is AsyncError) {
+    final errStr = txAsync.error.toString().toLowerCase();
+    final isPermissionDenied = errStr.contains('permission-denied') || errStr.contains('permission denied');
+    if (!isPermissionDenied || !txAsync.hasValue) {
+      if (isPermissionDenied) return const AsyncValue.loading();
+      return AsyncValue.error(txAsync.error!, txAsync.stackTrace!);
+    }
+  }
+  
+  if (lowStockAsync is AsyncError) {
+    final errStr = lowStockAsync.error.toString().toLowerCase();
+    final isPermissionDenied = errStr.contains('permission-denied') || errStr.contains('permission denied');
+    if (!isPermissionDenied || !lowStockAsync.hasValue) {
+      if (isPermissionDenied) return const AsyncValue.loading();
+      return AsyncValue.error(lowStockAsync.error!, lowStockAsync.stackTrace!);
+    }
+  }
 
-/// Dashboard provider — omzet hari ini, jumlah transaksi, stok menipis
-final ownerDashboardProvider = FutureProvider<Map<String, dynamic>>((
-  ref,
-) async {
-  final db = ref.watch(databaseProvider);
-  final now = DateTime.now();
-  final start = DateFormatter.startOfDay(now);
-  final end = DateFormatter.endOfDay(now);
+  final transactions = txAsync.value ?? [];
+  final lowStockItems = lowStockAsync.value ?? [];
 
-  final todayTxns = await db.getTransactionsByDate(start, end);
-  final lowStock = await db.getLowStockProducts();
-  final summaryProfit = await db.getSummaryProfit(start, end);
-  final activeWOCount = await db.getActiveWorkOrderCount();
-  final pendingApprovals = await db.getPendingServiceApprovals();
+  double totalSales = 0.0;
+  double grossProfit = 0.0;
+  int txnCount = 0;
+  List<TransactionModel> recentTxns = [];
 
-  final totalSales = todayTxns.fold(0.0, (sum, t) => sum + t.total);
-  final txnCount = todayTxns.length;
+  for (var tx in transactions) {
+    if (tx.status == 'completed') {
+      if (user?.role == 'cashier') {
+        if (tx.userId == user?.id) {
+          totalSales += tx.total;
+          txnCount++;
+          recentTxns.add(tx);
+        }
+      } else {
+        totalSales += tx.total;
+        grossProfit += (tx.total - tx.totalCost);
+        txnCount++;
+        recentTxns.add(tx);
+      }
+    }
+  }
 
-  return {
+  return AsyncValue.data({
     'totalSales': totalSales,
     'txnCount': txnCount,
-    'lowStockCount': lowStock.length,
-    'lowStockItems': lowStock,
-    'summaryProfit': summaryProfit,
-    'activeWOCount': activeWOCount,
-    'recentTxns': todayTxns.take(5).toList(),
-    'pendingApprovalCount': pendingApprovals.length,
-  };
+    'lowStockCount': lowStockItems.length,
+    'lowStockItems': lowStockItems,
+    'summaryProfit': {'grossProfit': grossProfit},
+    'activeWOCount': 0, // Placeholder
+    'recentTxns': recentTxns.take(5).toList(),
+    'pendingApprovalCount': 0,
+  });
 });
 
-/// Dashboard Owner
 class OwnerDashboardScreen extends ConsumerWidget {
   const OwnerDashboardScreen({super.key});
 
@@ -118,631 +132,285 @@ class OwnerDashboardScreen extends ConsumerWidget {
       ),
       body: dashboard.when(
         loading: () => const Center(child: CircularProgressIndicator()),
-        error: (e, _) => Center(child: Text('$e')),
+        error: (e, _) {
+          final errorStr = e.toString().toLowerCase();
+          if (errorStr.contains('permission-denied') || errorStr.contains('permission denied')) {
+            return const Center(child: CircularProgressIndicator());
+          }
+          return Center(child: Text('$e'));
+        },
         data: (data) {
-          return RefreshIndicator(
-            onRefresh: () async => ref.invalidate(ownerDashboardProvider),
-            child: ListView(
-              padding: const EdgeInsets.all(16),
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Halo, ${user?.name ?? "User"} 👋',
-                          style: theme.textTheme.headlineSmall?.copyWith(
-                            fontWeight: FontWeight.bold,
-                          ),
+          return ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Halo, ${user?.name ?? "User"} 👋',
+                        style: theme.textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          DateFormatter.formatLong(DateTime.now()),
-                          style: theme.textTheme.bodySmall,
-                        ),
-                      ],
-                    ),
-                    GestureDetector(
-                      onTap: () => context.go('/settings'),
-                      child: CircleAvatar(
-                        backgroundColor: AppColors.primary.withValues(
-                          alpha: 0.1,
-                        ),
-                        backgroundImage:
-                            user?.avatarUrl != null &&
-                                user!.avatarUrl!.isNotEmpty
-                            ? (user.avatarUrl!.startsWith('http')
-                                  ? CachedNetworkImageProvider(user.avatarUrl!)
-                                  : FileImage(File(user.avatarUrl!)))
-                            : null,
-                        child:
-                            user?.avatarUrl == null || user!.avatarUrl!.isEmpty
-                            ? const Icon(
-                                Icons.person_rounded,
-                                color: AppColors.primary,
-                              )
-                            : null,
                       ),
+                      const SizedBox(height: 2),
+                      Text(
+                        DateFormatter.formatLong(DateTime.now()),
+                        style: theme.textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                  GestureDetector(
+                    onTap: () => context.go('/settings'),
+                    child: CircleAvatar(
+                      backgroundColor: AppColors.primary,
+                      backgroundImage:
+                          user?.avatarUrl != null && user!.avatarUrl!.isNotEmpty
+                          ? (user.avatarUrl!.startsWith('data:image')
+                              ? MemoryImage(base64Decode(user.avatarUrl!.split(',').last))
+                              : user.avatarUrl!.startsWith('http')
+                                  ? CachedNetworkImageProvider(user.avatarUrl!)
+                                  : FileImage(File(user.avatarUrl!))) as ImageProvider
+                          : null,
+                      child: user?.avatarUrl == null || user!.avatarUrl!.isEmpty
+                          ? Text(
+                              user?.name.substring(0, 1).toUpperCase() ?? 'U',
+                              style: const TextStyle(
+                                fontSize: 18,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            )
+                          : null,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              GridView.count(
+                crossAxisCount: 2,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                mainAxisSpacing: 12,
+                crossAxisSpacing: 12,
+                childAspectRatio: 1.4,
+                children: [
+                  MetricCard(
+                    label: 'Omzet Hari Ini',
+                    value: CurrencyFormatter.format(data['totalSales'] ?? 0),
+                    icon: Icons.monetization_on_rounded,
+                    iconColor: AppColors.success,
+                    onTap: () => user?.role == 'cashier' ? context.go('/history?from=dashboard') : context.go('/reports'),
+                  ),
+                  if (user?.role != 'cashier')
+                    MetricCard(
+                      label: 'Estimasi Laba Hari Ini',
+                      value: CurrencyFormatter.format(
+                        data['summaryProfit']?['grossProfit'] ?? 0,
+                      ),
+                      icon: Icons.trending_up_rounded,
+                      iconColor: AppColors.primary,
+                      onTap: () => context.go('/reports'),
+                    ),
+                  MetricCard(
+                    label: 'Transaksi Hari Ini',
+                    value: '${data['txnCount'] ?? 0}',
+                    icon: Icons.receipt_long_rounded,
+                    iconColor: AppColors.info,
+                    onTap: () => context.go('/history?from=dashboard'),
+                  ),
+                  if (user?.role != 'cashier')
+                    MetricCard(
+                      label: 'Stok Menipis',
+                      value: '${data['lowStockCount'] ?? 0}',
+                      icon: Icons.warning_rounded,
+                      iconColor: AppColors.warning,
+                      onTap: () => context.go('/products?from=dashboard'),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 24),
+
+              if (user?.role != 'cashier') ...[
+                Text(
+                  'Akses Cepat',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _QuickActionBtn(
+                      label: 'Riwayat',
+                      icon: Icons.history_rounded,
+                      color: AppColors.primary,
+                      onTap: () => context.go('/history?from=dashboard'),
+                    ),
+                    _QuickActionBtn(
+                      label: 'Jasa',
+                      icon: Icons.build_rounded,
+                      color: AppColors.secondary,
+                      onTap: () => context.go('/services?from=dashboard'),
+                    ),
+                    _QuickActionBtn(
+                      label: 'Barang',
+                      icon: Icons.inventory_2_rounded,
+                      color: AppColors.info,
+                      onTap: () => context.go('/products?from=dashboard'),
+                    ),
+                    if (user?.role == 'owner')
+                      _QuickActionBtn(
+                        label: 'Karyawan',
+                        icon: Icons.people_alt_rounded,
+                        color: AppColors.warning,
+                        onTap: () => context.go('/staff?from=dashboard'),
+                      ),
+                    _QuickActionBtn(
+                      label: 'Persetujuan',
+                      icon: Icons.assignment_turned_in_rounded,
+                      color: AppColors.success,
+                      onTap: () =>
+                          context.go('/service-approval?from=dashboard'),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
+              ],
 
-                // Quick Actions
-                if (user?.role != 'cashier') ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      _QuickActionBtn(
-                        label: 'Riwayat',
-                        icon: Icons.history_rounded,
-                        color: AppColors.primary,
-                        onTap: () => context.go('/history?from=dashboard'),
-                      ),
-                      _QuickActionBtn(
-                        label: 'Jasa',
-                        icon: Icons.build_rounded,
-                        color: AppColors.secondary,
-                        onTap: () => context.go('/services?from=dashboard'),
-                      ),
-                      _QuickActionBtn(
-                        label: 'Barang',
-                        icon: Icons.inventory_2_rounded,
-                        color: AppColors.info,
-                        onTap: () => context.go('/products?from=dashboard'),
-                      ),
-                      if (user?.role == 'owner')
-                        _QuickActionBtn(
-                          label: 'Karyawan',
-                          icon: Icons.people_alt_rounded,
-                          color: AppColors.warning,
-                          onTap: () => context.go('/staff?from=dashboard'),
-                        ),
-                      _QuickActionBtn(
-                        label: 'Persetujuan',
-                        icon: Icons.assignment_turned_in_rounded,
-                        color: AppColors.success,
-                        onTap: () =>
-                            context.go('/service-approval?from=dashboard'),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 24),
-                ],
-
-                // Metric cards
-                GridView.count(
-                  crossAxisCount: user?.role == 'cashier' ? 1 : 2,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: user?.role == 'cashier' ? 3.5 : 1.4,
-                  children: [
-                    if (user?.role != 'cashier')
-                      MetricCard(
-                        label: 'Omzet Hari Ini',
-                        value: CurrencyFormatter.format(
-                          data['totalSales'] ?? 0,
-                        ),
-                        icon: Icons.monetization_on_rounded,
-                        iconColor: AppColors.success,
-                        onTap: () => context.go('/reports'),
-                      ),
-                    if (user?.role != 'cashier')
-                      MetricCard(
-                        label: 'Estimasi Laba Hari Ini',
-                        value: CurrencyFormatter.format(
-                          data['summaryProfit']['grossProfit'] ?? 0,
-                        ),
-                        icon: Icons.trending_up_rounded,
-                        iconColor: AppColors.primary,
-                        onTap: () => context.go('/reports'),
-                      ),
-                    MetricCard(
-                      label: 'Transaksi Hari Ini',
-                      value: '${data['txnCount'] ?? 0}',
-                      icon: Icons.receipt_long_rounded,
-                      iconColor: AppColors.info,
-                      onTap: () => context.go('/history?from=dashboard'),
-                    ),
-                    if (user?.role != 'cashier')
-                      MetricCard(
-                        label: 'Stok Menipis',
-                        value: '${data['lowStockCount'] ?? 0}',
-                        icon: Icons.warning_rounded,
-                        iconColor: AppColors.warning,
-                        onTap: () => context.go('/products?from=dashboard'),
-                      ),
-                  ],
+              const SizedBox(height: 24),
+              Text(
+                'Riwayat Transaksi Harian',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 32),
+              ),
+              const SizedBox(height: 12),
+              Consumer(
+                builder: (context, ref, child) {
+                  final recentAsync = ref.watch(todayTransactionsProvider);
+                  final isPermissionError = recentAsync.hasError && (recentAsync.error.toString().toLowerCase().contains('permission-denied') || recentAsync.error.toString().toLowerCase().contains('permission denied'));
+                  
+                  if (!recentAsync.hasValue && (recentAsync.isLoading || isPermissionError)) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+                  
+                  if (recentAsync.hasError && !isPermissionError && !recentAsync.hasValue) {
+                    return Text('Error: ${recentAsync.error}');
+                  }
+                  
+                  final transactions = recentAsync.value ?? [];
+                      final todaysTransactions = user?.role == 'cashier'
+                          ? transactions.where((t) => t.userId == user?.id).toList()
+                          : transactions;
 
-                // Chart penjualan
-                if (user?.role != 'cashier') ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Analisis Penjualan',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      Consumer(
-                        builder: (context, ref, _) {
-                          final period = ref.watch(
-                            dashboardChartPeriodProvider,
-                          );
-                          final current = ref.watch(dashboardChartDateProvider);
-                          return Row(
-                            children: [
-                              TextButton.icon(
-                                onPressed: () async {
-                                  final picked = await DatePickerUtils.pickDate(
-                                    context,
-                                    period,
-                                    current,
-                                  );
-                                  if (picked != null) {
-                                    ref
-                                            .read(
-                                              dashboardChartDateProvider
-                                                  .notifier,
-                                            )
-                                            .state =
-                                        picked;
-                                  }
-                                },
-                                icon: const Icon(
-                                  Icons.edit_calendar_rounded,
-                                  size: 16,
-                                ),
-                                label: Text(
-                                  DatePickerUtils.formatSelectedDate(
-                                    period,
-                                    current,
-                                  ),
-                                  style: const TextStyle(fontSize: 12),
-                                ),
-                                style: TextButton.styleFrom(
-                                  visualDensity: VisualDensity.compact,
-                                ),
-                              ),
-                              DropdownButton<ReportPeriod>(
-                                value: period,
-                                underline: const SizedBox(),
-                                icon: const Icon(
-                                  Icons.arrow_drop_down_rounded,
-                                  color: AppColors.primary,
-                                ),
-                                style: const TextStyle(
-                                  color: AppColors.primary,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                items: ReportPeriod.values.map((p) {
-                                  final label = switch (p) {
-                                    ReportPeriod.daily => 'Harian',
-                                    ReportPeriod.weekly => 'Mingguan',
-                                    ReportPeriod.monthly => 'Bulanan',
-                                    ReportPeriod.yearly => 'Tahunan',
-                                  };
-                                  return DropdownMenuItem(
-                                    value: p,
-                                    child: Text(label),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null)
-                                    ref
-                                            .read(
-                                              dashboardChartPeriodProvider
-                                                  .notifier,
-                                            )
-                                            .state =
-                                        val;
-                                },
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Consumer(
-                    builder: (context, ref, _) {
-                      final chartData = ref.watch(dashboardChartDataProvider);
-                      final chartPeriod = ref.watch(
-                        dashboardChartPeriodProvider,
-                      );
-                      return chartData.when(
-                        loading: () => const SizedBox(
-                          height: 220,
-                          child: Center(child: CircularProgressIndicator()),
-                        ),
-                        error: (e, _) => SizedBox(
-                          height: 220,
-                          child: Center(child: Text('Gagal memuat chart')),
-                        ),
-                        data: (dailySales) {
-                          return Container(
-                            height: 220,
-                            padding: const EdgeInsets.fromLTRB(12, 24, 12, 12),
-                            decoration: BoxDecoration(
-                              color: theme.cardTheme.color,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: AppColors.border.withValues(alpha: 0.6),
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha: 0.02),
-                                  blurRadius: 10,
-                                  offset: const Offset(0, 4),
-                                ),
-                              ],
-                            ),
-                            child: Builder(
-                              builder: (context) {
-                                final selectedDate = ref.read(
-                                  dashboardChartDateProvider,
-                                );
-                                final displaySales =
-                                    ReportUtils.getChartDisplayData(
-                                      dailySales,
-                                      chartPeriod,
-                                      selectedDate,
-                                    );
-                                final maxY = ReportUtils.getChartMaxY(
-                                  displaySales,
-                                );
+                      if (todaysTransactions.isEmpty) {
+                        return const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 24),
+                          child: EmptyStateWidget(
+                            icon: Icons.history_rounded,
+                            title: 'Belum ada transaksi hari ini',
+                          ),
+                        );
+                      }
 
-                                return BarChart(
-                                  BarChartData(
-                                    maxY: maxY,
-                                    barTouchData: BarTouchData(
-                                      touchTooltipData: BarTouchTooltipData(
-                                        getTooltipColor: (_) =>
-                                            const Color(0xFF334155),
-                                        tooltipBorder: BorderSide.none,
-                                        getTooltipItem:
-                                            (group, groupIndex, rod, rodIndex) {
-                                              return BarTooltipItem(
-                                                CurrencyFormatter.format(
-                                                  rod.toY * 1000,
-                                                ),
-                                                const TextStyle(
-                                                  color: Colors.white,
-                                                  fontWeight: FontWeight.bold,
-                                                  fontSize: 12,
-                                                ),
-                                              );
-                                            },
+                      return ListView.separated(
+                        shrinkWrap: true,
+                        physics: const NeverScrollableScrollPhysics(),
+                        itemCount: todaysTransactions.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 10),
+                        itemBuilder: (context, index) {
+                          final txn = todaysTransactions[index];
+                          return InkWell(
+                            onTap: () => ReceiptModal.show(context, ref, txn),
+                            borderRadius: BorderRadius.circular(14),
+                            child: Container(
+                              padding: const EdgeInsets.all(14),
+                              decoration: BoxDecoration(
+                                color: theme.cardTheme.color,
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(color: AppColors.border),
+                              ),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    padding: const EdgeInsets.all(10),
+                                    decoration: BoxDecoration(
+                                      color: AppColors.success.withValues(
+                                        alpha: 0.1,
                                       ),
+                                      borderRadius: BorderRadius.circular(10),
                                     ),
-                                    barGroups: displaySales.asMap().entries.map(
-                                      (e) {
-                                        return BarChartGroupData(
-                                          x: e.key,
-                                          barRods: [
-                                            ReportUtils.buildBarRod(
-                                              value:
-                                                  (e.value['total'] as num?)
-                                                      ?.toDouble() ??
-                                                  0,
-                                              maxY: maxY,
-                                              width: 16,
-                                              radius: 6,
-                                              backgroundBarColor: AppColors
-                                                  .border
-                                                  .withValues(alpha: 0.3),
-                                            ),
-                                          ],
-                                        );
-                                      },
-                                    ).toList(),
-                                    borderData: FlBorderData(show: false),
-                                    gridData: FlGridData(
-                                      show: true,
-                                      drawVerticalLine: false,
-                                      getDrawingHorizontalLine: (value) =>
-                                          FlLine(
-                                            color: AppColors.border.withValues(
-                                              alpha: 0.5,
-                                            ),
-                                            strokeWidth: 1,
-                                            dashArray: [4, 4],
-                                          ),
+                                    child: const Icon(
+                                      Icons.receipt_rounded,
+                                      color: AppColors.success,
+                                      size: 22,
                                     ),
-                                    titlesData: FlTitlesData(
-                                      show: true,
-                                      leftTitles: AxisTitles(
-                                        sideTitles: SideTitles(
-                                          showTitles: true,
-                                          reservedSize: 44,
-                                          getTitlesWidget: (value, meta) {
-                                            if (value == meta.min ||
-                                                value == meta.max)
-                                              return const SizedBox();
-                                            return SideTitleWidget(
-                                              meta: meta,
-                                              space: 4,
-                                              child: Text(
-                                                CurrencyFormatter.formatCompact(
-                                                  value * 1000,
+                                  ),
+                                  const SizedBox(width: 12),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(
+                                              txn.invoiceNo,
+                                              style: theme.textTheme.titleSmall,
+                                            ),
+                                            if (txn.status == 'returned') ...[
+                                              const SizedBox(width: 8),
+                                              Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.error.withValues(alpha: 0.1),
+                                                  borderRadius: BorderRadius.circular(4),
                                                 ),
-                                                style: TextStyle(
-                                                  fontSize: 9,
-                                                  color:
-                                                      theme
-                                                          .textTheme
-                                                          .bodySmall
-                                                          ?.color ??
-                                                      AppColors.textSecondary,
-                                                  fontWeight: FontWeight.w500,
+                                                child: const Text(
+                                                  'DIRETUR',
+                                                  style: TextStyle(fontSize: 10, color: AppColors.error, fontWeight: FontWeight.bold),
                                                 ),
                                               ),
-                                            );
-                                          },
+                                            ],
+                                          ],
                                         ),
-                                      ),
-                                      topTitles: const AxisTitles(
-                                        sideTitles: SideTitles(
-                                          showTitles: false,
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          DateFormatter.formatWithTime(
+                                            txn.createdAt,
+                                          ),
+                                          style: theme.textTheme.labelSmall,
                                         ),
-                                      ),
-                                      rightTitles: const AxisTitles(
-                                        sideTitles: SideTitles(
-                                          showTitles: false,
-                                        ),
-                                      ),
-                                      bottomTitles: AxisTitles(
-                                        sideTitles: SideTitles(
-                                          showTitles: true,
-                                          reservedSize: 36,
-                                          interval: 1,
-                                          getTitlesWidget: (value, meta) {
-                                            final index = value.toInt();
-                                            if (index >= 0 &&
-                                                index < displaySales.length) {
-                                              return SideTitleWidget(
-                                                meta: meta,
-                                                space: 6,
-                                                angle:
-                                                    chartPeriod ==
-                                                        ReportPeriod.weekly
-                                                    ? 0
-                                                    : -0.5,
-                                                child: Text(
-                                                  displaySales[index]['label']
-                                                      as String,
-                                                  style: TextStyle(
-                                                    fontSize: 9,
-                                                    color:
-                                                        theme
-                                                            .textTheme
-                                                            .bodySmall
-                                                            ?.color ??
-                                                        AppColors.textPrimary,
-                                                    fontWeight: FontWeight.w600,
-                                                  ),
-                                                ),
-                                              );
-                                            }
-                                            return SideTitleWidget(
-                                              meta: meta,
-                                              child: const SizedBox(),
-                                            );
-                                          },
-                                        ),
-                                      ),
+                                      ],
                                     ),
                                   ),
-                                );
-                              },
+                                  Column(
+                                    crossAxisAlignment: CrossAxisAlignment.end,
+                                    children: [
+                                      Text(
+                                        CurrencyFormatter.format(txn.total),
+                                        style: theme.textTheme.titleSmall
+                                            ?.copyWith(
+                                              color: AppColors.primary,
+                                            ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
                             ),
                           );
                         },
                       );
-                    },
-                  ),
-                  const SizedBox(height: 32),
-                ],
-                // Recent Activity
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Aktivitas Terbaru',
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    TextButton(
-                      onPressed: () => context.go('/history?from=dashboard'),
-                      child: const Text(
-                        'Lihat Semua',
-                        style: TextStyle(fontSize: 12),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  decoration: BoxDecoration(
-                    color: theme.cardTheme.color,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.border.withValues(alpha: 0.6),
-                    ),
-                  ),
-                  child: Column(
-                    children: (data['recentTxns'] as List<Transaction>)
-                        .asMap()
-                        .entries
-                        .map((entry) {
-                          final txn = entry.value;
-                          final isLast =
-                              entry.key ==
-                              (data['recentTxns'] as List).length - 1;
-                          return Column(
-                            children: [
-                              ListTile(
-                                leading: Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  child: const Icon(
-                                    Icons.receipt_rounded,
-                                    size: 18,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                title: Text(
-                                  txn.invoiceNo,
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  DateFormatter.formatShort(txn.createdAt),
-                                ),
-                                trailing: Text(
-                                  CurrencyFormatter.format(txn.total),
-                                  style: theme.textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.success,
-                                  ),
-                                ),
-                                onTap: () =>
-                                    ReceiptModal.show(context, ref, txn),
-                                dense: true,
-                              ),
-                              if (!isLast)
-                                const Divider(
-                                  height: 1,
-                                  indent: 60,
-                                  endIndent: 16,
-                                ),
-                            ],
-                          );
-                        })
-                        .toList(),
-                  ),
-                ),
-                const SizedBox(height: 32),
-
-                // Stok kritis
-                if (user?.role != 'cashier' &&
-                    (data['lowStockItems'] as List).isNotEmpty) ...[
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        'Stok Kritis',
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      TextButton(
-                        onPressed: () => context.go('/products?from=dashboard'),
-                        child: const Text(
-                          'Kelola',
-                          style: TextStyle(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    decoration: BoxDecoration(
-                      color: theme.cardTheme.color,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.border.withValues(alpha: 0.6),
-                      ),
-                    ),
-                    child: Column(
-                      children:
-                          ((data['lowStockItems'] as List<Product>)
-                                  .take(5)
-                                  .toList()
-                                  .asMap()
-                                  .entries
-                                  .map((entry) {
-                                    final p = entry.value;
-                                    final isLast =
-                                        entry.key ==
-                                        ((data['lowStockItems'] as List)
-                                                .take(5)
-                                                .length -
-                                            1);
-                                    return Column(
-                                      children: [
-                                        ListTile(
-                                          leading: Container(
-                                            padding: const EdgeInsets.all(8),
-                                            decoration: BoxDecoration(
-                                              color: p.stockQty == 0
-                                                  ? AppColors.errorLight
-                                                  : AppColors.warningLight,
-                                              borderRadius:
-                                                  BorderRadius.circular(10),
-                                            ),
-                                            child: Icon(
-                                              p.stockQty == 0
-                                                  ? Icons.error_rounded
-                                                  : Icons.warning_rounded,
-                                              size: 18,
-                                              color: p.stockQty == 0
-                                                  ? AppColors.error
-                                                  : AppColors.warning,
-                                            ),
-                                          ),
-                                          title: Text(
-                                            p.name,
-                                            style: theme.textTheme.titleSmall
-                                                ?.copyWith(
-                                                  fontWeight: FontWeight.w600,
-                                                ),
-                                          ),
-                                          subtitle: Text(
-                                            'Sisa ${p.stockQty} ${p.unit}',
-                                          ),
-                                          trailing: const Icon(
-                                            Icons.chevron_right_rounded,
-                                            size: 18,
-                                            color: AppColors.textHint,
-                                          ),
-                                          onTap: () => context.go(
-                                            '/products/${p.id}?from=dashboard',
-                                          ),
-                                          dense: true,
-                                        ),
-                                        if (!isLast)
-                                          const Divider(
-                                            height: 1,
-                                            indent: 60,
-                                            endIndent: 16,
-                                          ),
-                                      ],
-                                    );
-                                  }))
-                              .toList(),
-                    ),
-                  ),
-                  const SizedBox(height: 24),
-                ],
-              ],
-            ),
+                },
+              ),
+            ],
           );
         },
       ),

@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:dnd_markasban_app/core/services/sync_service.dart';
 import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
@@ -10,7 +8,6 @@ import '../../../../shared/widgets/empty_state_widget.dart';
 import '../providers/cart_provider.dart';
 import '../widgets/receipt_modal.dart';
 
-/// Riwayat transaksi
 class TransactionHistoryScreen extends ConsumerStatefulWidget {
   final String? transactionId;
   const TransactionHistoryScreen({super.key, this.transactionId});
@@ -23,7 +20,6 @@ class TransactionHistoryScreen extends ConsumerStatefulWidget {
 class _TransactionHistoryScreenState
     extends ConsumerState<TransactionHistoryScreen> {
   bool _hasCheckedInitialId = false;
-  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
@@ -33,36 +29,28 @@ class _TransactionHistoryScreenState
         _checkInitialId();
       });
     }
-
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >=
-          _scrollController.position.maxScrollExtent - 200) {
-        ref.read(transactionHistoryProvider.notifier).loadMore();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
   }
 
   Future<void> _checkInitialId() async {
     if (_hasCheckedInitialId || widget.transactionId == null) return;
     _hasCheckedInitialId = true;
 
-    final db = ref.read(databaseProvider);
-    final txn = await db.getTransactionById(widget.transactionId!);
-    if (txn != null && mounted) {
-      ReceiptModal.show(context, ref, txn);
+    // Use transactionHistoryProvider instead of db
+    final txns = ref.read(transactionHistoryProvider).value ?? [];
+    try {
+      final txn = txns.firstWhere((t) => t.id == widget.transactionId);
+      if (mounted) {
+        ReceiptModal.show(context, ref, txn);
+      }
+    } catch (_) {
+      // Ignore if not found
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final dateRange = ref.watch(historyDateRangeProvider);
-    final txns = ref.watch(transactionHistoryProvider);
+    final txnsAsync = ref.watch(transactionHistoryProvider);
     final theme = Theme.of(context);
     final from = GoRouterState.of(context).uri.queryParameters['from'];
     final target = from == 'dashboard' ? '/dashboard' : '/settings';
@@ -85,7 +73,7 @@ class _TransactionHistoryScreenState
           children: [
             _buildFilterPanel(context, ref, dateRange, theme),
             Expanded(
-              child: txns.when(
+              child: txnsAsync.when(
                 loading: () => const Center(child: CircularProgressIndicator()),
                 error: (e, _) => Center(child: Text('Error: $e')),
                 data: (items) {
@@ -96,21 +84,10 @@ class _TransactionHistoryScreenState
                     );
                   }
                   return ListView.separated(
-                    controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount:
-                        items.length +
-                        (ref.read(transactionHistoryProvider.notifier).hasMore
-                            ? 1
-                            : 0),
+                    itemCount: items.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {
-                      if (i == items.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
                       final txn = items[i];
                       return InkWell(
                         onTap: () => ReceiptModal.show(context, ref, txn),
@@ -143,9 +120,27 @@ class _TransactionHistoryScreenState
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      txn.invoiceNo,
-                                      style: theme.textTheme.titleSmall,
+                                    Row(
+                                      children: [
+                                        Text(
+                                          txn.invoiceNo,
+                                          style: theme.textTheme.titleSmall,
+                                        ),
+                                        if (txn.status == 'returned') ...[
+                                          const SizedBox(width: 8),
+                                          Container(
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.error.withValues(alpha: 0.1),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: const Text(
+                                              'DIRETUR',
+                                              style: TextStyle(fontSize: 10, color: AppColors.error, fontWeight: FontWeight.bold),
+                                            ),
+                                          ),
+                                        ],
+                                      ],
                                     ),
                                     const SizedBox(height: 2),
                                     Text(
@@ -164,25 +159,6 @@ class _TransactionHistoryScreenState
                                     CurrencyFormatter.format(txn.total),
                                     style: theme.textTheme.titleSmall?.copyWith(
                                       color: AppColors.primary,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 2),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 8,
-                                      vertical: 2,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: AppColors.successLight,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Text(
-                                      txn.paymentMethod.toUpperCase(),
-                                      style: const TextStyle(
-                                        fontSize: 10,
-                                        fontWeight: FontWeight.w600,
-                                        color: AppColors.success,
-                                      ),
                                     ),
                                   ),
                                 ],
@@ -209,8 +185,6 @@ class _TransactionHistoryScreenState
     ThemeData theme,
   ) {
     final now = DateTime.now();
-
-    // Check which quick chip is active
     final isToday =
         dateRange.start.day == now.day &&
         dateRange.start.month == now.month &&
@@ -235,14 +209,15 @@ class _TransactionHistoryScreenState
         dateRange.end.month == now.month;
 
     String activeLabel = 'Rentang Kustom';
-    if (isToday)
+    if (isToday) {
       activeLabel = 'Hari Ini';
-    else if (isYesterday)
+    } else if (isYesterday) {
       activeLabel = 'Kemarin';
-    else if (isThisWeek)
+    } else if (isThisWeek) {
       activeLabel = 'Minggu Ini';
-    else if (isThisMonth)
+    } else if (isThisMonth) {
       activeLabel = 'Bulan Ini';
+    }
 
     void updateRange(DateTime start, DateTime end) {
       ref.read(historyDateRangeProvider.notifier).state = DateTimeRange(

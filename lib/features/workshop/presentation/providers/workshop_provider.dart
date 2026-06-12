@@ -1,66 +1,79 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
+import '../../../../core/models/vehicle_model.dart';
+import '../../../../core/models/work_order_model.dart';
+import '../../data/workshop_repository.dart';
 
-/// Provider daftar semua kendaraan
-final vehiclesProvider = FutureProvider<List<Vehicle>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getAllVehicles();
+final vehiclesProvider = StreamProvider<List<VehicleModel>>((ref) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getVehicles();
 });
 
-/// Provider semua work orders
-final workOrdersProvider = FutureProvider<List<WorkOrder>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getAllWorkOrders();
+final workOrdersProvider = StreamProvider<List<WorkOrderModel>>((ref) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getWorkOrders();
 });
 
-/// Provider work orders aktif (waiting + in_progress)
-final activeWorkOrdersProvider = FutureProvider<List<WorkOrder>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getActiveWorkOrders();
+final activeWorkOrdersProvider = StreamProvider<List<WorkOrderModel>>((ref) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getActiveWorkOrders();
 });
 
-/// Provider work orders hari ini
-final todayWorkOrdersProvider = FutureProvider<List<WorkOrder>>((ref) {
-  final db = ref.watch(databaseProvider);
-  return db.getTodayWorkOrders();
+final todayWorkOrdersProvider = StreamProvider<List<WorkOrderModel>>((ref) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getWorkOrders().map((orders) {
+    final now = DateTime.now();
+    return orders.where((w) => 
+      w.createdAt.year == now.year && 
+      w.createdAt.month == now.month && 
+      w.createdAt.day == now.day
+    ).toList();
+  });
 });
 
-/// Provider work orders berdasarkan status
-final workOrdersByStatusProvider = FutureProvider.family<List<WorkOrder>, String?>((ref, status) {
-  final db = ref.watch(databaseProvider);
-  if (status == null) return db.getAllWorkOrders();
-  return db.getWorkOrdersByStatus(status);
+final workOrdersByStatusProvider = StreamProvider.family<List<WorkOrderModel>, String?>((ref, status) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getWorkOrders().map((orders) {
+    if (status == null) return orders;
+    return orders.where((w) => w.status == status).toList();
+  });
 });
 
-/// Provider work order detail by ID
-final workOrderDetailProvider = FutureProvider.family<WorkOrder?, String>((ref, id) {
-  final db = ref.watch(databaseProvider);
-  return db.getWorkOrderById(id);
+final workOrderDetailProvider = StreamProvider.family<WorkOrderModel?, String>((ref, id) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getWorkOrderById(id);
 });
 
-/// Provider vehicle by ID
-final vehicleDetailProvider = FutureProvider.family<Vehicle?, String>((ref, id) {
-  final db = ref.watch(databaseProvider);
-  return db.getVehicleById(id);
+final vehicleDetailProvider = StreamProvider.family<VehicleModel?, String>((ref, id) {
+  final repo = ref.watch(workshopRepositoryProvider);
+  return repo.getVehicles().map((vehicles) {
+    try {
+      return vehicles.firstWhere((v) => v.id == id);
+    } catch (_) {
+      return null;
+    }
+  });
 });
 
-/// Provider search kendaraan
 final vehicleSearchProvider = StateProvider<String>((ref) => '');
 
-/// Provider filtered vehicles
-final filteredVehiclesProvider = FutureProvider<List<Vehicle>>((ref) {
-  final db = ref.watch(databaseProvider);
+final filteredVehiclesProvider = StreamProvider<List<VehicleModel>>((ref) {
   final search = ref.watch(vehicleSearchProvider);
-  if (search.isEmpty) return db.getAllVehicles();
-  return db.searchVehicles(search);
+  final repo = ref.watch(workshopRepositoryProvider);
+  
+  return repo.getVehicles().map((vehicles) {
+    if (search.isEmpty) return vehicles;
+    final query = search.toLowerCase();
+    return vehicles.where((v) => 
+      v.customerName.toLowerCase().contains(query) ||
+      v.plateNumber.toLowerCase().contains(query) ||
+      (v.phoneNumber?.contains(query) ?? false) ||
+      (v.vehicleBrand?.toLowerCase().contains(query) ?? false)
+    ).toList();
+  });
 });
 
-/// Provider filter status work order
 final workOrderStatusFilterProvider = StateProvider<String?>((ref) => null);
 
-/// Status work order constants
 class WorkOrderStatus {
   static const String waiting = 'waiting';
   static const String inProgress = 'in_progress';
@@ -79,7 +92,7 @@ class WorkOrderStatus {
   static String getLabel(String value) {
     return all.firstWhere(
       (s) => s['value'] == value,
-      orElse: () => {'label': value},
+      orElse: () => {'value': value, 'label': value},
     )['label']!;
   }
 }

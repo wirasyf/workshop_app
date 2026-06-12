@@ -1,19 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_riverpod/legacy.dart';
-import '../../../../core/database/app_database.dart';
-import '../../../../core/services/sync_service.dart';
+import '../../../../core/models/transaction_model.dart';
+import '../../data/transaction_repository.dart';
 import '../../../auth/presentation/providers/auth_provider.dart';
 
-/// Tipe item di keranjang
 enum CartItemType { product, service }
 
-/// Item dalam keranjang — mendukung produk DAN jasa
 class CartItem {
-  final String productId; // ID produk ATAU ID jasa
+  final String productId;
   final String name;
   final double unitPrice;
   final String unit;
+  final double costPrice;
   final CartItemType type;
   int qty;
   double discount;
@@ -22,7 +20,7 @@ class CartItem {
 
   CartItem({
     required this.productId, required this.name, required this.unitPrice,
-    required this.unit, this.type = CartItemType.product, this.qty = 1, this.discount = 0,
+    required this.unit, this.costPrice = 0.0, this.type = CartItemType.product, this.qty = 1, this.discount = 0,
     this.isApproved = true, this.workerName,
   });
 
@@ -30,13 +28,12 @@ class CartItem {
 
   CartItem copyWith({int? qty, double? discount, bool? isApproved, String? workerName}) =>
       CartItem(productId: productId, name: name, unitPrice: unitPrice,
-          unit: unit, type: type, qty: qty ?? this.qty, discount: discount ?? this.discount,
+          unit: unit, costPrice: costPrice, type: type, qty: qty ?? this.qty, discount: discount ?? this.discount,
           isApproved: isApproved ?? this.isApproved, workerName: workerName ?? this.workerName);
 }
 
-/// Detail item transaksi (untuk riwayat)
 class TransactionDetail {
-  final TransactionItem item;
+  final TransactionItemModel item;
   final String productName;
   final String itemType;
   final String? workerName;
@@ -44,10 +41,8 @@ class TransactionDetail {
   TransactionDetail({required this.item, required this.productName, this.itemType = 'product', this.workerName});
 }
 
-/// Provider pekerja yang dipilih untuk jasa di keranjang
 final cartSelectedWorkerProvider = StateProvider<String?>((ref) => null);
 
-/// Provider keranjang belanja
 final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>((ref) {
   final notifier = CartNotifier();
   ref.listen(authStateProvider, (previous, next) {
@@ -62,41 +57,34 @@ final cartProvider = StateNotifierProvider<CartNotifier, List<CartItem>>((ref) {
   return notifier;
 });
 
-/// Provider subtotal
 final cartSubtotalProvider = Provider<double>((ref) {
   final cart = ref.watch(cartProvider);
   return cart.fold(0.0, (sum, item) => sum + item.subtotal);
 });
 
-/// Provider subtotal jasa
 final cartServiceSubtotalProvider = Provider<double>((ref) {
   final cart = ref.watch(cartProvider);
   return cart.where((i) => i.type == CartItemType.service).fold(0.0, (sum, item) => sum + item.subtotal);
 });
 
-/// Provider subtotal sparepart
 final cartPartsSubtotalProvider = Provider<double>((ref) {
   final cart = ref.watch(cartProvider);
   return cart.where((i) => i.type == CartItemType.product).fold(0.0, (sum, item) => sum + item.subtotal);
 });
 
-/// Provider diskon keseluruhan
 final cartDiscountProvider = StateProvider<double>((ref) => 0);
 
-/// Provider total (subtotal - diskon, tanpa pajak)
 final cartTotalProvider = Provider<double>((ref) {
   final subtotal = ref.watch(cartSubtotalProvider);
   final discount = ref.watch(cartDiscountProvider);
-  return subtotal - discount;
+  return (subtotal - discount).clamp(0.0, double.infinity);
 });
 
-/// Provider metode bayar
 final paymentMethodProvider = StateProvider<String>((ref) => 'cash');
+final cartWorkOrderIdProvider = StateProvider<String?>((ref) => null);
 
-/// Provider jumlah bayar
 final paidAmountProvider = StateProvider<double>((ref) => 0);
 
-/// Provider kembalian
 final changeAmountProvider = Provider<double>((ref) {
   final total = ref.watch(cartTotalProvider);
   final paid = ref.watch(paidAmountProvider);
@@ -111,78 +99,31 @@ final historyDateRangeProvider = StateProvider<DateTimeRange>((ref) {
   );
 });
 
-class TransactionHistoryNotifier extends AsyncNotifier<List<Transaction>> {
-  int _offset = 0;
-  final int _limit = 20;
-  bool _hasMore = true;
-
-  bool get hasMore => _hasMore;
-
-  @override
-  Future<List<Transaction>> build() async {
-    _offset = 0;
-    _hasMore = true;
-    
-    // Listen to date range changes
-    ref.watch(historyDateRangeProvider);
-    
-    return _fetchTransactions();
-  }
-
-  Future<List<Transaction>> _fetchTransactions() async {
-    final db = ref.read(databaseProvider);
-    final dateRange = ref.read(historyDateRangeProvider);
-    final user = ref.read(authStateProvider).value;
-    
-    final transactions = await db.getTransactionsByDate(
-      dateRange.start, 
-      dateRange.end,
-      userId: user?.role == 'cashier' ? user?.id : null,
-      limit: _limit,
-      offset: _offset,
-    );
-
-    _hasMore = transactions.length == _limit;
-    return transactions;
-  }
-
-  Future<void> loadMore() async {
-    if (!_hasMore || state.isLoading) return;
-
-    final currentTransactions = state.value ?? [];
-    _offset += _limit;
-
-    try {
-      final newTransactions = await _fetchTransactions();
-      state = AsyncValue.data([...currentTransactions, ...newTransactions]);
-    } catch (e, st) {
-      _offset -= _limit;
-      state = AsyncValue.error(e, st);
-    }
-  }
-}
-
-final transactionHistoryProvider = AsyncNotifierProvider<TransactionHistoryNotifier, List<Transaction>>(() {
-  return TransactionHistoryNotifier();
+final transactionHistoryProvider = StreamProvider<List<TransactionModel>>((ref) {
+  final repo = ref.watch(transactionRepositoryProvider);
+  final range = ref.watch(historyDateRangeProvider);
+  final user = ref.watch(authStateProvider).value;
+  
+  // Temporary: get recent and filter locally, in real app use firestore compound queries
+  return repo.getRecentTransactions(100).map((transactions) {
+    return transactions.where((t) {
+      bool inRange = !t.createdAt.isBefore(range.start) && !t.createdAt.isAfter(range.end);
+      bool isUser = user?.role == 'cashier' ? t.userId == user?.id : true;
+      return inRange && isUser;
+    }).toList();
+  });
 });
 
-
-/// Provider detail item transaksi
 final transactionItemsProvider = FutureProvider.family<List<TransactionDetail>, String>((ref, txnId) async {
-  final db = ref.watch(databaseProvider);
-  final results = await db.getTransactionItemsWithProduct(txnId);
-  return results.map((r) {
-    final ti = r.readTable(db.transactionItems);
-    final itemType = ti.itemType;
-    String name;
-    if (itemType == 'service') {
-      final service = r.readTableOrNull(db.services);
-      name = service?.name ?? 'Jasa';
-    } else {
-      final product = r.readTableOrNull(db.products);
-      name = product?.name ?? 'Produk';
-    }
-    return TransactionDetail(item: ti, productName: name, itemType: itemType, workerName: ti.workerName);
+  final repo = ref.watch(transactionRepositoryProvider);
+  final items = await repo.getTransactionItems(txnId);
+  return items.map((i) {
+    return TransactionDetail(
+      item: i,
+      productName: i.productName ?? (i.itemType == 'service' ? 'Jasa' : 'Produk'),
+      itemType: i.itemType,
+      workerName: i.workerName,
+    );
   }).toList();
 });
 

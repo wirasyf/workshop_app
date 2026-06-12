@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,39 +8,18 @@ import '../../../../core/constants/app_colors.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../shared/widgets/empty_state_widget.dart';
 import '../../../../shared/widgets/loading_widget.dart';
+import '../../../../shared/utils/app_toast.dart';
+import '../../../../core/services/excel_export_service.dart';
+import '../../../auth/presentation/providers/auth_provider.dart';
 import '../providers/product_provider.dart';
 import '../widgets/stock_badge.dart';
 
-/// Daftar produk dengan search & filter
-class ProductListScreen extends ConsumerStatefulWidget {
+class ProductListScreen extends ConsumerWidget {
   const ProductListScreen({super.key});
 
   @override
-  ConsumerState<ProductListScreen> createState() => _ProductListScreenState();
-}
-
-class _ProductListScreenState extends ConsumerState<ProductListScreen> {
-  final ScrollController _scrollController = ScrollController();
-
-  @override
-  void initState() {
-    super.initState();
-    _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200) {
-        ref.read(productsProvider.notifier).loadMore();
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _scrollController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final products = ref.watch(productsProvider);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final productsAsync = ref.watch(productsProvider);
     final filter = ref.watch(stockFilterProvider);
     final from = GoRouterState.of(context).uri.queryParameters['from'];
 
@@ -51,6 +31,27 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
           onPressed: () => context.go(from == 'dashboard' ? '/dashboard' : '/settings'),
         ),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded),
+            onPressed: () async {
+              final items = productsAsync.valueOrNull;
+              if (items == null || items.isEmpty) {
+                AppToast.show(context, 'Tidak ada data untuk diekspor', type: ToastType.warning);
+                return;
+              }
+              final user = ref.read(authStateProvider).value;
+              final isAdmin = user?.role == 'owner';
+              try {
+                AppToast.show(context, 'Menyiapkan file Excel...', type: ToastType.info);
+                await ExcelExportService.exportProducts(products: items, isAdmin: isAdmin);
+              } catch (e) {
+                if (context.mounted) {
+                  AppToast.show(context, 'Gagal mengekspor: $e', type: ToastType.error);
+                }
+              }
+            },
+            tooltip: 'Export ke Excel',
+          ),
           IconButton(
             icon: const Icon(Icons.category_rounded),
             onPressed: () => context.go('/products/categories${from == 'dashboard' ? '?from=dashboard' : ''}'),
@@ -110,7 +111,7 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
 
           // Product list
           Expanded(
-            child: products.when(
+            child: productsAsync.when(
               loading: () => const Padding(
                 padding: EdgeInsets.all(16),
                 child: LoadingWidget(),
@@ -127,17 +128,10 @@ class _ProductListScreenState extends ConsumerState<ProductListScreen> {
                 return RefreshIndicator(
                   onRefresh: () async => ref.invalidate(productsProvider),
                   child: ListView.separated(
-                    controller: _scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: items.length + (ref.read(productsProvider.notifier).hasMore ? 1 : 0),
-                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 10),
                     itemBuilder: (_, i) {
-                      if (i == items.length) {
-                        return const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 16),
-                          child: Center(child: CircularProgressIndicator()),
-                        );
-                      }
                       return _ProductTile(product: items[i]);
                     },
                   ),
@@ -185,18 +179,24 @@ class _ProductTile extends StatelessWidget {
               child: product.imageUrl != null
                   ? ClipRRect(
                       borderRadius: BorderRadius.circular(10),
-                      child: product.imageUrl!.startsWith('http')
-                        ? CachedNetworkImage(
-                            imageUrl: product.imageUrl!,
-                            fit: BoxFit.cover,
-                            placeholder: (_, __) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
-                            errorWidget: (_, __, ___) => const Icon(Icons.error_rounded, size: 20),
-                          )
-                        : Image.file(
-                            File(product.imageUrl!),
+                      child: product.imageUrl!.startsWith('data:image')
+                        ? Image.memory(
+                            base64Decode(product.imageUrl!.split(',').last),
                             fit: BoxFit.cover,
                             errorBuilder: (_, __, ___) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
-                          ),
+                          )
+                        : product.imageUrl!.startsWith('http')
+                          ? CachedNetworkImage(
+                              imageUrl: product.imageUrl!,
+                              fit: BoxFit.cover,
+                              placeholder: (_, _) => const Center(child: CircularProgressIndicator(strokeWidth: 2)),
+                              errorWidget: (_, _, _) => const Icon(Icons.error_rounded, size: 20),
+                            )
+                          : Image.file(
+                              File(product.imageUrl!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, _, _) => const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
+                            ),
                     )
                   : const Icon(Icons.settings_rounded, color: AppColors.primary, size: 28),
             ),

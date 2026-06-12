@@ -1,0 +1,177 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ============================================================
+    // HELPER FUNCTIONS
+    // ============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Membaca role dari dokumen users — mengembalikan string kosong jika
+    // dokumen belum ada (mencegah error NullPointerException di evaluasi rule).
+    function userRole() {
+      return isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+        : '';
+    }
+
+    function isOwner() {
+      return userRole() == 'owner';
+    }
+
+    function isAdmin() {
+      return userRole() in ['owner', 'admin'];
+    }
+
+    // True saat user yang sedang login membuat dokumennya sendiri
+    function isCreatingOwnDoc(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // ============================================================
+    // DATA VALIDATION FUNCTIONS
+    // ============================================================
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'sellPrice', 'stockQty']) &&
+             data.name is string &&
+             data.sellPrice is number && data.sellPrice >= 0 &&
+             data.stockQty is number && data.stockQty >= 0;
+    }
+
+    function isValidTransaction(data) {
+      return data.keys().hasAll(['total', 'status']) &&
+             data.total is number && data.total >= 0 &&
+             data.status is string;
+    }
+
+    function isValidTransactionItem(data) {
+      return data.keys().hasAll(['qty', 'unitPrice']) &&
+             data.qty is number && data.qty >= 0 &&
+             data.unitPrice is number && data.unitPrice >= 0;
+    }
+
+    // ============================================================
+    // USERS
+    // ============================================================
+    match /users/{userId} {
+      // Allow reading user docs for username lookup (login) — diperlukan
+      // sebelum user terautentikasi sehingga dibiarkan terbuka.
+      allow read: if true;
+      // Izinkan user membuat dokumennya sendiri (auto-provision saat first login)
+      // atau owner membuat akun staff baru.
+      allow create: if isCreatingOwnDoc(userId) || isOwner();
+      // Mencegah user mengubah rolenya sendiri menjadi owner
+      allow update: if isAuthenticated() && (
+        (request.auth.uid == userId && request.resource.data.role == resource.data.role) ||
+        isOwner()
+      );
+      allow delete: if isOwner();
+    }
+
+    // ============================================================
+    // PRODUCTS
+    // ============================================================
+    match /products/{productId} {
+      allow read: if isAuthenticated();
+      // Menerapkan validasi data produk
+      allow create: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow update: if isAuthenticated() && isValidProduct(request.resource.data);
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // CATEGORIES
+    // ============================================================
+    match /categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ============================================================
+    // SERVICES (Jasa)
+    // ============================================================
+    match /services/{serviceId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // SERVICE CATEGORIES
+    // ============================================================
+    match /service_categories/{categoryId} {
+      allow read: if isAuthenticated();
+      allow create, update, delete: if isAdmin();
+    }
+
+    // ============================================================
+    // TRANSACTIONS
+    // ============================================================
+    match /transactions/{transactionId} {
+      allow read: if isAuthenticated();
+      // Menerapkan validasi data transaksi
+      allow create: if isAuthenticated() && isValidTransaction(request.resource.data);
+      // Hanya izinkan user biasa update status (untuk retur). Selain status, wajib admin.
+      // Update juga divalidasi memastikan tipe data tetap valid
+      allow update: if isAuthenticated() && isValidTransaction(request.resource.data) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // TRANSACTION ITEMS
+    // ============================================================
+    match /transaction_items/{itemId} {
+      allow read: if isAuthenticated();
+      // Menerapkan validasi data item transaksi
+      allow create: if isAuthenticated() && isValidTransactionItem(request.resource.data);
+      // Hanya izinkan user biasa update status retur. Selain itu wajib admin.
+      allow update: if isAuthenticated() && isValidTransactionItem(request.resource.data) && (
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isReturned', 'isApproved']) || isAdmin()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // WORK ORDERS (Bengkel)
+    // ============================================================
+    match /work_orders/{orderId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // VEHICLES
+    // ============================================================
+    match /vehicles/{vehicleId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    // ============================================================
+    // NOTIFICATIONS
+    // ============================================================
+    match /notifications/{notificationId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update: if isAuthenticated();
+      allow delete: if isAuthenticated();
+    }
+
+    // ============================================================
+    // STOCK ADJUSTMENTS
+    // ============================================================
+    match /stock_adjustments/{adjustmentId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated();
+      allow update, delete: if isAdmin();
+    }
+  }
+}

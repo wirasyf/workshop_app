@@ -1,8 +1,8 @@
+import 'package:dnd_markasban_app/core/models/work_order_model.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/constants/app_colors.dart';
-import '../../../../core/database/app_database.dart';
 import '../../../../core/utils/currency_formatter.dart';
 import '../../../../core/utils/date_formatter.dart';
 import '../../../../shared/widgets/loading_widget.dart';
@@ -34,12 +34,7 @@ class WorkshopScreen extends ConsumerWidget {
             ),
           ],
         ),
-        body: const TabBarView(
-          children: [
-            _ActiveQueueTab(),
-            _HistoryTab(),
-          ],
-        ),
+        body: const TabBarView(children: [_ActiveQueueTab(), _HistoryTab()]),
         floatingActionButton: FloatingActionButton.extended(
           onPressed: () => context.go('/workshop/new-order'),
           icon: const Icon(Icons.add_rounded),
@@ -96,9 +91,14 @@ class _HistoryTab extends ConsumerWidget {
       loading: () => const Center(child: LoadingWidget()),
       error: (e, _) => Center(child: Text('Error: $e')),
       data: (orders) {
-        final history = orders.where((w) =>
-            w.status == 'completed' || w.status == 'paid' || w.status == 'cancelled'
-        ).toList();
+        final history = orders
+            .where(
+              (w) =>
+                  w.status == 'completed' ||
+                  w.status == 'paid' ||
+                  w.status == 'cancelled',
+            )
+            .toList();
 
         if (history.isEmpty) {
           return const EmptyStateWidget(
@@ -122,7 +122,7 @@ class _HistoryTab extends ConsumerWidget {
 
 /// Card work order
 class _WorkOrderCard extends ConsumerWidget {
-  final WorkOrder workOrder;
+  final WorkOrderModel workOrder;
   const _WorkOrderCard({required this.workOrder});
 
   @override
@@ -185,7 +185,10 @@ class _WorkOrderCard extends ConsumerWidget {
                   ],
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
@@ -207,29 +210,45 @@ class _WorkOrderCard extends ConsumerWidget {
 
             // Vehicle info
             vehicleAsync.when(
-              loading: () => const SizedBox(height: 20, child: Center(child: CircularProgressIndicator(strokeWidth: 1))),
+              loading: () => const SizedBox(
+                height: 20,
+                child: Center(child: CircularProgressIndicator(strokeWidth: 1)),
+              ),
               error: (_, __) => const Text('-'),
               data: (vehicle) {
                 if (vehicle == null) return const Text('-');
                 return Row(
                   children: [
-                    Icon(Icons.person_rounded, size: 14, color: AppColors.textSecondary),
+                    Icon(
+                      Icons.person_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       vehicle.customerName,
-                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     const SizedBox(width: 12),
-                    Icon(Icons.directions_car_rounded, size: 14, color: AppColors.textSecondary),
+                    Icon(
+                      Icons.directions_car_rounded,
+                      size: 14,
+                      color: AppColors.textSecondary,
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       vehicle.plateNumber,
-                      style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                     if (vehicle.vehicleType != null) ...[
                       const SizedBox(width: 8),
                       Text(
-                        '${vehicle.vehicleBrand ?? ''} ${vehicle.vehicleType ?? ''}'.trim(),
+                        '${vehicle.vehicleBrand ?? ''} ${vehicle.vehicleType ?? ''}'
+                            .trim(),
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondary,
                           fontSize: 11,
@@ -242,12 +261,17 @@ class _WorkOrderCard extends ConsumerWidget {
             ),
 
             // Complaint
-            if (workOrder.complaint != null && workOrder.complaint!.isNotEmpty) ...[
+            if (workOrder.complaint != null &&
+                workOrder.complaint!.isNotEmpty) ...[
               const SizedBox(height: 8),
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.report_problem_rounded, size: 14, color: AppColors.warning),
+                  Icon(
+                    Icons.report_problem_rounded,
+                    size: 14,
+                    color: AppColors.warning,
+                  ),
                   const SizedBox(width: 4),
                   Expanded(
                     child: Text(
@@ -283,23 +307,35 @@ class _WorkOrderCard extends ConsumerWidget {
 
   Color _getStatusColor(String status) {
     switch (status) {
-      case 'waiting': return AppColors.warning;
-      case 'in_progress': return AppColors.info;
-      case 'completed': return AppColors.success;
-      case 'paid': return AppColors.primary;
-      case 'cancelled': return AppColors.error;
-      default: return AppColors.textSecondary;
+      case 'waiting':
+        return AppColors.warning;
+      case 'in_progress':
+        return AppColors.info;
+      case 'completed':
+        return AppColors.success;
+      case 'paid':
+        return AppColors.primary;
+      case 'cancelled':
+        return AppColors.error;
+      default:
+        return AppColors.textSecondary;
     }
   }
 
   IconData _getStatusIcon(String status) {
     switch (status) {
-      case 'waiting': return Icons.hourglass_top_rounded;
-      case 'in_progress': return Icons.build_rounded;
-      case 'completed': return Icons.check_circle_rounded;
-      case 'paid': return Icons.payment_rounded;
-      case 'cancelled': return Icons.cancel_rounded;
-      default: return Icons.help_rounded;
+      case 'waiting':
+        return Icons.hourglass_top_rounded;
+      case 'in_progress':
+        return Icons.build_rounded;
+      case 'completed':
+        return Icons.check_circle_rounded;
+      case 'paid':
+        return Icons.payment_rounded;
+      case 'cancelled':
+        return Icons.cancel_rounded;
+      default:
+        return Icons.help_rounded;
     }
   }
 }
